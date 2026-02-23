@@ -7,7 +7,6 @@ import getpass
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import requests
 from colorama import Fore, Style
@@ -27,8 +26,8 @@ from utils import (
 
 
 def make_api_request(
-    url: str, token: str, method: str = "POST", data: Optional[Dict] = None
-) -> Tuple[int, Dict]:
+    url: str, token: str, method: str = "POST", data: dict | None = None
+) -> tuple[int, dict]:
     """Make an authenticated API request and return status code and response body."""
     headers = {
         "Authorization": f"Bearer {token}",
@@ -126,7 +125,7 @@ def test_missing_field(api_url: str, token: str) -> bool:
         return False
 
 
-def run_tests(api_url: str, token: str) -> Tuple[int, int]:
+def run_tests(api_url: str, token: str) -> tuple[int, int]:
     """
     Run all tests and return (passed, failed) counts.
 

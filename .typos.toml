@@ -1,0 +1,3 @@
+[default.extend-words]
+# JWT header field "typ" is valid (not a typo of "type")
+typ = "typ"

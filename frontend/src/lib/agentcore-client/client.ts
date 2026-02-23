@@ -1,7 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentCoreConfig, AgentPattern, ChunkParser, StreamCallback } from "./types";
+import type {
+  AgentCoreConfig,
+  AgentPattern,
+  ChunkParser,
+  StreamCallback,
+} from "./types";
 import { parseStrandsChunk } from "./parsers/strands";
 import { parseLanggraphChunk } from "./parsers/langgraph";
 import { readSSEStream } from "./utils/sse";
@@ -30,7 +35,7 @@ export class AgentCoreClient {
     query: string,
     sessionId: string,
     accessToken: string,
-    onEvent: StreamCallback
+    onEvent: StreamCallback,
   ): Promise<void> {
     if (!accessToken) throw new Error("No valid access token found.");
     if (!this.runtimeArn) throw new Error("Agent Runtime ARN not configured.");
@@ -39,7 +44,9 @@ export class AgentCoreClient {
     const escapedArn = encodeURIComponent(this.runtimeArn);
     const url = `${endpoint}/runtimes/${escapedArn}/invocations?qualifier=DEFAULT`;
 
-    const traceId = `1-${Math.floor(Date.now() / 1000).toString(16)}-${crypto.randomUUID()}`;
+    const traceId = `1-${Math.floor(Date.now() / 1000).toString(
+      16,
+    )}-${crypto.randomUUID()}`;
 
     // User identity is extracted server-side from the validated JWT token
     // (Authorization header), not sent in the payload body. This prevents

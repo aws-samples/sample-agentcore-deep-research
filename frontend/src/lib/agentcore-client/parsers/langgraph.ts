@@ -36,7 +36,10 @@ export const parseLanggraphChunk: ChunkParser = (line, callback) => {
       callback({
         type: "tool_result",
         toolUseId: json.tool_call_id,
-        result: typeof json.content === "string" ? json.content : JSON.stringify(json.content),
+        result:
+          typeof json.content === "string"
+            ? json.content
+            : JSON.stringify(json.content),
       });
       return;
     }
@@ -53,12 +56,24 @@ export const parseLanggraphChunk: ChunkParser = (line, callback) => {
           // Tool use start — has id and name
           if (block.type === "tool_use" && block.id && block.name) {
             currentToolUseId = block.id;
-            callback({ type: "tool_use_start", toolUseId: block.id, name: block.name });
+            callback({
+              type: "tool_use_start",
+              toolUseId: block.id,
+              name: block.name,
+            });
           }
 
           // Tool input streaming — has partial_json
-          if (block.type === "tool_use" && typeof block.partial_json === "string" && block.partial_json) {
-            callback({ type: "tool_use_delta", toolUseId: currentToolUseId, input: block.partial_json });
+          if (
+            block.type === "tool_use" &&
+            typeof block.partial_json === "string" &&
+            block.partial_json
+          ) {
+            callback({
+              type: "tool_use_delta",
+              toolUseId: currentToolUseId,
+              input: block.partial_json,
+            });
           }
         }
       }

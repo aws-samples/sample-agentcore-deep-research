@@ -35,14 +35,22 @@ export const parseConverseChunk: ChunkParser = (line, callback) => {
       if (event.contentBlockStart?.start?.toolUse) {
         const toolUse = event.contentBlockStart.start.toolUse;
         currentToolUseId = toolUse.toolUseId;
-        callback({ type: "tool_use_start", toolUseId: toolUse.toolUseId, name: toolUse.name });
+        callback({
+          type: "tool_use_start",
+          toolUseId: toolUse.toolUseId,
+          name: toolUse.name,
+        });
         return;
       }
 
       // Tool use input streaming
       if (event.contentBlockDelta?.delta?.toolUse?.input) {
         const input = event.contentBlockDelta.delta.toolUse.input;
-        callback({ type: "tool_use_delta", toolUseId: currentToolUseId, input });
+        callback({
+          type: "tool_use_delta",
+          toolUseId: currentToolUseId,
+          input,
+        });
         return;
       }
 
@@ -63,7 +71,13 @@ export const parseConverseChunk: ChunkParser = (line, callback) => {
 
     // Final result (Strands-level)
     if (json.result) {
-      callback({ type: "result", stopReason: typeof json.result === "object" ? json.result.stop_reason : "end_turn" });
+      callback({
+        type: "result",
+        stopReason:
+          typeof json.result === "object"
+            ? json.result.stop_reason
+            : "end_turn",
+      });
       return;
     }
   } catch {

@@ -8,7 +8,7 @@
 .PHONY: install docs build deploy clean gitlab-pages
 
 # install: Install all documentation dependencies
-# 
+#
 # Installs Python packages required to build and serve the documentation:
 # - mkdocs: Static site generator
 # - mkdocs-material: Material Design theme

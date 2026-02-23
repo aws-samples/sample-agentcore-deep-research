@@ -18,7 +18,6 @@ from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
-
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.ssm import get_ssm_parameter
 
@@ -29,7 +28,7 @@ SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
 def load_system_prompt() -> str:
     """Load the system prompt from the external file."""
-    with open(SYSTEM_PROMPT_PATH, "r") as f:
+    with open(SYSTEM_PROMPT_PATH) as f:
         return f.read()
 
 
@@ -39,7 +38,7 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
 
     MCP (Model Context Protocol) is how agents communicate with tool providers.
     This creates a client that can talk to the AgentCore Gateway using the provided
-    access token for authentication. The Gateway then provides access to Lambda-based tools.
+    access token for authentication.
     """
     stack_name = os.environ.get("STACK_NAME")
     if not stack_name:
@@ -69,7 +68,7 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
 
 def create_deep_research_agent(user_id: str, session_id: str) -> Agent:
     """
-    Create a deep research agent with file tools, Gateway MCP tools, and memory integration.
+    Create a deep research agent with file tools, Gateway MCP tools, and memory.
 
     This agent implements a 3-round iterative research workflow:
     1. Initial draft creation
@@ -152,7 +151,7 @@ def create_deep_research_agent(user_id: str, session_id: str) -> Agent:
 @app.entrypoint
 async def agent_stream(payload, context: RequestContext):
     """
-    Main entrypoint for the deep research agent using streaming with Gateway integration.
+    Main entrypoint for the deep research agent with streaming and Gateway integration.
 
     This is the function that AgentCore Runtime calls when the agent receives a request.
     It extracts the user's query from the payload, securely obtains the user ID from
@@ -173,9 +172,7 @@ async def agent_stream(payload, context: RequestContext):
         # Extract user ID securely from the validated JWT token
         user_id = extract_user_id_from_context(context)
 
-        print(
-            f"[STREAM] Starting deep research for user: {user_id}, session: {session_id}"
-        )
+        print(f"[STREAM] Starting deep research for user: {user_id}")
         print(f"[STREAM] Query: {user_query}")
 
         agent = create_deep_research_agent(user_id, session_id)

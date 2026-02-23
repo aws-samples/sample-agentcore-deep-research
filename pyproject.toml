@@ -77,13 +77,17 @@ ignore = ["S101", "S603", "S607"]                                    # Allow ass
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]  # Allow assert in tests
-"test-scripts/*.py" = ["E402"]  # Allow imports after sys.path modification
+"test-scripts/*.py" = ["E402", "T201", "S110", "B904", "B007", "E501"]  # Test scripts
+"infra-cdk/lambdas/zip-packager/*.py" = ["S310"]  # CFN response URL is trusted
+"patterns/*/*.py" = ["T201"]  # Allow print statements for agent logging
+"scripts/*.py" = ["T201", "UP036", "E501"]  # Allow print statements in CLI scripts
 
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+exclude = ["patterns/"]  # Folders with hyphens are not valid Python package names
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

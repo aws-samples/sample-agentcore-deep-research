@@ -25,7 +25,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 import requests
 from colorama import Fore, Style
@@ -43,7 +42,7 @@ from utils import (
 )
 
 # Globals
-_container_id: Optional[str] = None
+_container_id: str | None = None
 REPO_ROOT = Path(__file__).parent.parent
 IMAGE_NAME = "fast-agent-local"
 
@@ -91,7 +90,7 @@ def build_docker_image(pattern: str) -> bool:
     return True
 
 
-def run_docker_container(memory_id: str, stack_name: str, region: str) -> Optional[str]:
+def run_docker_container(memory_id: str, stack_name: str, region: str) -> str | None:
     """
     Run the Docker container with required environment variables.
 

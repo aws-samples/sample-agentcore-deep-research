@@ -1,7 +1,8 @@
 """Strands-specific wrapper for Code Interpreter - import shim."""
 
-from tools.code_interpreter.code_interpreter_tools import CodeInterpreterTools
 from strands import tool
+
+from tools.code_interpreter.code_interpreter_tools import CodeInterpreterTools
 
 
 class StrandsCodeInterpreterTools:
@@ -19,7 +20,7 @@ class StrandsCodeInterpreterTools:
     def cleanup(self):
         """
         Clean up code interpreter session.
-        
+
         Note: AgentCore automatically cleans up inactive sessions after timeout,
         so manual cleanup is optional but recommended for immediate resource release.
         """

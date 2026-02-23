@@ -1,6 +1,6 @@
 # Founding Authors
 
-- David Kaleko 
+- David Kaleko
 - Isaac Privitera
 - Brian Zambrano
 - Ryan Razkenari
