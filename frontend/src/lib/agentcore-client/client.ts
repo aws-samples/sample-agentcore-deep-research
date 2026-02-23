@@ -13,6 +13,7 @@ import { readSSEStream } from "./utils/sse";
 
 const PARSERS: Record<AgentPattern, ChunkParser> = {
   "strands-single-agent": parseStrandsChunk,
+  "strands-deep-research": parseStrandsChunk,
   "langgraph-single-agent": parseLanggraphChunk,
 };
 
@@ -36,6 +37,7 @@ export class AgentCoreClient {
     sessionId: string,
     accessToken: string,
     onEvent: StreamCallback,
+    enabledSources?: string[],
   ): Promise<void> {
     if (!accessToken) throw new Error("No valid access token found.");
     if (!this.runtimeArn) throw new Error("Agent Runtime ARN not configured.");
@@ -48,6 +50,16 @@ export class AgentCoreClient {
       16,
     )}-${crypto.randomUUID()}`;
 
+    // Build payload with optional enabled sources
+    const payload: Record<string, unknown> = {
+      prompt: query,
+      runtimeSessionId: sessionId,
+    };
+
+    if (enabledSources) {
+      payload.enabledSources = enabledSources;
+    }
+
     // User identity is extracted server-side from the validated JWT token
     // (Authorization header), not sent in the payload body. This prevents
     // impersonation via prompt injection.
@@ -59,10 +71,7 @@ export class AgentCoreClient {
         "Content-Type": "application/json",
         "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
       },
-      body: JSON.stringify({
-        prompt: query,
-        runtimeSessionId: sessionId,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
