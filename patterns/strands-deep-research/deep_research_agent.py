@@ -8,6 +8,9 @@ import os
 import traceback
 from pathlib import Path
 
+# Bypass tool confirmation prompts for headless operation in AgentCore Runtime
+os.environ["BYPASS_TOOL_CONSENT"] = "true"
+
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
 from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
@@ -17,7 +20,7 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-from strands_tools import editor, file_read, file_write
+from strands_tools import file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.ssm import get_ssm_parameter
 
@@ -25,11 +28,69 @@ app = BedrockAgentCoreApp()
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
+# Available data sources with their tool names
+DATA_SOURCES = {
+    "tavily": {
+        "name": "Tavily Web Search",
+        "tool": "tavily_web_search",
+        "description": "Search the web for current information",
+    },
+    "nova": {
+        "name": "Nova Web Search",
+        "tool": "nova_web_search",
+        "description": "Web search via Amazon Nova with citations",
+    },
+    "arxiv": {
+        "name": "ArXiv Search",
+        "tool": "arxiv_search",
+        "description": "Search academic papers on arXiv",
+    },
+    "kb": {
+        "name": "Knowledge Base Search",
+        "tool": "knowledge_base_search",
+        "description": "Query Amazon Bedrock Knowledge Bases",
+        "requires_params": True,
+    },
+}
 
-def load_system_prompt() -> str:
-    """Load the system prompt from the external file."""
+# Default enabled sources (KB excluded by default as it requires configuration)
+DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "arxiv"]
+
+
+def load_system_prompt(enabled_sources: list[str] | None = None) -> str:
+    """
+    Load the system prompt and customize based on enabled data sources.
+
+    Parameters
+    ----------
+    enabled_sources : list[str] | None
+        List of enabled source keys (tavily, nova, arxiv). If None, all are enabled.
+    """
     with open(SYSTEM_PROMPT_PATH) as f:
-        return f.read()
+        base_prompt = f.read()
+
+    if enabled_sources is None:
+        enabled_sources = DEFAULT_ENABLED_SOURCES
+
+    # Build the data retrieval tools section
+    tools_section = "### Data Retrieval (via Gateway)\n"
+    for source_key in enabled_sources:
+        if source_key in DATA_SOURCES:
+            source = DATA_SOURCES[source_key]
+            tools_section += f"- `{source['tool']}`: {source['description']}\n"
+
+    # If no sources enabled, add a note
+    if not any(s in DATA_SOURCES for s in enabled_sources):
+        tools_section += "- No external data sources enabled\n"
+
+    # Replace the data retrieval section in the prompt
+    # Find and replace the section between "### Data Retrieval" and the next "##"
+    import re
+
+    pattern = r"### Data Retrieval \(via Gateway\)\n(?:- .*\n)*"
+    base_prompt = re.sub(pattern, tools_section, base_prompt)
+
+    return base_prompt
 
 
 def create_gateway_mcp_client(access_token: str) -> MCPClient:
@@ -66,24 +127,28 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
     return gateway_client
 
 
-def create_deep_research_agent(user_id: str, session_id: str) -> Agent:
+def create_deep_research_agent(
+    user_id: str, session_id: str, enabled_sources: list[str] | None = None
+) -> Agent:
     """
-    Create a deep research agent with file tools, Gateway MCP tools, and memory.
+    Create a deep research agent with Gateway MCP tools and memory.
 
-    This agent implements a 3-round iterative research workflow:
-    1. Initial draft creation
-    2. Research and enrichment
-    3. Refinement and finalization
-
-    The agent uses file tools (file_read, file_write, editor) for report management
-    and Gateway tools for data retrieval from multiple sources.
+    Parameters
+    ----------
+    user_id : str
+        User identifier from JWT token
+    session_id : str
+        Session identifier for conversation continuity
+    enabled_sources : list[str] | None
+        List of enabled data sources (tavily, nova, arxiv). Default: all enabled.
     """
-    system_prompt = load_system_prompt()
+    system_prompt = load_system_prompt(enabled_sources)
+    print(f"[AGENT] Enabled data sources: {enabled_sources or DEFAULT_ENABLED_SOURCES}")
 
     bedrock_model = BedrockModel(
         model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         temperature=0.3,
-        max_tokens=8192,
+        max_tokens=30000,
     )
 
     memory_id = os.environ.get("MEMORY_ID")
@@ -100,12 +165,10 @@ def create_deep_research_agent(user_id: str, session_id: str) -> Agent:
         region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
     )
 
-    # Collect all tools
-    tools = [
-        # Strands built-in file tools for report management
+    # Collect all tools - file tools for local report management
+    tools: list = [
         file_read,
         file_write,
-        editor,
     ]
 
     try:
@@ -136,7 +199,7 @@ def create_deep_research_agent(user_id: str, session_id: str) -> Agent:
                 "session.id": session_id,
             },
         )
-        print("[AGENT] Agent created successfully with file tools and Gateway tools")
+        print("[AGENT] Agent created successfully with Gateway tools")
         return agent
 
     except Exception as e:
@@ -157,9 +220,18 @@ async def agent_stream(payload, context: RequestContext):
     It extracts the user's query from the payload, securely obtains the user ID from
     the validated JWT token in the request context, creates a deep research agent with
     file tools and Gateway tools, and streams the response back.
+
+    Payload fields:
+    - prompt: User's research query (required)
+    - runtimeSessionId: Session ID for continuity (required)
+    - enabledSources: List of enabled data sources (optional, default: all)
+      Valid values: "tavily", "nova", "arxiv"
     """
     user_query = payload.get("prompt")
     session_id = payload.get("runtimeSessionId")
+    enabled_sources = payload.get(
+        "enabledSources"
+    )  # Optional: ["tavily", "nova", "arxiv"]
 
     if not all([user_query, session_id]):
         yield {
@@ -174,8 +246,9 @@ async def agent_stream(payload, context: RequestContext):
 
         print(f"[STREAM] Starting deep research for user: {user_id}")
         print(f"[STREAM] Query: {user_query}")
+        print(f"[STREAM] Enabled sources: {enabled_sources or 'all (default)'}")
 
-        agent = create_deep_research_agent(user_id, session_id)
+        agent = create_deep_research_agent(user_id, session_id, enabled_sources)
 
         # Use the agent's stream_async method for true token-level streaming
         async for event in agent.stream_async(user_query):
