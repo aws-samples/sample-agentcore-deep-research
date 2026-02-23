@@ -14,12 +14,38 @@ import { useAuth } from "react-oidc-context";
 import { useDefaultTool } from "@/hooks/useToolRenderer";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 
+// Available data sources configuration
+const DATA_SOURCES = [
+  { id: "tavily", name: "Tavily Web", icon: "🌐", defaultEnabled: true },
+  { id: "nova", name: "Nova Search", icon: "🔍", defaultEnabled: true },
+  { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: true },
+] as const;
+
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<AgentCoreClient | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID());
+
+  // Data source toggles - initialize from defaults
+  const [enabledSources, setEnabledSources] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(DATA_SOURCES.map((s) => [s.id, s.defaultEnabled])),
+  );
+
+  // Get array of enabled source IDs for API
+  const getEnabledSourceIds = () =>
+    Object.entries(enabledSources)
+      .filter(([, enabled]) => enabled)
+      .map(([id]) => id);
+
+  // Toggle a data source
+  const toggleSource = (sourceId: string) => {
+    setEnabledSources((prev) => ({
+      ...prev,
+      [sourceId]: !prev[sourceId],
+    }));
+  };
 
   const { isLoading, setIsLoading } = useGlobal();
   const auth = useAuth();
@@ -129,68 +155,75 @@ export default function ChatInterface() {
 
       // User identity is extracted server-side from the validated JWT token,
       // not passed as a parameter — prevents impersonation via prompt injection.
-      await client.invoke(userMessage, sessionId, accessToken, (event) => {
-        switch (event.type) {
-          case "text": {
-            // If text arrives after a tool segment, mark all pending tools as complete
-            const prev = segments[segments.length - 1];
-            if (prev && prev.type === "tool") {
-              for (const tc of toolCallMap.values()) {
-                if (tc.status === "streaming" || tc.status === "executing") {
-                  tc.status = "complete";
+      const enabledSourceIds = getEnabledSourceIds();
+      await client.invoke(
+        userMessage,
+        sessionId,
+        accessToken,
+        (event) => {
+          switch (event.type) {
+            case "text": {
+              // If text arrives after a tool segment, mark all pending tools as complete
+              const prev = segments[segments.length - 1];
+              if (prev && prev.type === "tool") {
+                for (const tc of toolCallMap.values()) {
+                  if (tc.status === "streaming" || tc.status === "executing") {
+                    tc.status = "complete";
+                  }
                 }
               }
-            }
-            // Append to last text segment, or create new one
-            const last = segments[segments.length - 1];
-            if (last && last.type === "text") {
-              last.content += event.content;
-            } else {
-              segments.push({ type: "text", content: event.content });
-            }
-            updateMessage();
-            break;
-          }
-          case "tool_use_start": {
-            const tc: ToolCall = {
-              toolUseId: event.toolUseId,
-              name: event.name,
-              input: "",
-              status: "streaming",
-            };
-            toolCallMap.set(event.toolUseId, tc);
-            segments.push({ type: "tool", toolCall: tc });
-            updateMessage();
-            break;
-          }
-          case "tool_use_delta": {
-            const tc = toolCallMap.get(event.toolUseId);
-            if (tc) {
-              tc.input += event.input;
-            }
-            updateMessage();
-            break;
-          }
-          case "tool_result": {
-            const tc = toolCallMap.get(event.toolUseId);
-            if (tc) {
-              tc.result = event.result;
-              tc.status = "complete";
-            }
-            updateMessage();
-            break;
-          }
-          case "message": {
-            if (event.role === "assistant") {
-              for (const tc of toolCallMap.values()) {
-                if (tc.status === "streaming") tc.status = "executing";
+              // Append to last text segment, or create new one
+              const last = segments[segments.length - 1];
+              if (last && last.type === "text") {
+                last.content += event.content;
+              } else {
+                segments.push({ type: "text", content: event.content });
               }
               updateMessage();
+              break;
             }
-            break;
+            case "tool_use_start": {
+              const tc: ToolCall = {
+                toolUseId: event.toolUseId,
+                name: event.name,
+                input: "",
+                status: "streaming",
+              };
+              toolCallMap.set(event.toolUseId, tc);
+              segments.push({ type: "tool", toolCall: tc });
+              updateMessage();
+              break;
+            }
+            case "tool_use_delta": {
+              const tc = toolCallMap.get(event.toolUseId);
+              if (tc) {
+                tc.input += event.input;
+              }
+              updateMessage();
+              break;
+            }
+            case "tool_result": {
+              const tc = toolCallMap.get(event.toolUseId);
+              if (tc) {
+                tc.result = event.result;
+                tc.status = "complete";
+              }
+              updateMessage();
+              break;
+            }
+            case "message": {
+              if (event.role === "assistant") {
+                for (const tc of toolCallMap.values()) {
+                  if (tc.status === "streaming") tc.status = "executing";
+                }
+                updateMessage();
+              }
+              break;
+            }
           }
-        }
-      });
+        },
+        enabledSourceIds,
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(`Failed to get response: ${errorMessage}`);
@@ -298,20 +331,30 @@ export default function ChatInterface() {
               Ask a research question and I'll search across multiple sources to
               create a comprehensive report
             </p>
-            <div className="flex flex-wrap justify-center gap-2 mt-4 text-xs text-gray-500">
-              <span className="px-2 py-1 bg-gray-100 rounded">
-                📚 ArXiv Papers
-              </span>
-              <span className="px-2 py-1 bg-gray-100 rounded">
-                🌐 Web Search
-              </span>
-              <span className="px-2 py-1 bg-gray-100 rounded">
-                📁 Knowledge Bases
-              </span>
-              <span className="px-2 py-1 bg-gray-100 rounded">
-                📄 Documents
-              </span>
+
+            {/* Data source toggles */}
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
+              {DATA_SOURCES.map((source) => (
+                <button
+                  key={source.id}
+                  onClick={() => toggleSource(source.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    enabledSources[source.id]
+                      ? "bg-blue-100 text-blue-800 border-2 border-blue-300"
+                      : "bg-gray-100 text-gray-400 border-2 border-transparent"
+                  }`}
+                >
+                  <span className="mr-1">{source.icon}</span>
+                  {source.name}
+                  <span className="ml-2">
+                    {enabledSources[source.id] ? "✓" : "○"}
+                  </span>
+                </button>
+              ))}
             </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Click to toggle data sources
+            </p>
           </div>
 
           {/* Centered input */}

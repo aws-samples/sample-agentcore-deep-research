@@ -234,7 +234,7 @@ def invoke_agent(
 
     try:
         response = requests.post(
-            url, headers=headers, json=payload, stream=True, timeout=60
+            url, headers=headers, json=payload, stream=True, timeout=300
         )
 
         if response.status_code != 200:
