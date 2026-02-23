@@ -6,12 +6,14 @@ This code is being licensed under the terms of the Amazon Software License avail
 import json
 import logging
 import os
+from urllib.request import Request, urlopen
 
 import boto3
-from tavily import TavilyClient
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+TAVILY_API_URL = "https://api.tavily.com/search"
 
 
 def get_tavily_api_key() -> str:
@@ -39,7 +41,7 @@ def search_web(
     include_answer: bool = True,
 ) -> str:
     """
-    Search the web using Tavily API.
+    Search the web using Tavily REST API directly.
 
     Parameters
     ----------
@@ -58,15 +60,25 @@ def search_web(
         Formatted search results as string
     """
     api_key = get_tavily_api_key()
-    client = TavilyClient(api_key=api_key)
 
-    response = client.search(
-        query=query,
-        max_results=min(max_results, 20),
-        search_depth=search_depth,
-        include_answer=include_answer,
-        include_raw_content=False,
+    payload = {
+        "api_key": api_key,
+        "query": query,
+        "max_results": min(max_results, 20),
+        "search_depth": search_depth,
+        "include_answer": include_answer,
+        "include_raw_content": False,
+    }
+
+    req = Request(
+        TAVILY_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
+
+    with urlopen(req, timeout=30) as resp:
+        response = json.loads(resp.read().decode("utf-8"))
 
     # Format results
     output = f"Web search results for: '{query}'\n\n"
