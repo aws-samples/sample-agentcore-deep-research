@@ -80,6 +80,7 @@ ignore = ["S101", "S603", "S607"]                                    # Allow ass
 "test-scripts/*.py" = ["E402", "T201", "S110", "B904", "B007", "E501"]  # Test scripts
 "infra-cdk/lambdas/zip-packager/*.py" = ["S310"]  # CFN response URL is trusted
 "gateway/tools/tavily_search/*.py" = ["S310"]  # Tavily API URL is trusted
+"test-scripts/test_tavily_local.py" = ["S310"]  # Tavily API URL is trusted
 "patterns/*/*.py" = ["T201"]  # Allow print statements for agent logging
 "scripts/*.py" = ["T201", "UP036", "E501"]  # Allow print statements in CLI scripts
 
