@@ -17,6 +17,8 @@ build/
 __pycache__
 *.code-workspace
 .ruff_cache
+.mypycache
+.claude
 .kiro
 rvl_cdip_*
 notebooks/examples/data

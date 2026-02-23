@@ -39,7 +39,7 @@ Note, the above guideline applies to FAST core _developers_ who are _contributin
 # FAST Tenets
 Contributions must comply with the five core tenets of the FAST solution:
 1. **Simplicity, simplicity, simplicity**: The starter pack should be just that, a starter pack. It should be bare bones and without any frills, to keep it as easy to adopt as possible. Developers, who are often scientists and not SDEs, should start with the starter pack to handle most of the undifferentiated heavy lifting components of building a full stack application then add onto it, not start with a bloated package and have to remove unnecessary features.
-2. **Adoptability though Documentation**: The starter pack should be extremely well documented. While non-core features may not exist in the code base, approaches for implementing them should appear in markdown files in the repository. Users of FAST should instruct their coding assistants to prioritize following this documentation above all else. 
+2. **Adoptability though Documentation**: The starter pack should be extremely well documented. While non-core features may not exist in the code base, approaches for implementing them should appear in markdown files in the repository. Users of FAST should instruct their coding assistants to prioritize following this documentation above all else.
 3. **Vibe Friendly**: The starter pack should have READMEs and guides demonstrating how to use adapt it according to best practices with vibe coding. It should have opinions on recommended MCP servers and workflows for development. It should show developers that they don’t need to understand any React to modify the frontend.
 4. **Opinionated Language and Framework**: Python for the backend as it is the language everyone (including LLMs) is most comfortable with. React for the frontend to keep it as close to production grade as possible. CDK for the infrastructure as code for the modularity.
 5. **Single threaded owner**: The starter pack should always have a single-threaded owner/team who maintains it and decides which features are important enough to add into code vs into documentation files (see Tenets #1 and #2).
@@ -66,9 +66,9 @@ This section describes how _FAST contributors_ should get started. If you are a 
 
 3. **Install Dependencies and test local build**:
    See the [Deployment Guide](docs/DEPLOYMENT.md) for prerequisites and setup instructions.
-   
+
    For frontend-specific development, see [Frontend README](frontend/README.md).
-   
+
    For infrastructure development, see [Infrastructure README](infra-cdk/README.md).
 
 ## Project Structure
@@ -93,7 +93,7 @@ Familiarize yourself with the project structure:
    ```bash
    git checkout -b feature/your-feature-name
    ```
-   
+
    Use prefixes like `feature/`, `fix/`, `docs/` to indicate the type of change.
 
 ## Making Changes
@@ -111,13 +111,13 @@ Familiarize yourself with the project structure:
    ```bash
    # Run linting and formatting checks
    make all
-   
+
    # For frontend-specific testing
    cd frontend
    npm run lint
    cd ..
    ```
-   
+
    For comprehensive testing procedures, see [Scripts README](scripts/README.md).
 
 2. **Integration Testing**:
