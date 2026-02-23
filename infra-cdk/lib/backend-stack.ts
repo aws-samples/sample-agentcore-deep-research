@@ -709,7 +709,8 @@ export class BackendStack extends cdk.NestedStack {
         resources: [
           "arn:aws:bedrock:*::foundation-model/*",
           `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
-          `arn:aws:bedrock:${this.region}:${this.account}:system-tool/amazon.nova_grounding`,
+          // System tool ARN has no region (AWS-managed)
+          `arn:aws:bedrock::${this.account}:system-tool/amazon.nova_grounding`,
         ],
       })
     )
