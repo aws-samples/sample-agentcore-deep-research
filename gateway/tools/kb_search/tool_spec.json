@@ -1,0 +1,24 @@
+[
+  {
+    "name": "knowledge_base_search",
+    "description": "Search a Bedrock Knowledge Base for relevant content. Returns chunks of text from documents that match the query, with relevance scores and source information.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for finding relevant content in the knowledge base"
+        },
+        "knowledge_base_id": {
+          "type": "string",
+          "description": "The ID of the Bedrock Knowledge Base to search"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of chunks to return (default 10, max 25)"
+        }
+      },
+      "required": ["query", "knowledge_base_id"]
+    }
+  }
+]

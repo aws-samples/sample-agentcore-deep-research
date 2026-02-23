@@ -25,12 +25,12 @@ export function ChatHeader({ title, onNewChat, canStartNewChat }: ChatHeaderProp
   return (
     <header className="flex items-center justify-between p-4 border-b w-full">
       <div className="flex items-center">
-        <h1 className="text-xl font-bold">{title || "Fullstack AgentCore Solution Template"}</h1>
+        <h1 className="text-xl font-bold">{title || "Correlate Deep Research"}</h1>
       </div>
       <div className="flex items-center gap-2">
         <Button onClick={onNewChat} variant="outline" className="gap-2" disabled={!canStartNewChat}>
           <Plus className="h-4 w-4" />
-          New Chat
+          New Research
         </Button>
         {isAuthenticated && (
           <AlertDialog>

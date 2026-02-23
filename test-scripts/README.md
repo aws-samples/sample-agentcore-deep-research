@@ -161,6 +161,52 @@ uv run test-scripts/test-gateway.py
 
 ---
 
+### test-arxiv-tool.py
+
+Tests the ArXiv search tool via AgentCore Gateway.
+
+**Usage:**
+
+```bash
+uv run test-scripts/test-arxiv-tool.py
+```
+
+**What it does:**
+
+1. Authenticates with Gateway using machine credentials
+2. Lists available tools and finds arxiv_search
+3. Executes a test search for "large language models agents"
+4. Displays formatted search results
+
+---
+
+### test-deep-research-agent.py
+
+Tests the Deep Research Agent via AgentCore Runtime with streaming.
+
+**Usage:**
+
+```bash
+# Default research query
+uv run test-scripts/test-deep-research-agent.py
+
+# Custom query
+uv run test-scripts/test-deep-research-agent.py "What are the latest advances in AI agents?"
+```
+
+**Prerequisites:**
+
+- Deployed stack with `strands-deep-research` pattern
+- `ACCESS_TOKEN` environment variable set with valid Cognito token
+
+**What it does:**
+
+1. Sends research query to the Deep Research Agent
+2. Streams the response including tool calls
+3. Shows file operations and data retrieval in real-time
+
+---
+
 ## Shared Utilities
 
 The test scripts use shared utilities from `../scripts/utils.py`:

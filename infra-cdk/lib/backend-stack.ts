@@ -569,14 +569,170 @@ export class BackendStack extends cdk.NestedStack {
       }),
     })
 
+    // ========== CORRELATE RESEARCH TOOLS ==========
+
+    // ArXiv Search Lambda
+    const arxivLambda = new lambda.Function(this, "ArxivSearchLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "arxiv_search_lambda.handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../../gateway/tools/arxiv_search"),
+        { bundling: this.getPythonBundlingOptions(["arxiv"]) }
+      ),
+      timeout: cdk.Duration.seconds(60),
+      logGroup: new logs.LogGroup(this, "ArxivLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-arxiv-search`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Create Tavily API key secret if provided in config
+    const tavilySecretName = `/${config.stack_name_base}/tavily-api-key`
+    if (config.api_keys?.tavily) {
+      new secretsmanager.Secret(this, "TavilyApiKeySecret", {
+        secretName: tavilySecretName,
+        description: "Tavily API key for web search",
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.tavily),
+      })
+    }
+
+    // Tavily Web Search Lambda
+    const tavilyLambda = new lambda.Function(this, "TavilySearchLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "tavily_search_lambda.handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../../gateway/tools/tavily_search"),
+        { bundling: this.getPythonBundlingOptions(["tavily-python", "boto3"]) }
+      ),
+      timeout: cdk.Duration.seconds(60),
+      environment: {
+        TAVILY_SECRET_NAME: tavilySecretName,
+      },
+      logGroup: new logs.LogGroup(this, "TavilyLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-tavily-search`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Grant Tavily Lambda access to Secrets Manager
+    tavilyLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:/${config.stack_name_base}/tavily-api-key*`,
+        ],
+      })
+    )
+
+    // Knowledge Base Search Lambda
+    const kbSearchLambda = new lambda.Function(this, "KBSearchLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "kb_search_lambda.handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../../gateway/tools/kb_search"),
+        { bundling: this.getPythonBundlingOptions(["boto3"]) }
+      ),
+      timeout: cdk.Duration.seconds(60),
+      logGroup: new logs.LogGroup(this, "KBSearchLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-kb-search`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Grant KB Search Lambda access to Bedrock Knowledge Bases
+    kbSearchLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:Retrieve"],
+        resources: ["*"], // Scoped to specific KBs in production
+      })
+    )
+
+    // S3 Document Reader Lambda (with BDA)
+    const s3BdaLambda = new lambda.Function(this, "S3BdaReaderLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "s3_bda_reader_lambda.handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../../gateway/tools/s3_bda_reader"),
+        { bundling: this.getPythonBundlingOptions(["boto3"]) }
+      ),
+      timeout: cdk.Duration.minutes(3),
+      environment: {
+        BDA_PROJECT_ARN: "", // Set via SSM or config in production
+      },
+      logGroup: new logs.LogGroup(this, "S3BdaLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-s3-bda-reader`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Grant S3 BDA Lambda access to S3 and BDA
+    s3BdaLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["s3:GetObject", "s3:ListBucket", "s3:PutObject"],
+        resources: ["*"], // Scoped to specific buckets in production
+      })
+    )
+    s3BdaLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeDataAutomationAsync",
+          "bedrock:GetDataAutomationStatus",
+        ],
+        resources: ["*"],
+      })
+    )
+
+    // Nova Web Search Lambda
+    const novaSearchLambda = new lambda.Function(this, "NovaSearchLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "nova_search_lambda.handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../../gateway/tools/nova_search"),
+        { bundling: this.getPythonBundlingOptions(["boto3"]) }
+      ),
+      timeout: cdk.Duration.minutes(2),
+      logGroup: new logs.LogGroup(this, "NovaSearchLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-nova-search`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Grant Nova Search Lambda access to Bedrock and Web Grounding
+    novaSearchLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeTool"],
+        resources: [
+          "arn:aws:bedrock:*::foundation-model/*",
+          `arn:aws:bedrock:${this.region}:${this.account}:system-tool/amazon.nova_grounding`,
+        ],
+      })
+    )
+
+    // ========== END CORRELATE RESEARCH TOOLS ==========
+
     // Create comprehensive IAM role for gateway
     const gatewayRole = new iam.Role(this, "GatewayRole", {
       assumedBy: new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
       description: "Role for AgentCore Gateway with comprehensive permissions",
     })
 
-    // Lambda invoke permission
+    // Lambda invoke permissions for all tools
     toolLambda.grantInvoke(gatewayRole)
+    arxivLambda.grantInvoke(gatewayRole)
+    tavilyLambda.grantInvoke(gatewayRole)
+    kbSearchLambda.grantInvoke(gatewayRole)
+    s3BdaLambda.grantInvoke(gatewayRole)
+    novaSearchLambda.grantInvoke(gatewayRole)
 
     // Bedrock permissions (region-agnostic)
     gatewayRole.addToPolicy(
@@ -674,9 +830,120 @@ export class BackendStack extends cdk.NestedStack {
       ],
     })
 
+    // ========== CORRELATE RESEARCH TOOL TARGETS ==========
+
+    // Load tool specifications
+    const arxivSpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/arxiv_search/tool_spec.json"), "utf8")
+    )
+    const tavilySpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/tavily_search/tool_spec.json"), "utf8")
+    )
+    const kbSearchSpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/kb_search/tool_spec.json"), "utf8")
+    )
+    const s3BdaSpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/s3_bda_reader/tool_spec.json"), "utf8")
+    )
+    const novaSearchSpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/nova_search/tool_spec.json"), "utf8")
+    )
+
+    // ArXiv Search Target
+    const arxivTarget = new bedrockagentcore.CfnGatewayTarget(this, "ArxivSearchTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "arxiv-search-target",
+      description: "ArXiv academic paper search",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: arxivLambda.functionArn,
+            toolSchema: { inlinePayload: arxivSpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    arxivTarget.addDependency(gateway)
+
+    // Tavily Web Search Target
+    const tavilyTarget = new bedrockagentcore.CfnGatewayTarget(this, "TavilySearchTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "tavily-search-target",
+      description: "Tavily web search",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: tavilyLambda.functionArn,
+            toolSchema: { inlinePayload: tavilySpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    tavilyTarget.addDependency(gateway)
+
+    // Knowledge Base Search Target
+    const kbSearchTarget = new bedrockagentcore.CfnGatewayTarget(this, "KBSearchTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "kb-search-target",
+      description: "Bedrock Knowledge Base search",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: kbSearchLambda.functionArn,
+            toolSchema: { inlinePayload: kbSearchSpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    kbSearchTarget.addDependency(gateway)
+
+    // S3 BDA Document Reader Target
+    const s3BdaTarget = new bedrockagentcore.CfnGatewayTarget(this, "S3BdaReaderTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "s3-bda-reader-target",
+      description: "S3 document reader with BDA",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: s3BdaLambda.functionArn,
+            toolSchema: { inlinePayload: s3BdaSpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    s3BdaTarget.addDependency(gateway)
+
+    // Nova Web Search Target
+    const novaSearchTarget = new bedrockagentcore.CfnGatewayTarget(this, "NovaSearchTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "nova-search-target",
+      description: "Nova web search with grounding",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: novaSearchLambda.functionArn,
+            toolSchema: { inlinePayload: novaSearchSpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    novaSearchTarget.addDependency(gateway)
+
+    // ========== END CORRELATE RESEARCH TOOL TARGETS ==========
+
     // Ensure proper creation order
     gatewayTarget.addDependency(gateway)
     gateway.node.addDependency(toolLambda)
+    gateway.node.addDependency(arxivLambda)
+    gateway.node.addDependency(tavilyLambda)
+    gateway.node.addDependency(kbSearchLambda)
+    gateway.node.addDependency(s3BdaLambda)
+    gateway.node.addDependency(novaSearchLambda)
     gateway.node.addDependency(this.machineClient)
     gateway.node.addDependency(gatewayRole)
 
@@ -817,5 +1084,25 @@ export class BackendStack extends cdk.NestedStack {
   private hashContent(content: string): string {
     const crypto = require("crypto")
     return crypto.createHash("sha256").update(content).digest("hex").slice(0, 16)
+  }
+
+  /**
+   * Get Python bundling options for Lambda functions with pip dependencies.
+   *
+   * @param dependencies - List of pip packages to install.
+   * @returns Bundling options for CDK.
+   */
+  private getPythonBundlingOptions(dependencies: string[]): cdk.BundlingOptions {
+    return {
+      image: lambda.Runtime.PYTHON_3_13.bundlingImage,
+      command: [
+        "bash",
+        "-c",
+        [
+          "pip install " + dependencies.join(" ") + " -t /asset-output",
+          "cp -r . /asset-output",
+        ].join(" && "),
+      ],
+    }
   }
 }

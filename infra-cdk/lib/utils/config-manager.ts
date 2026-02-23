@@ -13,6 +13,9 @@ export interface AppConfig {
     pattern: string
     deployment_type: DeploymentType
   }
+  api_keys?: {
+    tavily?: string | null
+  }
 }
 
 export class ConfigManager {
@@ -55,6 +58,9 @@ export class ConfigManager {
         backend: {
           pattern: parsedConfig.backend?.pattern || "strands-single-agent",
           deployment_type: deploymentType,
+        },
+        api_keys: {
+          tavily: parsedConfig.api_keys?.tavily || null,
         },
       }
     } catch (error) {

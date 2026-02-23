@@ -1,0 +1,32 @@
+[
+  {
+    "name": "arxiv_search",
+    "description": "Search ArXiv for academic papers. Returns paper titles, authors, abstracts, and PDF links. Useful for finding research papers on scientific and technical topics.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for finding papers (e.g., 'large language models', 'reinforcement learning')"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results to return (default 10, max 50)"
+        },
+        "sort_by": {
+          "type": "string",
+          "enum": ["relevance", "date"],
+          "description": "Sort order: 'relevance' for most relevant first, 'date' for newest first"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ArXiv categories to filter by (e.g., ['cs.AI', 'cs.LG', 'cs.CL'])"
+        }
+      },
+      "required": ["query"]
+    }
+  }
+]
