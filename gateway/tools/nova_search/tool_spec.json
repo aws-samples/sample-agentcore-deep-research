@@ -1,0 +1,16 @@
+[
+  {
+    "name": "nova_web_search",
+    "description": "Search the web using Amazon Nova's Web Grounding feature. Returns up-to-date information with citations to source material. Best for queries requiring current information beyond training data.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for finding current web information"
+        }
+      },
+      "required": ["query"]
+    }
+  }
+]

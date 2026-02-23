@@ -286,8 +286,16 @@ export default function ChatInterface() {
 
           {/* Centered welcome message */}
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">Welcome to FAST Chat</h2>
-            <p className="text-gray-600 mt-2">Ask me anything to get started</p>
+            <h2 className="text-2xl font-bold text-gray-800">Correlate Deep Research</h2>
+            <p className="text-gray-600 mt-2">
+              Ask a research question and I'll search across multiple sources to create a comprehensive report
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-4 text-xs text-gray-500">
+              <span className="px-2 py-1 bg-gray-100 rounded">📚 ArXiv Papers</span>
+              <span className="px-2 py-1 bg-gray-100 rounded">🌐 Web Search</span>
+              <span className="px-2 py-1 bg-gray-100 rounded">📁 Knowledge Bases</span>
+              <span className="px-2 py-1 bg-gray-100 rounded">📄 Documents</span>
+            </div>
           </div>
 
           {/* Centered input */}

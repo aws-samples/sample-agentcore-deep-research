@@ -60,7 +60,7 @@ export function ChatInput({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message... (Ctrl+Enter for new line)"
+          placeholder="Enter your research question... (Ctrl+Enter for new line)"
           disabled={isLoading}
           className="flex-1 min-h-[40px] max-h-[200px] resize-none py-2"
           rows={1}

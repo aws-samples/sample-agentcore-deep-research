@@ -1,0 +1,29 @@
+[
+  {
+    "name": "tavily_web_search",
+    "description": "Search the web for current information on any topic using Tavily. Returns relevant web pages with titles, URLs, and content snippets. Includes an AI-generated answer summary.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for finding web content"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results to return (default 10, max 20)"
+        },
+        "search_depth": {
+          "type": "string",
+          "enum": ["basic", "advanced"],
+          "description": "Search depth: 'basic' for fast results, 'advanced' for more thorough search"
+        },
+        "include_answer": {
+          "type": "boolean",
+          "description": "Whether to include an AI-generated answer summary (default true)"
+        }
+      },
+      "required": ["query"]
+    }
+  }
+]
