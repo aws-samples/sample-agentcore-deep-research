@@ -599,12 +599,12 @@ export class BackendStack extends cdk.NestedStack {
       })
     }
 
-    // Tavily Web Search Lambda
+    // Tavily Web Search Lambda (uses REST API directly, no SDK needed)
     const tavilyLambda = new lambda.Function(this, "TavilySearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "tavily_search_lambda.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/tavily_search"), {
-        bundling: this.getPythonBundlingOptions(["tavily-python", "boto3"]),
+        bundling: this.getPythonBundlingOptions(["boto3"]),
       }),
       timeout: cdk.Duration.seconds(60),
       environment: {
@@ -705,9 +705,10 @@ export class BackendStack extends cdk.NestedStack {
     novaSearchLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["bedrock:InvokeModel", "bedrock:InvokeTool"],
+        actions: ["bedrock:InvokeModel", "bedrock:Converse", "bedrock:InvokeTool"],
         resources: [
           "arn:aws:bedrock:*::foundation-model/*",
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
           `arn:aws:bedrock:${this.region}:${this.account}:system-tool/amazon.nova_grounding`,
         ],
       })
