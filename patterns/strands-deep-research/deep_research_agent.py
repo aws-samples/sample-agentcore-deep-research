@@ -23,6 +23,11 @@ from strands.tools.mcp import MCPClient
 from strands_tools import file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.ssm import get_ssm_parameter
+from utils.inference import get_bedrock_config, get_inference_configs
+
+# load inference configurations
+INFERENCE_CONFIG, REASONING_CONFIG = get_inference_configs()
+BEDROCK_CONFIG = get_bedrock_config()
 
 app = BedrockAgentCoreApp()
 
@@ -147,8 +152,12 @@ def create_deep_research_agent(
 
     bedrock_model = BedrockModel(
         model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        temperature=0.3,
-        max_tokens=30000,
+        temperature=INFERENCE_CONFIG["temperature"],
+        max_tokens=INFERENCE_CONFIG["maxTokens"],
+        streaming=True,
+        boto_client_config=BEDROCK_CONFIG,
+        cache_prompt="default",
+        cache_tools="default",
     )
 
     memory_id = os.environ.get("MEMORY_ID")

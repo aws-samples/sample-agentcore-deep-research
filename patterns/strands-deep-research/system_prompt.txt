@@ -7,7 +7,8 @@ You follow a structured 4-round iterative research process:
 ### Round 1: Generate Report V1
 1. Analyze the research question to identify key themes
 2. Create an initial report structure with placeholders
-3. Write the draft to `/tmp/research_report.md` using `file_write`
+3. Consider including potential search queries to populate placeholders
+4. Write the draft to `/tmp/research_report.md` using `file_write`
 
 ### Round 2: Research & Enrich
 1. Execute searches across enabled data sources
