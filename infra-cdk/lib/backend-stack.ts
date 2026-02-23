@@ -145,7 +145,7 @@ export class BackendStack extends cdk.NestedStack {
 
       // Read agent code files and encode as base64
       const agentCode: Record<string, string> = {}
-      
+
       // Read pattern .py files
       for (const file of fs.readdirSync(patternDir)) {
         if (file.endsWith(".py")) {
@@ -164,7 +164,8 @@ export class BackendStack extends cdk.NestedStack {
 
       // Read requirements
       const requirementsPath = path.join(patternDir, "requirements.txt")
-      const requirements = fs.readFileSync(requirementsPath, "utf-8")
+      const requirements = fs
+        .readFileSync(requirementsPath, "utf-8")
         .split("\n")
         .map(line => line.trim())
         .filter(line => line && !line.startsWith("#"))
@@ -381,7 +382,9 @@ export class BackendStack extends cdk.NestedStack {
 
     new secretsmanager.Secret(this, "MachineClientSecret", {
       secretName: `/${config.stack_name_base}/machine_client_secret`,
-      secretStringValue: cdk.SecretValue.unsafePlainText(this.machineClient.userPoolClientSecret.unsafeUnwrap()),
+      secretStringValue: cdk.SecretValue.unsafePlainText(
+        this.machineClient.userPoolClientSecret.unsafeUnwrap()
+      ),
       description: "Machine Client Secret for M2M authentication",
     })
 
@@ -575,10 +578,9 @@ export class BackendStack extends cdk.NestedStack {
     const arxivLambda = new lambda.Function(this, "ArxivSearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "arxiv_search_lambda.handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../../gateway/tools/arxiv_search"),
-        { bundling: this.getPythonBundlingOptions(["arxiv"]) }
-      ),
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/arxiv_search"), {
+        bundling: this.getPythonBundlingOptions(["arxiv"]),
+      }),
       timeout: cdk.Duration.seconds(60),
       logGroup: new logs.LogGroup(this, "ArxivLambdaLogGroup", {
         logGroupName: `/aws/lambda/${config.stack_name_base}-arxiv-search`,
@@ -601,10 +603,9 @@ export class BackendStack extends cdk.NestedStack {
     const tavilyLambda = new lambda.Function(this, "TavilySearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "tavily_search_lambda.handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../../gateway/tools/tavily_search"),
-        { bundling: this.getPythonBundlingOptions(["tavily-python", "boto3"]) }
-      ),
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/tavily_search"), {
+        bundling: this.getPythonBundlingOptions(["tavily-python", "boto3"]),
+      }),
       timeout: cdk.Duration.seconds(60),
       environment: {
         TAVILY_SECRET_NAME: tavilySecretName,
@@ -631,10 +632,9 @@ export class BackendStack extends cdk.NestedStack {
     const kbSearchLambda = new lambda.Function(this, "KBSearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "kb_search_lambda.handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../../gateway/tools/kb_search"),
-        { bundling: this.getPythonBundlingOptions(["boto3"]) }
-      ),
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/kb_search"), {
+        bundling: this.getPythonBundlingOptions(["boto3"]),
+      }),
       timeout: cdk.Duration.seconds(60),
       logGroup: new logs.LogGroup(this, "KBSearchLambdaLogGroup", {
         logGroupName: `/aws/lambda/${config.stack_name_base}-kb-search`,
@@ -656,10 +656,9 @@ export class BackendStack extends cdk.NestedStack {
     const s3BdaLambda = new lambda.Function(this, "S3BdaReaderLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "s3_bda_reader_lambda.handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../../gateway/tools/s3_bda_reader"),
-        { bundling: this.getPythonBundlingOptions(["boto3"]) }
-      ),
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/s3_bda_reader"), {
+        bundling: this.getPythonBundlingOptions(["boto3"]),
+      }),
       timeout: cdk.Duration.minutes(3),
       environment: {
         BDA_PROJECT_ARN: "", // Set via SSM or config in production
@@ -682,10 +681,7 @@ export class BackendStack extends cdk.NestedStack {
     s3BdaLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: [
-          "bedrock:InvokeDataAutomationAsync",
-          "bedrock:GetDataAutomationStatus",
-        ],
+        actions: ["bedrock:InvokeDataAutomationAsync", "bedrock:GetDataAutomationStatus"],
         resources: ["*"],
       })
     )
@@ -694,10 +690,9 @@ export class BackendStack extends cdk.NestedStack {
     const novaSearchLambda = new lambda.Function(this, "NovaSearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "nova_search_lambda.handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../../gateway/tools/nova_search"),
-        { bundling: this.getPythonBundlingOptions(["boto3"]) }
-      ),
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/nova_search"), {
+        bundling: this.getPythonBundlingOptions(["boto3"]),
+      }),
       timeout: cdk.Duration.minutes(2),
       logGroup: new logs.LogGroup(this, "NovaSearchLambdaLogGroup", {
         logGroupName: `/aws/lambda/${config.stack_name_base}-nova-search`,
@@ -834,19 +829,31 @@ export class BackendStack extends cdk.NestedStack {
 
     // Load tool specifications
     const arxivSpec = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../../gateway/tools/arxiv_search/tool_spec.json"), "utf8")
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/arxiv_search/tool_spec.json"),
+        "utf8"
+      )
     )
     const tavilySpec = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../../gateway/tools/tavily_search/tool_spec.json"), "utf8")
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/tavily_search/tool_spec.json"),
+        "utf8"
+      )
     )
     const kbSearchSpec = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../../gateway/tools/kb_search/tool_spec.json"), "utf8")
     )
     const s3BdaSpec = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../../gateway/tools/s3_bda_reader/tool_spec.json"), "utf8")
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/s3_bda_reader/tool_spec.json"),
+        "utf8"
+      )
     )
     const novaSearchSpec = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../../gateway/tools/nova_search/tool_spec.json"), "utf8")
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/nova_search/tool_spec.json"),
+        "utf8"
+      )
     )
 
     // ArXiv Search Target

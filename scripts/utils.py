@@ -2,7 +2,7 @@
 """
 Shared utilities for test scripts
 
-Provides essential functions for stack discovery, AWS resource fetching, and authentication.
+Provides functions for stack discovery, AWS resource fetching, and authentication.
 """
 
 import base64
@@ -10,7 +10,6 @@ import json
 import sys
 import uuid
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import boto3
 import yaml
@@ -20,7 +19,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 
-def get_stack_config(stack_name: Optional[str] = None) -> Dict:
+def get_stack_config(stack_name: str | None = None) -> dict:
     """
     Get complete stack configuration including outputs from main stack.
 
@@ -28,7 +27,7 @@ def get_stack_config(stack_name: Optional[str] = None) -> Dict:
         stack_name: Base stack name (if None, loads from config.yaml)
 
     Returns:
-        Dictionary with stack_name, region, account, pattern, and outputs from main stack
+        Dictionary with stack_name, region, account, pattern, and outputs
     """
     # Load config.yaml
     script_dir = Path(__file__).parent
@@ -38,7 +37,7 @@ def get_stack_config(stack_name: Optional[str] = None) -> Dict:
         print_msg("Configuration file not found", "error")
         sys.exit(1)
 
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
 
     # Get stack name from config if not provided
@@ -80,8 +79,7 @@ def get_stack_config(stack_name: Optional[str] = None) -> Dict:
         print_msg(f"CloudFormation error: {error_code}", "error")
         if error_code == "ValidationError":
             print_msg(
-                f"Stack '{stack_name}' not found. Make sure you've deployed the CDK stack.",
-                "error",
+                f"Stack '{stack_name}' not found. Deploy the CDK stack first.", "error"
             )
         sys.exit(1)
     except Exception as e:
@@ -89,7 +87,7 @@ def get_stack_config(stack_name: Optional[str] = None) -> Dict:
         sys.exit(1)
 
 
-def get_ssm_params(stack_name: str, *param_names: str) -> Dict[str, str]:
+def get_ssm_params(stack_name: str, *param_names: str) -> dict[str, str]:
     """
     Fetch multiple SSM parameters for a stack.
 
@@ -118,7 +116,7 @@ def get_ssm_params(stack_name: str, *param_names: str) -> Dict[str, str]:
 
 def authenticate_cognito(
     user_pool_id: str, client_id: str, username: str, password: str
-) -> Tuple[str, str, str]:
+) -> tuple[str, str, str]:
     """
     Authenticate with Cognito.
 

@@ -42,8 +42,8 @@ def handler(event, context):
     Text analysis tool Lambda function for FAST AgentCore Gateway.
 
     DESIGN PATTERN:
-    This Lambda follows the "one tool per Lambda" design pattern, where each Lambda function
-    implements exactly one tool. This provides:
+    This Lambda follows the "one tool per Lambda" design pattern, where each Lambda
+    function implements exactly one tool. This provides:
     - Clear separation of concerns
     - Independent scaling per tool
     - Easier maintenance and debugging
@@ -52,7 +52,8 @@ def handler(event, context):
 
     INPUT FORMAT:
     - event: Contains tool arguments directly (not wrapped in HTTP body)
-    - context.client_context.custom['bedrockAgentCoreToolName']: Full tool name with target prefix
+    - context.client_context.custom['bedrockAgentCoreToolName']: Full tool name with
+      target prefix
 
     OUTPUT FORMAT:
     - Return object with 'content' array containing response data
@@ -81,18 +82,16 @@ def handler(event, context):
         if tool_name == "text_analysis_tool":
             # Get arguments from event
             text = event.get("text", "")
-            N = event.get("N", 5)
+            n_chars = event.get("N", 5)
 
             # Analyze text
-            result = analyze_text(text, N)
+            result = analyze_text(text, n_chars)
 
             return {"content": [{"type": "text", "text": result}]}
         else:
             # This should never happen if gateway is configured correctly
             logger.error(f"Unexpected tool name: {tool_name}")
-            return {
-                "error": f"This Lambda only supports 'text_analysis_tool', received: {tool_name}"
-            }
+            return {"error": f"Unexpected tool received: {tool_name}"}
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")

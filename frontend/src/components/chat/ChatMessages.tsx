@@ -1,16 +1,16 @@
-import { RefObject } from "react"
-import { Message } from "./types"
-import { ChatMessage } from "./ChatMessage"
+import { RefObject } from "react";
+import { Message } from "./types";
+import { ChatMessage } from "./ChatMessage";
 
 interface ChatMessagesProps {
-  messages: Message[]
-  messagesEndRef: RefObject<HTMLDivElement | null>
-  sessionId: string
+  messages: Message[];
+  messagesEndRef: RefObject<HTMLDivElement | null>;
+  sessionId: string;
   onFeedbackSubmit: (
     messageContent: string,
     feedbackType: "positive" | "negative",
-    comment: string
-  ) => Promise<void>
+    comment: string,
+  ) => Promise<void>;
 }
 
 export function ChatMessages({
@@ -36,12 +36,12 @@ export function ChatMessages({
             message={message}
             sessionId={sessionId}
             onFeedbackSubmit={async (feedbackType, comment) => {
-              await onFeedbackSubmit(message.content, feedbackType, comment)
+              await onFeedbackSubmit(message.content, feedbackType, comment);
             }}
           />
         ))
       )}
       <div ref={messagesEndRef} />
     </div>
-  )
+  );
 }

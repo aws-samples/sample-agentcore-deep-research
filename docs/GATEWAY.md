@@ -59,10 +59,10 @@ def handler(event, context):
     delimiter = "___"
     original_tool_name = context.client_context.custom['bedrockAgentCoreToolName']
     tool_name = original_tool_name[original_tool_name.index(delimiter) + len(delimiter):]
-    
+
     # Event contains tool arguments directly
     arguments = event
-    
+
     # Return response in expected format
     return {
         'content': [
@@ -112,14 +112,14 @@ def lambda_handler(event, context):
         original_tool_name = context.client_context.custom['bedrockAgentCoreToolName']
         logger.info(f"Received tool invocation: {original_tool_name}")
         logger.info(f"Event: {json.dumps(event)}")
-        
+
         # Strip target prefix
         delimiter = "___"
         if delimiter in original_tool_name:
             tool_name = original_tool_name[original_tool_name.index(delimiter) + len(delimiter):]
         else:
             tool_name = original_tool_name
-        
+
         # Route to appropriate tool handler
         if tool_name == "sample_tool":
             name = event.get('name', 'World')
@@ -127,7 +127,7 @@ def lambda_handler(event, context):
             return {"result": result}
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
-            
+
     except Exception as e:
         logger.error(f"Error in lambda_handler: {str(e)}", exc_info=True)
         raise

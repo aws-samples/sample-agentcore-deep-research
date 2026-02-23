@@ -15,7 +15,6 @@ import boto3
 import jwt
 import requests
 from bedrock_agentcore.runtime import RequestContext
-
 from utils.ssm import get_ssm_parameter
 
 logger = logging.getLogger(__name__)
@@ -65,8 +64,7 @@ def extract_user_id_from_context(context: RequestContext) -> str:
         else auth_header
     )
 
-    # Decode without signature verification — Runtime already validated the token.
-    # We use options to skip all verification since this is a trusted, pre-validated token.
+    # Decode without verification — Runtime already validated the token
     claims = jwt.decode(
         jwt=token,
         options={"verify_signature": False},
@@ -76,8 +74,7 @@ def extract_user_id_from_context(context: RequestContext) -> str:
     user_id = claims.get("sub")
     if not user_id:
         raise ValueError(
-            "JWT token does not contain a 'sub' claim. "
-            "Cannot determine user identity."
+            "JWT token does not contain a 'sub' claim. Cannot determine user identity."
         )
 
     logger.info("Extracted user_id from JWT: %s", user_id)
@@ -109,22 +106,22 @@ def get_secret(secret_name: str) -> str:
     try:
         response = secrets_client.get_secret_value(SecretId=secret_name)
         return response["SecretString"]
-    except secrets_client.exceptions.ResourceNotFoundException:
-        raise ValueError(f"Secret not found: {secret_name}")
-    except secrets_client.exceptions.InvalidParameterException:
-        raise ValueError(f"Invalid secret parameter: {secret_name}")
-    except secrets_client.exceptions.InvalidRequestException:
-        raise ValueError(f"Invalid request for secret: {secret_name}")
-    except secrets_client.exceptions.DecryptionFailureException:
-        raise RuntimeError(f"Failed to decrypt secret: {secret_name}")
-    except secrets_client.exceptions.InternalServiceErrorException:
+    except secrets_client.exceptions.ResourceNotFoundException as e:
+        raise ValueError(f"Secret not found: {secret_name}") from e
+    except secrets_client.exceptions.InvalidParameterException as e:
+        raise ValueError(f"Invalid secret parameter: {secret_name}") from e
+    except secrets_client.exceptions.InvalidRequestException as e:
+        raise ValueError(f"Invalid request for secret: {secret_name}") from e
+    except secrets_client.exceptions.DecryptionFailureException as e:
+        raise RuntimeError(f"Failed to decrypt secret: {secret_name}") from e
+    except secrets_client.exceptions.InternalServiceErrorException as e:
         raise RuntimeError(
             f"AWS Secrets Manager service error for secret: {secret_name}"
-        )
+        ) from e
     except Exception as e:
         raise RuntimeError(
             f"Unexpected error retrieving secret {secret_name}: {str(e)}"
-        )
+        ) from e
 
 
 def get_gateway_access_token() -> str:

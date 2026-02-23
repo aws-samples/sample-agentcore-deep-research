@@ -1,0 +1,98 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+          )$
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+          )$
+      - id: check-case-conflict
+      - id: check-merge-conflict
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.24.1
+    hooks:
+      - id: validate-pyproject
+        files: pyproject\.toml$
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.34.0
+    hooks:
+      - id: typos
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+            |.*\.json$
+            |.*\.csv$
+          )$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.3
+    hooks:
+      - id: ruff
+        args: [--exit-non-zero-on-fix, --config=pyproject.toml, --fix]
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+          )$
+      - id: ruff-format
+        args: [--config=pyproject.toml]
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+          )$
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, scss]
+        additional_dependencies:
+          - prettier@3.0.3
+          - prettier-plugin-organize-imports@3.2.3
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-PyYAML==6.0.12.20250516, types-requests==2.32.4.20250611, types-retry==0.9.9.20250322]
+        exclude: |
+          (?x)^(
+            |data/.*
+            |logs/.*
+            |results/.*
+            |patterns/.*
+            |infra-cdk/lambdas/.*
+            |test-scripts/.*
+            |gateway/tools/.*
+            |tools/.*
+          )$
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.100.0
+    hooks:
+      - id: terraform_fmt
+        files: .*\.tf$
+
+  - repo: https://github.com/awslabs/automated-security-helper.git
+    rev: v3.0.0
+    hooks:
+    - id: ash
+      name: scan files using ash
+      stages: [ manual ]

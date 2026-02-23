@@ -29,7 +29,9 @@ export class ConfigManager {
     const configPath = path.join(__dirname, "..", "..", configFile)
 
     if (!fs.existsSync(configPath)) {
-      throw new Error(`Configuration file ${configPath} does not exist. Please create config.yaml file.`)
+      throw new Error(
+        `Configuration file ${configPath} does not exist. Please create config.yaml file.`
+      )
     }
 
     try {

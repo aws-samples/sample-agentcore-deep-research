@@ -142,7 +142,7 @@ The agent container builds use a specific configuration to handle the repository
 **Solution**: Use repository root as build context with optimized file filtering:
 
 1. **Build Context**: Repository root (`/path/to/fullstack-agentcore-solution-template/`)
-2. **Dockerfile Location**: `patterns/{pattern}/Dockerfile` 
+2. **Dockerfile Location**: `patterns/{pattern}/Dockerfile`
 3. **Package Installation**: Install FAST package (`gateway/` + `pyproject.toml`) as proper Python package
 4. **File Filtering**: `.dockerignore` excludes large directories to prevent build hangs
 
@@ -152,7 +152,7 @@ The agent container builds use a specific configuration to handle the repository
 
 **Solution**: `.dockerignore` file at repository root excludes:
 - `node_modules/` directories (frontend and infra)
-- `.git/` version control data  
+- `.git/` version control data
 - Build artifacts (`cdk.out/`, `.next/`, `dist/`)
 - Cache directories (`.ruff_cache/`, `__pycache__/`)
 
@@ -177,7 +177,7 @@ This approach scales to multiple agent patterns without code duplication while m
 
 ### Key Resources Created
 
-1. **Backend Stack**: 
+1. **Backend Stack**:
    - Cognito User Pool integration and machine client
    - AgentCore Gateway with Lambda tool targets
    - AgentCore Runtime for agent execution

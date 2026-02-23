@@ -6,7 +6,7 @@
 import os
 import time
 import uuid
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
@@ -81,7 +81,7 @@ class FeedbackRequest(BaseModel):
     feedback_type: Literal["positive", "negative"] = Field(
         ..., description="User's rating of the response"
     )
-    comment: Optional[str] = Field(
+    comment: str | None = Field(
         None,
         max_length=MAX_MESSAGE_LENGTH,
         description="User's explanation for their rating",
@@ -91,7 +91,7 @@ class FeedbackRequest(BaseModel):
     @classmethod
     def validate_session_id_format(cls, v: str) -> str:
         """
-        Validate session_id contains only alphanumeric characters, hyphens, and underscores.
+        Validate session_id contains only alphanumeric chars, hyphens and underscores.
 
         Args:
             v: Session ID value to validate
@@ -104,13 +104,13 @@ class FeedbackRequest(BaseModel):
         """
         if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError(
-                "sessionId must contain only alphanumeric characters, hyphens, and underscores"
+                "sessionId must contain only alphanumeric, hyphens, underscores"
             )
         return v
 
 
 @app.post("/feedback")
-def submit_feedback() -> Dict[str, Any]:
+def submit_feedback() -> dict[str, Any]:
     """
     Handle POST /feedback endpoint.
 

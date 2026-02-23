@@ -69,10 +69,7 @@ export class AmplifyHostingStack extends cdk.NestedStack {
         effect: iam.Effect.DENY,
         principals: [new iam.AnyPrincipal()],
         actions: ["s3:*"],
-        resources: [
-          this.stagingBucket.bucketArn,
-          this.stagingBucket.arnForObjects("*"),
-        ],
+        resources: [this.stagingBucket.bucketArn, this.stagingBucket.arnForObjects("*")],
         conditions: {
           Bool: {
             "aws:SecureTransport": "false",

@@ -7,7 +7,7 @@ import type { ChunkParser, StreamCallback } from "../types";
 export async function readSSEStream(
   response: Response,
   parser: ChunkParser,
-  callback: StreamCallback
+  callback: StreamCallback,
 ): Promise<void> {
   let buffer = "";
 

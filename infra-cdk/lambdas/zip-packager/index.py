@@ -197,7 +197,7 @@ def handler(event: dict, context) -> None:
     request_type = event["RequestType"]
     props = event["ResourceProperties"]
 
-    # On Delete, just succeed since there's nothing to clean up. The bucket handles its own cleanup.
+    # On Delete, just succeed since there's nothing to clean up
     if request_type == "Delete":
         send_response(event, context, "SUCCESS")
         return

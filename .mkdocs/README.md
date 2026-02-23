@@ -13,7 +13,7 @@ The documentation system consists of four key components:
 The site configuration defines the Material theme, plugins, and markdown extensions:
 
 - **Theme**: Material for MkDocs with navigation features (tabs, sections, instant loading)
-- **Plugins**: 
+- **Plugins**:
   - `search` - Full-text search across all documentation
   - `awesome-nav` - Dynamic navigation generation from directory structure
 - **Extensions**: Code highlighting, admonitions, tables, Mermaid diagrams, and more

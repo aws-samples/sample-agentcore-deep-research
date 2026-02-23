@@ -2,7 +2,6 @@ import json
 import os
 import traceback
 
-import boto3
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
 from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
@@ -13,7 +12,6 @@ from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands_code_interpreter import StrandsCodeInterpreterTools
-
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.ssm import get_ssm_parameter
 
@@ -26,7 +24,7 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
 
     MCP (Model Context Protocol) is how agents communicate with tool providers.
     This creates a client that can talk to the AgentCore Gateway using the provided
-    access token for authentication. The Gateway then provides access to Lambda-based tools.
+    access token for authentication.
     """
     stack_name = os.environ.get("STACK_NAME")
     if not stack_name:
@@ -63,8 +61,10 @@ def create_basic_agent(user_id: str, session_id: str) -> Agent:
     connection, and configures the agent with access to all tools available through
     the Gateway. If Gateway connection fails, it falls back to an agent without tools.
     """
-    system_prompt = """You are a helpful assistant with access to tools via the Gateway and Code Interpreter.
-    When asked about your tools, list them and explain what they do."""
+    system_prompt = (
+        "You are a helpful assistant with access to tools via Gateway and "
+        "Code Interpreter. When asked about your tools, list them and explain."
+    )
 
     bedrock_model = BedrockModel(
         model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0", temperature=0.1
@@ -84,9 +84,8 @@ def create_basic_agent(user_id: str, session_id: str) -> Agent:
         region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
     )
 
-    # Initialize Code Interpreter tools with boto3 session
+    # Initialize Code Interpreter tools
     region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-    session = boto3.Session(region_name=region)
     code_tools = StrandsCodeInterpreterTools(region)
 
     try:
@@ -141,7 +140,7 @@ async def agent_stream(payload, context: RequestContext):
     It extracts the user's query from the payload, securely obtains the user ID from
     the validated JWT token in the request context, creates an agent with Gateway tools
     and memory, and streams the response back. This function handles the complete
-    request lifecycle with token-level streaming. The user ID is extracted from the 
+    request lifecycle with token-level streaming. The user ID is extracted from the
     JWT token (via RequestContext).
     """
     user_query = payload.get("prompt")
@@ -159,9 +158,7 @@ async def agent_stream(payload, context: RequestContext):
         # instead of trusting the payload body (which could be manipulated)
         user_id = extract_user_id_from_context(context)
 
-        print(
-            f"[STREAM] Starting streaming invocation for user: {user_id}, session: {session_id}"
-        )
+        print(f"[STREAM] Invocation for user: {user_id}, session: {session_id}")
         print(f"[STREAM] Query: {user_query}")
 
         agent = create_basic_agent(user_id, session_id)

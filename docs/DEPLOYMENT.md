@@ -35,7 +35,7 @@ backend:
   deployment_type: docker # Available deployment types: docker (default), zip
 ```
 
-**Important**: 
+**Important**:
 - Change `stack_name_base` to a unique name for your project to avoid conflicts
 - Maximum length is 35 characters (due to AWS AgentCore runtime naming constraints)
 

@@ -2,4 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { AgentCoreClient } from "./client";
-export type { AgentCoreConfig, AgentPattern, StreamCallback, StreamEvent, ChunkParser } from "./types";
+export type {
+  AgentCoreConfig,
+  AgentPattern,
+  StreamCallback,
+  StreamEvent,
+  ChunkParser,
+} from "./types";

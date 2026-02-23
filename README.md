@@ -17,7 +17,7 @@ The application is intentionally kept very, very simple to allow developers to e
 
 1. **Gateway Tools** - Lambda-based tools behind AgentCore Gateway with authentication:
    - Text analysis tool (counts words and letter frequency)
-   
+
 2. **Code Interpreter** - Direct integration with Amazon Bedrock AgentCore Code Interpreter:
    - Secure Python code execution in isolated sandbox
    - Session management with state persistence
@@ -32,7 +32,7 @@ If you are a delivery scientist or engineer who wants to use FAST to build a ful
 
 FAST is designed to be forked and deployed out of the box with a security-approved baseline system working. Your task will be to customize it to create your own full stack application to to do (literally) anything on AgentCore.
 
-Deploying the full stack out-of-the-box FAST baseline system is only a few cdk commands once you have forked the repo, namely: 
+Deploying the full stack out-of-the-box FAST baseline system is only a few cdk commands once you have forked the repo, namely:
 
 ```bash
 cd infra-cdk
@@ -58,7 +58,7 @@ You must first deploy the stack with `cdk deploy`, then you can run the frontend
 ```bash
 # Set required environment variables (see below for how to find these)
 export MEMORY_ID=your-memory-id
-export STACK_NAME=your-stack-name  
+export STACK_NAME=your-stack-name
 export AWS_DEFAULT_REGION=us-east-1
 
 # Start the full stack locally

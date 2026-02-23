@@ -62,11 +62,11 @@ def invoke_agent_streaming(
     access_token : str
         Cognito access token for authentication
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("RESEARCH QUERY:")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(prompt)
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     payload = {
         "prompt": prompt,
@@ -110,7 +110,7 @@ def invoke_agent_streaming(
                             tool_name = data.get("name", "unknown")
                             print(f"\n[Tool: {tool_name}]", flush=True)
                         elif event_type == "tool_result":
-                            print(f"\n[Tool completed]", flush=True)
+                            print("\n[Tool completed]", flush=True)
 
                 except json.JSONDecodeError:
                     # Raw text chunk

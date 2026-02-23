@@ -29,7 +29,6 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Tuple
 
 import boto3
 from botocore.exceptions import ClientError
@@ -315,7 +314,7 @@ def test_invalid_memory_id(client: boto3.client) -> bool:
         return False
 
 
-def run_tests(client: boto3.client, memory_id: str) -> Tuple[int, int]:
+def run_tests(client: boto3.client, memory_id: str) -> tuple[int, int]:
     """Run all tests and return (passed, failed) counts."""
     print_section("Running Tests")
 
@@ -360,7 +359,7 @@ def parse_arguments() -> argparse.Namespace:
 Examples:
   # Auto-discover memory from nested stack
   uv run scripts/test-memory.py
-  
+
   # Use specific memory ARN
   uv run scripts/test-memory.py --memory-arn arn:aws:bedrock-agentcore:us-east-1:123456789:memory/abc123
         """,

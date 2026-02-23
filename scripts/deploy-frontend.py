@@ -25,7 +25,6 @@ import subprocess  # nosec B404 - subprocess used securely with explicit paramet
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional
 
 # Minimum Python version check
 if sys.version_info < (3, 8):
@@ -76,7 +75,7 @@ def run_command(
     command: list,
     capture_output: bool = True,
     check: bool = True,
-    cwd: Optional[str] = None,
+    cwd: str | None = None,
 ) -> subprocess.CompletedProcess:
     """
     Execute a command securely via subprocess.
@@ -114,7 +113,7 @@ def check_prerequisite(command: str) -> bool:
     return shutil.which(command) is not None
 
 
-def parse_config_yaml(config_path: Path) -> Dict[str, str]:
+def parse_config_yaml(config_path: Path) -> dict[str, str]:
     """
     Parse config.yaml using regex (no PyYAML dependency).
 
@@ -154,7 +153,7 @@ def get_file_size_human(filepath: str) -> str:
     Returns:
         Human-readable size string (e.g., "1.5MB")
     """
-    size = os.path.getsize(filepath)
+    size: float = os.path.getsize(filepath)
     for unit in ["B", "KB", "MB", "GB"]:
         if size < 1024:
             return f"{size:.1f}{unit}"
@@ -165,7 +164,7 @@ def get_file_size_human(filepath: str) -> str:
 # --- AWS CLI wrappers ---
 
 
-def get_stack_outputs(stack_name: str) -> Dict[str, str]:
+def get_stack_outputs(stack_name: str) -> dict[str, str]:
     """
     Fetch CloudFormation stack outputs via AWS CLI.
 
@@ -227,7 +226,7 @@ def get_stack_region(stack_name: str) -> str:
     arn_parts = stack_arn.split(":")
     if len(arn_parts) < 4:
         raise ValueError(f"Invalid stack ARN format: {stack_arn}")
-    return arn_parts[3]
+    return str(arn_parts[3])
 
 
 def upload_to_s3(local_path: str, bucket: str, key: str) -> None:
@@ -244,7 +243,7 @@ def upload_to_s3(local_path: str, bucket: str, key: str) -> None:
     )
 
 
-def start_amplify_deployment(app_id: str, branch: str, source_url: str) -> Dict:
+def start_amplify_deployment(app_id: str, branch: str, source_url: str) -> dict:
     """
     Start an Amplify deployment via AWS CLI.
 
@@ -272,7 +271,7 @@ def start_amplify_deployment(app_id: str, branch: str, source_url: str) -> Dict:
         ]
     )
 
-    return json.loads(result.stdout)
+    return dict(json.loads(result.stdout))
 
 
 def get_amplify_job_status(app_id: str, branch: str, job_id: str) -> str:
@@ -303,7 +302,7 @@ def get_amplify_job_status(app_id: str, branch: str, job_id: str) -> str:
         ]
     )
 
-    return json.loads(result.stdout)["job"]["summary"]["status"]
+    return str(json.loads(result.stdout)["job"]["summary"]["status"])
 
 
 def get_amplify_app_domain(app_id: str) -> str:
@@ -330,7 +329,7 @@ def get_amplify_app_domain(app_id: str) -> str:
         ]
     )
 
-    return result.stdout.strip()
+    return str(result.stdout.strip())
 
 
 # --- Main deployment logic ---
@@ -338,7 +337,7 @@ def get_amplify_app_domain(app_id: str) -> str:
 
 def generate_aws_exports(
     stack_name: str,
-    outputs: Dict[str, str],
+    outputs: dict[str, str],
     region: str,
     pattern: str,
     frontend_dir: Path,

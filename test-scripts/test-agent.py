@@ -32,7 +32,6 @@ import subprocess  # nosec B404 - subprocess used securely with explicit paramet
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional
 
 import requests
 from colorama import Fore, Style
@@ -53,7 +52,7 @@ from utils import (
 )
 
 # Global variable to track agent process
-_agent_process: Optional[subprocess.Popen] = None
+_agent_process: subprocess.Popen | None = None
 
 
 def generate_trace_id() -> str:
@@ -207,7 +206,7 @@ def invoke_agent(
     prompt: str,
     session_id: str,
     user_id: str = "local-test-user",
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> None:
     """
     Invoke agent and print raw streaming events in real-time.
@@ -313,7 +312,7 @@ def invoke_agent(
         print(f"Error: {e}")
 
 
-def run_chat(local_mode: bool, config: Dict[str, str]) -> None:
+def run_chat(local_mode: bool, config: dict[str, str]) -> None:
     """
     Run interactive chat session.
 
@@ -398,10 +397,10 @@ def parse_arguments() -> argparse.Namespace:
 Examples:
   # Remote agent (prompts for credentials)
   uv run scripts/test-agent.py
-  
+
   # Local agent on localhost:8080 (uses pattern from config.yaml)
   uv run scripts/test-agent.py --local
-  
+
   # Override pattern for local testing
   uv run scripts/test-agent.py --local --pattern strands-single-agent
 
@@ -435,7 +434,7 @@ def main():
     print("=" * 60 + "\n")
 
     args = parse_arguments()
-    config: Dict[str, str] = {}
+    config: dict[str, str] = {}
 
     # Get stack configuration
     stack_cfg = get_stack_config()

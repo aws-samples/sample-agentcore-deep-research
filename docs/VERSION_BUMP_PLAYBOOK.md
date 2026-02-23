@@ -27,7 +27,7 @@ Manually update the 6 files listed above with the new version number.
 # Frontend
 cd frontend && npm install
 
-# Infrastructure  
+# Infrastructure
 cd infra-cdk && npm install && npm run build
 ```
 
