@@ -5,6 +5,8 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
 import { Message, MessageSegment, ToolCall } from "./types";
+import { ResearchReportPanel } from "./ResearchReportPanel";
+import { ResizableSplitPane } from "./ResizableSplitPane";
 
 import { useGlobal } from "@/app/context/GlobalContext";
 import { AgentCoreClient } from "@/lib/agentcore-client";
@@ -13,6 +15,23 @@ import { submitFeedback } from "@/services/feedbackService";
 import { useAuth } from "react-oidc-context";
 import { useDefaultTool } from "@/hooks/useToolRenderer";
 import { ToolCallDisplay } from "./ToolCallDisplay";
+
+// Extract report URL from tool result
+function extractReportUrl(result: string): string | null {
+  const match = result.match(/\[REPORT_URL:(https?:\/\/[^\]]+)\]/);
+  return match ? match[1] : null;
+}
+
+// Fetch report content from pre-signed S3 URL
+async function fetchReportContent(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
 
 // Available data sources configuration
 const DATA_SOURCES = [
@@ -32,6 +51,12 @@ export default function ChatInterface() {
   const [enabledSources, setEnabledSources] = useState<Record<string, boolean>>(
     () => Object.fromEntries(DATA_SOURCES.map((s) => [s.id, s.defaultEnabled])),
   );
+
+  // Research report state
+  const [reportContent, setReportContent] = useState<string>("");
+  const [researchRound, setResearchRound] = useState<number>(0);
+  const [showReportPanel, setShowReportPanel] = useState<boolean>(false);
+  const fileWriteCountRef = useRef<number>(0);
 
   // Get array of enabled source IDs for API
   const getEnabledSourceIds = () =>
@@ -191,6 +216,14 @@ export default function ChatInterface() {
               };
               toolCallMap.set(event.toolUseId, tc);
               segments.push({ type: "tool", toolCall: tc });
+
+              // update research round and show panel when new file_write/editor starts
+              if (event.name === "file_write" || event.name === "editor") {
+                fileWriteCountRef.current += 1;
+                setResearchRound(fileWriteCountRef.current);
+                setShowReportPanel(true); // Show panel immediately when tool starts
+              }
+
               updateMessage();
               break;
             }
@@ -207,6 +240,18 @@ export default function ChatInterface() {
               if (tc) {
                 tc.result = event.result;
                 tc.status = "complete";
+
+                // Extract report URL from file_write/editor results and fetch from S3
+                if (tc.name === "file_write" || tc.name === "editor") {
+                  const reportUrl = extractReportUrl(tc.result || "");
+                  if (reportUrl) {
+                    fetchReportContent(reportUrl).then((content) => {
+                      if (content) {
+                        setReportContent(content);
+                      }
+                    });
+                  }
+                }
               }
               updateMessage();
               break;
@@ -288,6 +333,10 @@ export default function ChatInterface() {
     setMessages([]);
     setInput("");
     setError(null);
+    setReportContent("");
+    setResearchRound(0);
+    setShowReportPanel(false);
+    fileWriteCountRef.current = 0;
     // Note: sessionId stays the same for the component lifecycle
     // If you want a new session ID, you'd need to remount the component
   };
@@ -299,6 +348,9 @@ export default function ChatInterface() {
   const hasAssistantMessages = messages.some(
     (message) => message.role === "assistant",
   );
+
+  // Show split view when report panel should be visible (triggered on first file_write/editor start)
+  const showSplitView = showReportPanel;
 
   return (
     <div className="flex flex-col h-screen w-full">
@@ -325,7 +377,7 @@ export default function ChatInterface() {
           {/* Centered welcome message */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800">
-              Correlate Deep Research
+              Correlate: Deep Research
             </h2>
             <p className="text-gray-600 mt-2">
               Ask a research question and I'll search across multiple sources to
@@ -370,8 +422,47 @@ export default function ChatInterface() {
           {/* Empty space below */}
           <div className="grow" />
         </>
+      ) : showSplitView ? (
+        // Split view - chat on left, report on right
+        <div className="grow overflow-hidden">
+          <ResizableSplitPane
+            defaultLeftWidth={33}
+            minLeftWidth={25}
+            maxLeftWidth={50}
+            left={
+              <div className="flex flex-col h-full border-r">
+                {/* Chat messages */}
+                <div className="grow overflow-hidden">
+                  <ChatMessages
+                    messages={messages}
+                    messagesEndRef={messagesEndRef}
+                    sessionId={sessionId}
+                    isLoading={isLoading}
+                    onFeedbackSubmit={handleFeedbackSubmit}
+                  />
+                </div>
+                {/* Chat input */}
+                <div className="flex-none p-2 border-t bg-white">
+                  <ChatInput
+                    input={input}
+                    setInput={setInput}
+                    handleSubmit={handleSubmit}
+                    isLoading={isLoading}
+                  />
+                </div>
+              </div>
+            }
+            right={
+              <ResearchReportPanel
+                content={reportContent}
+                isLoading={isLoading}
+                currentRound={researchRound}
+              />
+            }
+          />
+        </div>
       ) : (
-        // Chat in progress - normal layout
+        // Chat in progress without report - normal layout
         <>
           {/* Scrollable message area */}
           <div className="grow overflow-hidden">
@@ -380,6 +471,7 @@ export default function ChatInterface() {
                 messages={messages}
                 messagesEndRef={messagesEndRef}
                 sessionId={sessionId}
+                isLoading={isLoading}
                 onFeedbackSubmit={handleFeedbackSubmit}
               />
             </div>
