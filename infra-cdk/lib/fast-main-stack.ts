@@ -38,6 +38,7 @@ export class FastMainStack extends cdk.Stack {
       userPoolClientId: this.cognitoStack.userPoolClientId,
       userPoolDomain: this.cognitoStack.userPoolDomain,
       frontendUrl: this.amplifyHostingStack.amplifyUrl,
+      stagingBucket: this.amplifyHostingStack.stagingBucket,
     })
 
     // Outputs

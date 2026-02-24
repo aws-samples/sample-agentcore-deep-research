@@ -49,6 +49,14 @@ export class AmplifyHostingStack extends cdk.NestedStack {
           expiration: cdk.Duration.days(30), // Clean up old deployment artifacts after 30 days
         },
       ],
+      // CORS configuration for frontend to fetch research reports
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.GET],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+        },
+      ],
     })
 
     // Add bucket policy to allow Amplify service access
