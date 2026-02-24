@@ -17,13 +17,14 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 )
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
+from report_upload_hook import ReportS3UploadHook
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-from strands_tools import file_read, file_write
+from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
-from utils.ssm import get_ssm_parameter
 from utils.inference import get_bedrock_config, get_inference_configs
+from utils.ssm import get_ssm_parameter
 
 # load inference configurations
 INFERENCE_CONFIG, REASONING_CONFIG = get_inference_configs()
@@ -150,8 +151,11 @@ def create_deep_research_agent(
     system_prompt = load_system_prompt(enabled_sources)
     print(f"[AGENT] Enabled data sources: {enabled_sources or DEFAULT_ENABLED_SOURCES}")
 
+    model_id = os.environ.get(
+        "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    )
     bedrock_model = BedrockModel(
-        model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        model_id=model_id,
         temperature=INFERENCE_CONFIG["temperature"],
         max_tokens=INFERENCE_CONFIG["maxTokens"],
         streaming=True,
@@ -178,6 +182,7 @@ def create_deep_research_agent(
     tools: list = [
         file_read,
         file_write,
+        editor,
     ]
 
     try:
@@ -197,18 +202,25 @@ def create_deep_research_agent(
         tools.append(gateway_client)
 
         print("[AGENT] Step 3: Creating Deep Research Agent...")
+
+        # Create hook for S3 report upload
+        report_upload_hook = ReportS3UploadHook()
+
         agent = Agent(
             name="DeepResearchAgent",
             system_prompt=system_prompt,
             tools=tools,
             model=bedrock_model,
             session_manager=session_manager,
+            hooks=[report_upload_hook],
             trace_attributes={
                 "user.id": user_id,
                 "session.id": session_id,
             },
         )
-        print("[AGENT] Agent created successfully with Gateway tools")
+        print(
+            "[AGENT] Agent created successfully with Gateway tools and S3 upload hook"
+        )
         return agent
 
     except Exception as e:
@@ -260,7 +272,8 @@ async def agent_stream(payload, context: RequestContext):
         agent = create_deep_research_agent(user_id, session_id, enabled_sources)
 
         # Use the agent's stream_async method for true token-level streaming
-        async for event in agent.stream_async(user_query):
+        # Pass session_id in invocation state for the S3 upload hook
+        async for event in agent.stream_async(user_query, session_id=session_id):
             yield json.loads(json.dumps(dict(event), default=str))
 
     except Exception as e:

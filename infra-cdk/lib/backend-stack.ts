@@ -25,6 +25,7 @@ export interface BackendStackProps extends cdk.NestedStackProps {
   userPoolClientId: string
   userPoolDomain: cognito.UserPoolDomain
   frontendUrl: string
+  stagingBucket: s3.Bucket
 }
 
 export class BackendStack extends cdk.NestedStack {
@@ -39,6 +40,7 @@ export class BackendStack extends cdk.NestedStack {
   private userPool: cognito.IUserPool
   private machineClient: cognito.UserPoolClient
   private agentRuntime: agentcore.Runtime
+  private stagingBucketName: string
 
   constructor(scope: Construct, id: string, props: BackendStackProps) {
     super(scope, id, props)
@@ -47,6 +49,7 @@ export class BackendStack extends cdk.NestedStack {
     this.userPoolId = props.userPoolId
     this.userPoolClientId = props.userPoolClientId
     this.userPoolDomain = props.userPoolDomain
+    this.stagingBucketName = props.stagingBucket.bucketName
 
     // Import the Cognito resources from the other stack
     this.userPool = cognito.UserPool.fromUserPoolId(
@@ -300,7 +303,18 @@ export class BackendStack extends cdk.NestedStack {
       AWS_DEFAULT_REGION: stack.region,
       MEMORY_ID: memoryId,
       STACK_NAME: config.stack_name_base, // Required for agent to find SSM parameters
+      MODEL_ID: config.backend?.model_id || "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      STAGING_BUCKET_NAME: this.stagingBucketName, // For S3 report upload
     }
+
+    // Grant S3 write permissions for report upload
+    agentRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+        resources: [`arn:aws:s3:::${this.stagingBucketName}/reports/*`],
+      })
+    )
 
     // Create the runtime using L2 construct
     // requestHeaderConfiguration allows the agent to read the Authorization header
