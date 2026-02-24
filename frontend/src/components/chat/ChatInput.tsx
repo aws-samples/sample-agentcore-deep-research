@@ -40,8 +40,8 @@ export function ChatInput({
         setInput(`${input}\n\n`);
         e.preventDefault();
       } else if (!e.shiftKey) {
-        // Submit the form when Enter is pressed without Shift
-        if (input.trim()) {
+        // Submit the form when Enter is pressed without Shift (only if not loading)
+        if (input.trim() && !isLoading) {
           e.preventDefault();
           handleSubmit(e as unknown as FormEvent);
         }
@@ -61,7 +61,6 @@ export function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Enter your research question... (Ctrl+Enter for new line)"
-          disabled={isLoading}
           className="flex-1 min-h-[40px] max-h-[200px] resize-none py-2"
           rows={1}
           autoFocus
