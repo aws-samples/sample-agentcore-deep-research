@@ -332,6 +332,9 @@ export class BackendStack extends cdk.NestedStack {
         allowlistedHeaders: ["Authorization"],
       },
       description: `${pattern} agent runtime for ${config.stack_name_base}`,
+      lifecycleConfiguration: {
+        idleRuntimeSessionTimeout: cdk.Duration.minutes(30),
+      },
     })
 
     // Make sure that ZIP is uploaded before Runtime is created

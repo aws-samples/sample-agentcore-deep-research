@@ -19,7 +19,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from report_upload_hook import ReportS3UploadHook
 from strands import Agent
-from strands.models import BedrockModel
+from safe_bedrock_model import SafeBedrockModel
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
@@ -154,7 +154,7 @@ def create_deep_research_agent(
     model_id = os.environ.get(
         "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
     )
-    bedrock_model = BedrockModel(
+    bedrock_model = SafeBedrockModel(
         model_id=model_id,
         temperature=INFERENCE_CONFIG["temperature"],
         max_tokens=INFERENCE_CONFIG["maxTokens"],

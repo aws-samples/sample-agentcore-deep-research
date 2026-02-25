@@ -36,6 +36,7 @@ EXPOSE 8080
 COPY patterns/strands-deep-research/deep_research_agent.py .
 COPY patterns/strands-deep-research/system_prompt.txt .
 COPY patterns/strands-deep-research/report_upload_hook.py .
+COPY patterns/strands-deep-research/safe_bedrock_model.py .
 COPY patterns/utils/ utils/
 
 # Healthcheck using Python (no extra dependencies needed)
