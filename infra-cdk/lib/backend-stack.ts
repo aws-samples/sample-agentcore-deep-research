@@ -732,6 +732,21 @@ export class BackendStack extends cdk.NestedStack {
       })
     )
 
+    // OpenFDA Drug Search Lambda
+    const openfdaLambda = new lambda.Function(this, "OpenFDASearchLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "openfda_lambda.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/openfda"), {
+        bundling: this.getPythonBundlingOptions([]),
+      }),
+      timeout: cdk.Duration.seconds(60),
+      logGroup: new logs.LogGroup(this, "OpenFDALambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-openfda-search`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
     // ========== END CORRELATE RESEARCH TOOLS ==========
 
     // Create comprehensive IAM role for gateway
@@ -747,6 +762,7 @@ export class BackendStack extends cdk.NestedStack {
     kbSearchLambda.grantInvoke(gatewayRole)
     s3BdaLambda.grantInvoke(gatewayRole)
     novaSearchLambda.grantInvoke(gatewayRole)
+    openfdaLambda.grantInvoke(gatewayRole)
 
     // Bedrock permissions (region-agnostic)
     gatewayRole.addToPolicy(
@@ -874,6 +890,12 @@ export class BackendStack extends cdk.NestedStack {
         "utf8"
       )
     )
+    const openfdaSpec = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"),
+        "utf8"
+      )
+    )
 
     // ArXiv Search Target
     const arxivTarget = new bedrockagentcore.CfnGatewayTarget(this, "ArxivSearchTarget", {
@@ -960,6 +982,23 @@ export class BackendStack extends cdk.NestedStack {
     })
     novaSearchTarget.addDependency(gateway)
 
+    // OpenFDA Drug Search Target
+    const openfdaTarget = new bedrockagentcore.CfnGatewayTarget(this, "OpenFDASearchTarget", {
+      gatewayIdentifier: gateway.attrGatewayIdentifier,
+      name: "openfda-search-target",
+      description: "OpenFDA drug label search",
+      targetConfiguration: {
+        mcp: {
+          lambda: {
+            lambdaArn: openfdaLambda.functionArn,
+            toolSchema: { inlinePayload: openfdaSpec },
+          },
+        },
+      },
+      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+    })
+    openfdaTarget.addDependency(gateway)
+
     // ========== END CORRELATE RESEARCH TOOL TARGETS ==========
 
     // Ensure proper creation order
@@ -970,6 +1009,7 @@ export class BackendStack extends cdk.NestedStack {
     gateway.node.addDependency(kbSearchLambda)
     gateway.node.addDependency(s3BdaLambda)
     gateway.node.addDependency(novaSearchLambda)
+    gateway.node.addDependency(openfdaLambda)
     gateway.node.addDependency(this.machineClient)
     gateway.node.addDependency(gatewayRole)
 
@@ -1119,16 +1159,15 @@ export class BackendStack extends cdk.NestedStack {
    * @returns Bundling options for CDK.
    */
   private getPythonBundlingOptions(dependencies: string[]): cdk.BundlingOptions {
+    const commands = []
+    if (dependencies.length > 0) {
+      commands.push("pip install " + dependencies.join(" ") + " -t /asset-output")
+    }
+    commands.push("cp -r . /asset-output")
+
     return {
       image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-      command: [
-        "bash",
-        "-c",
-        [
-          "pip install " + dependencies.join(" ") + " -t /asset-output",
-          "cp -r . /asset-output",
-        ].join(" && "),
-      ],
+      command: ["bash", "-c", commands.join(" && ")],
     }
   }
 }

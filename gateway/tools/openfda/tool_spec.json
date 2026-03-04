@@ -1,0 +1,20 @@
+[
+  {
+    "name": "openfda_drug_search",
+    "description": "Search OpenFDA drug label database for brand or generic drugs. Returns structured information including brand name, manufacturer, product type, indications, and adverse reactions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "description": "Name of the drug to search for. Can be brand name (e.g., 'Tylenol', 'Advil', 'Lipitor') or generic name (e.g., 'acetaminophen', 'ibuprofen', 'atorvastatin'). Use specific drug names rather than drug classes."
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results to return (default 10, max 50)"
+        }
+      },
+      "required": ["drug_name"]
+    }
+  }
+]
