@@ -38,6 +38,7 @@ const DATA_SOURCES = [
   { id: "tavily", name: "Tavily Web", icon: "🌐", defaultEnabled: true },
   { id: "nova", name: "Nova Search", icon: "🔍", defaultEnabled: true },
   { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: true },
+  { id: "openfda", name: "OpenFDA Drugs", icon: "💊", defaultEnabled: true },
 ] as const;
 
 export default function ChatInterface() {

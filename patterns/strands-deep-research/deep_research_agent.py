@@ -51,6 +51,11 @@ DATA_SOURCES = {
         "tool": "arxiv_search",
         "description": "Search academic papers on arXiv",
     },
+    "openfda": {
+        "name": "OpenFDA Drug Search",
+        "tool": "openfda_drug_search",
+        "description": "Search FDA drug label database for pharmaceutical information",
+    },
     "kb": {
         "name": "Knowledge Base Search",
         "tool": "knowledge_base_search",
@@ -60,7 +65,7 @@ DATA_SOURCES = {
 }
 
 # Default enabled sources (KB excluded by default as it requires configuration)
-DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "arxiv"]
+DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "arxiv", "openfda"]
 
 
 def load_system_prompt(enabled_sources: list[str] | None = None) -> str:
@@ -246,13 +251,13 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv"
+      Valid values: "tavily", "nova", "arxiv", "openfda"
     """
     user_query = payload.get("prompt")
     session_id = payload.get("runtimeSessionId")
     enabled_sources = payload.get(
         "enabledSources"
-    )  # Optional: ["tavily", "nova", "arxiv"]
+    )  # Optional: ["tavily", "nova", "arxiv", "openfda"]
 
     if not all([user_query, session_id]):
         yield {
