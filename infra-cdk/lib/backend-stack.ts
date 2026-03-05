@@ -98,7 +98,7 @@ export class BackendStack extends cdk.NestedStack {
   }
 
   private createAgentCoreRuntime(config: AppConfig): void {
-    const pattern = config.backend?.pattern || "strands-single-agent"
+    const pattern = config.backend?.pattern || "strands-deep-research"
 
     // Parameters
     this.agentName = new cdk.CfnParameter(this, "AgentName", {
@@ -891,10 +891,7 @@ export class BackendStack extends cdk.NestedStack {
       )
     )
     const openfdaSpec = JSON.parse(
-      fs.readFileSync(
-        path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"),
-        "utf8"
-      )
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"), "utf8")
     )
 
     // ArXiv Search Target

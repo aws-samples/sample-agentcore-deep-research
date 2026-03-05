@@ -2,7 +2,10 @@
 
 import { useMemo } from "react";
 import { Download, FileText, Loader2, BookOpen } from "lucide-react";
-import { ReportMarkdownRenderer, extractReportTitle } from "./ReportMarkdownRenderer";
+import {
+  ReportMarkdownRenderer,
+  extractReportTitle,
+} from "./ReportMarkdownRenderer";
 
 interface ResearchReportPanelProps {
   content: string;
@@ -18,7 +21,7 @@ export function ResearchReportPanel({
   // Extract H1 title from markdown content
   const reportTitle = useMemo(
     () => extractReportTitle(content) || "Research Report",
-    [content]
+    [content],
   );
 
   const handleDownload = () => {
@@ -41,7 +44,10 @@ export function ResearchReportPanel({
           <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
             <FileText className="w-5 h-5 text-blue-600" />
           </div>
-          <h2 className="font-semibold text-gray-800 truncate" title={reportTitle}>
+          <h2
+            className="font-semibold text-gray-800 truncate"
+            title={reportTitle}
+          >
             {reportTitle}
           </h2>
           {isLoading && (
@@ -69,7 +75,11 @@ export function ResearchReportPanel({
         {content ? (
           <div className="p-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <ReportMarkdownRenderer content={content} collapsibleSections={true} isLoading={isLoading} />
+              <ReportMarkdownRenderer
+                content={content}
+                collapsibleSections={true}
+                isLoading={isLoading}
+              />
             </div>
           </div>
         ) : (
@@ -77,7 +87,9 @@ export function ResearchReportPanel({
             <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
               <BookOpen className="w-16 h-16 text-gray-300" />
             </div>
-            <p className="text-lg font-medium text-gray-500">Generating report...</p>
+            <p className="text-lg font-medium text-gray-500">
+              Generating report...
+            </p>
             <p className="text-sm mt-1 text-gray-400 max-w-xs text-center">
               The research report will appear here as it's being generated
             </p>

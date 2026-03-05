@@ -157,7 +157,7 @@ config = AgentCoreMemoryConfig(
 )
 ```
 
-**💡 Example:** See this approach implemented in `patterns/strands-single-agent/basic_agent.py`
+**💡 Example:** See this approach implemented in `patterns/strands-deep-research/deep_research_agent.py`
 
 **📚 Official AWS Guide:** [Strands SDK Memory Integration](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/strands-sdk-memory.html)
 
@@ -296,7 +296,7 @@ async for event in graph.astream(
     # Process streaming chunks
 ```
 
-**💡 Example:** See this approach implemented in `patterns/langgraph-single-agent/langgraph_agent.py`
+**💡 Example:** LangGraph pattern has been removed. See `patterns/strands-deep-research/deep_research_agent.py` for the current Strands implementation.
 
 **Long-term memory (Store):**
 

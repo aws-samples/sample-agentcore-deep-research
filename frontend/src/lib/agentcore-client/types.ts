@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /** Supported agent framework patterns */
-export type AgentPattern =
-  | "strands-single-agent"
-  | "strands-deep-research"
-  | "langgraph-single-agent";
+export type AgentPattern = "strands-deep-research";
 
 /** Configuration for AgentCoreClient */
 export interface AgentCoreConfig {

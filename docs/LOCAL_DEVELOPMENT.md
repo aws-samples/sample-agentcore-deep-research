@@ -1,14 +1,14 @@
 # Local Development with Docker Compose
 
-This guide explains how to run the full FAST stack locally using Docker Compose for development purposes.
+This guide explains how to run the full Correlate stack locally using Docker Compose for development purposes.
 
 ## Prerequisites
 
-**Important**: Local development still requires a deployed FAST stack in AWS for backend dependencies (Memory, Gateway, SSM parameters). Docker Compose only containerizes the frontend and agent - it doesn't replace AWS services.
+**Important**: Local development still requires a deployed Correlate stack in AWS for backend dependencies (Memory, Gateway, SSM parameters). Docker Compose only containerizes the frontend and agent - it doesn't replace AWS services.
 
 ### Required
 
-1. **Deployed FAST Stack**: You must have already deployed FAST to AWS using:
+1. **Deployed FAST Stack**: You must have already deployed Correlate to AWS using:
    ```bash
    cd infra-cdk
    cdk deploy
@@ -104,19 +104,11 @@ Then run: `cd docker && docker compose up --build`
 
 ### Using Different Agent Patterns
 
-To use a different agent pattern (e.g., LangGraph):
+To rebuild the agent container after making changes:
 
-1. **Edit docker/docker-compose.yml**:
-   ```yaml
-   agent:
-     build:
-       dockerfile: patterns/langgraph-single-agent/Dockerfile
-   ```
-
-2. **Rebuild**:
-   ```bash
-   cd docker && docker compose up --build agent
-   ```
+```bash
+cd docker && docker compose up --build agent
+```
 
 ### Logs and Debugging
 

@@ -2,5 +2,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for FAST
+Unit tests
 """

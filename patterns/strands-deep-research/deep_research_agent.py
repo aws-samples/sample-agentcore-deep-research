@@ -18,8 +18,8 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from report_upload_hook import ReportS3UploadHook
-from strands import Agent
 from safe_bedrock_model import SafeBedrockModel
+from strands import Agent
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token

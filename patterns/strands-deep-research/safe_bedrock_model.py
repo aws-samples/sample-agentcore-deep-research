@@ -1,11 +1,13 @@
-"""Safe wrapper around strands BedrockModel that fixes streaming bugs with large tool inputs.
+"""Safe wrapper around strands BedrockModel that fixes streaming bugs.
 
-This module addresses two issues in the strands-agents SDK (tested against v1.26.0):
+This module addresses two issues in the strands-agents SDK (v1.26.0):
 
-1. Silent JSON parse failure: When large tool inputs (e.g., editor writing report sections)
-   arrive via streaming and the JSON is truncated (due to max_tokens or EventStream errors),
-   the SDK silently defaults to {}, losing all tool parameters.
-   Fix: Monkey-patch handle_content_block_stop to attempt JSON repair before falling back.
+1. Silent JSON parse failure: When large tool inputs (e.g., editor
+   writing report sections) arrive via streaming and the JSON is
+   truncated (due to max_tokens or EventStream errors), the SDK
+   silently defaults to {}, losing all tool parameters.
+   Fix: Monkey-patch handle_content_block_stop to attempt JSON
+   repair before falling back.
 
 2. Unhandled BotoCoreError: The SDK's _stream method only catches ClientError, but
    ConnectionClosedError, ReadTimeoutError, and other BotoCoreError subclasses can occur
@@ -19,13 +21,17 @@ Usage:
 
 import json
 import logging
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 from strands.event_loop import streaming as _streaming_module
 from strands.models.bedrock import BedrockModel
 from strands.types.content import Messages, SystemContentBlock
-from strands.types.exceptions import ContextWindowOverflowException, ModelThrottledException
+from strands.types.exceptions import (
+    ContextWindowOverflowException,
+    ModelThrottledException,
+)
 from strands.types.tools import ToolChoice, ToolSpec
 
 logger = logging.getLogger(__name__)
@@ -150,7 +156,7 @@ def _safe_handle_content_block_stop(state: dict[str, Any]) -> dict[str, Any]:
                     # so the original function's json.loads() will succeed
                     current_tool_use["input"] = json.dumps(repaired)
                     logger.info(
-                        "[SafeBedrockModel] Successfully repaired truncated JSON for tool '%s'",
+                        "[SafeBedrockModel] Repaired truncated JSON for tool '%s'",
                         tool_name,
                     )
                 else:
@@ -193,8 +199,8 @@ class SafeBedrockModel(BedrockModel):
         self,
         callback: Callable[..., None],
         messages: Messages,
-        tool_specs: Optional[list[ToolSpec]] = None,
-        system_prompt_content: Optional[list[SystemContentBlock]] = None,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt_content: list[SystemContentBlock] | None = None,
         tool_choice: ToolChoice | None = None,
     ) -> None:
         """Override _stream to catch broader exceptions with proper logging.
@@ -204,7 +210,9 @@ class SafeBedrockModel(BedrockModel):
         streaming responses and would otherwise propagate with no context.
         """
         try:
-            super()._stream(callback, messages, tool_specs, system_prompt_content, tool_choice)
+            super()._stream(
+                callback, messages, tool_specs, system_prompt_content, tool_choice
+            )
         except (ModelThrottledException, ContextWindowOverflowException):
             # Already handled by parent, let propagate
             raise
