@@ -16,7 +16,6 @@ logger.setLevel(logging.INFO)
 s3_client = boto3.client("s3")
 
 MAX_LINES_LIMIT = 5000
-PRESIGNED_URL_EXPIRY = 3600  # 1 hour
 PDF_EXTENSIONS = {".pdf"}
 
 
@@ -51,71 +50,59 @@ def _get_file_extension(key: str) -> str:
     return ext.lower()
 
 
-def _generate_presigned_url(bucket: str, key: str) -> str:
-    """Generate a pre-signed URL for an S3 object."""
-    return s3_client.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": bucket, "Key": key},
-        ExpiresIn=PRESIGNED_URL_EXPIRY,
-    )
-
-
-def _truncate_lines(text: str, max_lines: int) -> tuple[str, int, bool]:
-    """Split text into lines and truncate. Returns (content, total, truncated)."""
+def _slice_lines(text: str, start_line: int, end_line: int) -> tuple[str, int]:
+    """Extract a range of lines. Returns (content, total_lines)."""
     lines = text.splitlines()
     total = len(lines)
-    truncated = total > max_lines
-    content = "\n".join(lines[:max_lines])
-    return content, total, truncated
+    start = max(0, start_line - 1)  # convert to 0-indexed
+    end = min(total, end_line)
+    content = "\n".join(lines[start:end])
+    return content, total
 
 
-def read_pdf_file(s3_uri: str, max_lines: int = 500) -> str:
+def read_pdf_file(s3_uri: str, start_line: int = 1, end_line: int = 500) -> str:
     """
-    Download a PDF from S3, convert to markdown, and return content.
+    Download a PDF from S3, convert to markdown, and return a line range.
 
     Parameters
     ----------
     s3_uri : str
         S3 URI of the PDF file
-    max_lines : int
-        Maximum number of lines to return
+    start_line : int
+        First line to return (1-indexed)
+    end_line : int
+        Last line to return (inclusive)
     """
     import pymupdf4llm  # noqa: E402
 
     bucket, key = parse_s3_uri(s3_uri)
-    max_lines = min(max_lines, MAX_LINES_LIMIT)
 
-    # download PDF to temp file
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
         s3_client.download_file(bucket, key, tmp.name)
         markdown = pymupdf4llm.to_markdown(tmp.name, show_progress=False)
 
-    content, total, truncated = _truncate_lines(markdown, max_lines)
-    presigned_url = _generate_presigned_url(bucket, key)
-
-    header = f"File: {s3_uri} (PDF converted to markdown, {total} lines"
-    if truncated:
-        header += f", showing first {max_lines})"
-    else:
-        header += ")"
-    header += f"\nDownload link: {presigned_url}"
-
+    content, total = _slice_lines(markdown, start_line, end_line)
+    header = (
+        f"File: {s3_uri} (PDF, {total} lines total, "
+        f"showing lines {start_line}-{min(end_line, total)})"
+    )
     return f"{header}\n\n{content}"
 
 
-def read_text_file(s3_uri: str, max_lines: int = 500) -> str:
+def read_text_file(s3_uri: str, start_line: int = 1, end_line: int = 500) -> str:
     """
-    Read a text file from S3 and return up to max_lines lines.
+    Read a text file from S3 and return a range of lines.
 
     Parameters
     ----------
     s3_uri : str
         S3 URI of the text file to read
-    max_lines : int
-        Maximum number of lines to return
+    start_line : int
+        First line to return (1-indexed)
+    end_line : int
+        Last line to return (inclusive)
     """
     bucket, key = parse_s3_uri(s3_uri)
-    max_lines = min(max_lines, MAX_LINES_LIMIT)
 
     response = s3_client.get_object(Bucket=bucket, Key=key)
     body = response["Body"].read()
@@ -125,16 +112,11 @@ def read_text_file(s3_uri: str, max_lines: int = 500) -> str:
     except UnicodeDecodeError:
         text = body.decode("latin-1")
 
-    content, total, truncated = _truncate_lines(text, max_lines)
-    presigned_url = _generate_presigned_url(bucket, key)
-
-    header = f"File: {s3_uri} ({total} lines total"
-    if truncated:
-        header += f", showing first {max_lines})"
-    else:
-        header += ")"
-    header += f"\nDownload link: {presigned_url}"
-
+    content, total = _slice_lines(text, start_line, end_line)
+    header = (
+        f"File: {s3_uri} ({total} lines total, "
+        f"showing lines {start_line}-{min(end_line, total)})"
+    )
     return f"{header}\n\n{content}"
 
 
@@ -159,17 +141,23 @@ def handler(event, context):
             if not s3_uri:
                 return {"error": "Missing required parameter: s3_uri"}
 
-            max_lines = event.get("max_lines", 500)
-            if not isinstance(max_lines, int) or max_lines < 1:
-                max_lines = 500
+            start_line = event.get("start_line", 1)
+            end_line = event.get("end_line", 500)
+            if not isinstance(start_line, int) or start_line < 1:
+                start_line = 1
+            if not isinstance(end_line, int) or end_line < start_line:
+                end_line = start_line + 499
+            # cap range to MAX_LINES_LIMIT
+            if end_line - start_line + 1 > MAX_LINES_LIMIT:
+                end_line = start_line + MAX_LINES_LIMIT - 1
 
             _, key = parse_s3_uri(s3_uri)
             ext = _get_file_extension(key)
 
             if ext in PDF_EXTENSIONS:
-                result = read_pdf_file(s3_uri=s3_uri, max_lines=max_lines)
+                result = read_pdf_file(s3_uri, start_line, end_line)
             else:
-                result = read_text_file(s3_uri=s3_uri, max_lines=max_lines)
+                result = read_text_file(s3_uri, start_line, end_line)
 
             return {"content": [{"type": "text", "text": result}]}
 
