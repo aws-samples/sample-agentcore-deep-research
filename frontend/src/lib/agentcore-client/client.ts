@@ -35,6 +35,7 @@ export class AgentCoreClient {
     accessToken: string,
     onEvent: StreamCallback,
     enabledSources?: string[],
+    s3FileUris?: string[],
   ): Promise<void> {
     if (!accessToken) throw new Error("No valid access token found.");
     if (!this.runtimeArn) throw new Error("Agent Runtime ARN not configured.");
@@ -55,6 +56,10 @@ export class AgentCoreClient {
 
     if (enabledSources) {
       payload.enabledSources = enabledSources;
+    }
+
+    if (s3FileUris && s3FileUris.length > 0) {
+      payload.s3FileUris = s3FileUris;
     }
 
     // User identity is extracted server-side from the validated JWT token

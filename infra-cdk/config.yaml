@@ -7,7 +7,7 @@ admin_user_email: null
 backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
-  model_id: global.anthropic.claude-sonnet-4-5-20250929-v1:0 # Model ID for the agent (with cross-region prefix)
+  model_id: global.anthropic.claude-sonnet-4-6 # Model ID for the agent (with cross-region prefix)
 
 # API Keys for research tools (used by strands-deep-research pattern)
 # Get your Tavily API key at: https://tavily.com/
