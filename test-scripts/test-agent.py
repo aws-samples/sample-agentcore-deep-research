@@ -19,7 +19,7 @@ Usage:
     uv run scripts/test-agent.py --local
 
     # Override pattern from config
-    uv run scripts/test-agent.py --pattern strands-single-agent
+    uv run scripts/test-agent.py --pattern strands-deep-research
 """
 
 import argparse
@@ -96,7 +96,7 @@ def start_local_agent(
         memory_id (str): Memory ID for the agent
         region (str): AWS region
         stack_name (str): CloudFormation stack name for SSM parameter lookup
-        pattern (str): Agent pattern name (e.g., 'strands-single-agent', 'langgraph-single-agent')
+        pattern (str): Agent pattern name (e.g., 'strands-deep-research')
 
     Returns:
         subprocess.Popen: Subprocess object for the running agent
@@ -105,8 +105,7 @@ def start_local_agent(
 
     # Map pattern to agent file
     pattern_files = {
-        "strands-single-agent": "basic_agent.py",
-        "langgraph-single-agent": "langgraph_agent.py",
+        "strands-deep-research": "deep_research_agent.py",
     }
 
     agent_file = pattern_files.get(pattern)
@@ -402,7 +401,7 @@ Examples:
   uv run scripts/test-agent.py --local
 
   # Override pattern for local testing
-  uv run scripts/test-agent.py --local --pattern strands-single-agent
+  uv run scripts/test-agent.py --local --pattern strands-deep-research
 
 Notes:
   - Remote mode: Tests deployed agent
@@ -421,7 +420,7 @@ Notes:
     parser.add_argument(
         "--pattern",
         type=str,
-        help="Override agent pattern from config (e.g., 'strands-single-agent', 'langgraph-single-agent')",
+        help="Override agent pattern from config (e.g., 'strands-deep-research')",
     )
 
     return parser.parse_args()
@@ -445,7 +444,7 @@ def main():
         pattern = (
             args.pattern
             if args.pattern
-            else stack_cfg.get("pattern", "strands-single-agent")
+            else stack_cfg.get("pattern", "strands-deep-research")
         )
         print(f"Using pattern: {pattern}\n")
         print_section("LOCAL MODE - Auto-starting agent")

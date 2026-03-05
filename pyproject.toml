@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fullstack-agentcore-solution-template"
+name = "correlate-deep-research"
 version = "0.3.1"
-description = "Fullstack AgentCore Solution Template - A template for building AgentCore applications"
+description = "Correlate: Deep Research - AI-powered multi-source research application built on Amazon Bedrock AgentCore"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
@@ -42,25 +42,16 @@ agent-strands = [
     "mcp==1.21.0",
 ]
 
-# LangGraph agent dependencies (for local development)
-agent-langgraph = [
-    "langgraph==1.0.3",
-    "langchain-aws==1.0.0",
-    "langchain-mcp-adapters==0.1.13",
-    "langgraph-checkpoint-aws==1.0.1",
-    "mcp==1.21.0",
-]
-
 # All dependencies for local development
 all = [
-    "fullstack-agentcore-solution-template[dev,agent-strands,agent-langgraph]",
+    "correlate-deep-research[dev,agent-strands]",
 ]
 
 [project.urls]
-Homepage = "https://github.com/aws-samples/fullstack-agentcore-solution-template"
-Documentation = "https://github.com/aws-samples/fullstack-agentcore-solution-template/tree/main/docs"
-Repository = "https://github.com/aws-samples/fullstack-agentcore-solution-template"
-Issues = "https://github.com/aws-samples/fullstack-agentcore-solution-template/issues"
+Homepage = "https://github.com/aws-samples/correlate-deep-research"
+Documentation = "https://github.com/aws-samples/correlate-deep-research/tree/main/docs"
+Repository = "https://github.com/aws-samples/correlate-deep-research"
+Issues = "https://github.com/aws-samples/correlate-deep-research/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

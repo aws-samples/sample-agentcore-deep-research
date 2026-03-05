@@ -8,13 +8,10 @@ import type {
   StreamCallback,
 } from "./types";
 import { parseStrandsChunk } from "./parsers/strands";
-import { parseLanggraphChunk } from "./parsers/langgraph";
 import { readSSEStream } from "./utils/sse";
 
 const PARSERS: Record<AgentPattern, ChunkParser> = {
-  "strands-single-agent": parseStrandsChunk,
   "strands-deep-research": parseStrandsChunk,
-  "langgraph-single-agent": parseLanggraphChunk,
 };
 
 export class AgentCoreClient {

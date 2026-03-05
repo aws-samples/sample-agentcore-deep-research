@@ -1,8 +1,8 @@
 {
-  "name": "fast-cdk",
+  "name": "correlate-cdk",
   "version": "0.3.1",
   "bin": {
-    "fast-cdk": "bin/fast-cdk.js"
+    "correlate-cdk": "bin/correlate-cdk.js"
   },
   "scripts": {
     "build": "tsc",

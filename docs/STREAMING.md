@@ -22,7 +22,7 @@ Your agent sends streaming events in SSE format. This guide explains how to inte
 
 ### Backend: Strands Agent
 
-**File:** `patterns/strands-single-agent/basic_agent.py`
+**File:** `patterns/strands-deep-research/deep_research_agent.py`
 
 The backend yields all raw Strands streaming events, serialized to JSON-safe dicts:
 
@@ -37,7 +37,7 @@ async for event in agent.stream_async(user_query):
 
 **File:** `frontend/src/lib/agentcore-client/parsers/strands.ts`
 
-The default parser for `strands-single-agent` handles Strands schema events:
+The default parser for `strands-deep-research` handles Strands schema events:
 
 ```typescript
 export const parseStrandsChunk: ChunkParser = (line, callback) => {
@@ -129,7 +129,7 @@ To use this parser instead of the default strands parser, update `client.ts`:
 import { parseConverseChunk } from "./parsers/converse";
 
 const PARSERS: Record<AgentPattern, ChunkParser> = {
-  "strands-single-agent": parseConverseChunk,  // Switch to Converse parser
+  "strands-deep-research": parseConverseChunk,  // Switch to Converse parser
   ...
 };
 ```
@@ -205,7 +205,7 @@ data: {"event": {"metadata": {"usage": {"inputTokens": 88, "outputTokens": 30}}}
 
 ### Backend
 
-**File:** `patterns/langgraph-single-agent/langgraph_agent.py`
+**File:** (LangGraph pattern removed, see `patterns/strands-deep-research/deep_research_agent.py` for current implementation)
 
 ```python
 # Stream with messages mode - yields raw LangChain message chunks

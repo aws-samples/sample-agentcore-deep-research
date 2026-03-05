@@ -36,13 +36,12 @@ uv run test-scripts/test-agent.py
 uv run test-scripts/test-agent.py --local
 
 # Override pattern for local testing
-uv run test-scripts/test-agent.py --local --pattern strands-single-agent
+uv run test-scripts/test-agent.py --local --pattern strands-deep-research
 ```
 
 **Supported Patterns:**
 
-- `strands-single-agent` - Basic Strands agent
-- `langgraph-single-agent` - LangGraph agent with streaming
+- `strands-deep-research` - Deep Research agent with multi-source search
 
 **Prerequisites:**
 
@@ -68,7 +67,7 @@ python test-scripts/test-agent-docker.py --build-only
 python test-scripts/test-agent-docker.py --skip-build
 
 # Test specific pattern
-python test-scripts/test-agent-docker.py --pattern langgraph-single-agent
+python test-scripts/test-agent-docker.py --pattern strands-deep-research
 ```
 
 **What it tests:**

@@ -12,7 +12,7 @@ ENV UV_SYSTEM_PYTHON=1 \
     OTEL_PYTHON_LOG_CORRELATION=true \
     PYTHONUNBUFFERED=1
 
-# Copy pyproject.toml and gateway package for FAST installation
+# Copy pyproject.toml and gateway package for installation
 COPY pyproject.toml .
 COPY gateway/ gateway/
 COPY tools/ tools/
@@ -22,7 +22,7 @@ COPY patterns/strands-deep-research/requirements.txt requirements.txt
 RUN uv pip install --no-cache -r requirements.txt && \
     uv pip install --no-cache aws-opentelemetry-distro==0.10.1
 
-# Install FAST package with only core dependencies (no dev/agent optional deps)
+# Install package with only core dependencies (no dev/agent optional deps)
 RUN uv pip install --no-cache -e . --no-deps && \
     uv pip install --no-cache requests>=2.31.0
 

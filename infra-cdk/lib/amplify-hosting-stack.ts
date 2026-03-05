@@ -15,7 +15,7 @@ export class AmplifyHostingStack extends cdk.NestedStack {
   public readonly stagingBucket: s3.Bucket
 
   constructor(scope: Construct, id: string, props: AmplifyStackProps) {
-    const description = "Fullstack AgentCore Solution Template - Amplify Hosting Stack"
+    const description = "Correlate: Deep Research - Amplify Hosting Stack"
     super(scope, id, { ...props, description })
 
     // Create access logs bucket for staging bucket
