@@ -5,8 +5,8 @@ This code is being licensed under the terms of the Amazon Software License avail
 
 import json
 import logging
-from urllib.request import Request, urlopen
 from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -14,10 +14,7 @@ logger.setLevel(logging.INFO)
 OPENFDA_DRUG_LABEL_URL = "https://api.fda.gov/drug/label.json"
 
 
-def search_openfda(
-    drug_name: str,
-    max_results: int = 10
-) -> str:
+def search_openfda(drug_name: str, max_results: int = 10) -> str:
     """
     Search OpenFDA drug label API for information on a given drug.
 
@@ -40,11 +37,16 @@ def search_openfda(
     """
     query = quote(drug_name)
     limit = min(max_results, 50)
-    url = f"{OPENFDA_DRUG_LABEL_URL}?search=openfda.brand_name:{query}+openfda.generic_name:{query}+openfda.substance_name:{query}&limit={limit}"
+    search = (
+        f"openfda.brand_name:{query}"
+        f"+openfda.generic_name:{query}"
+        f"+openfda.substance_name:{query}"
+    )
+    url = f"{OPENFDA_DRUG_LABEL_URL}?search={search}&limit={limit}"
 
-    req = Request(url, method="GET")
+    req = Request(url, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             response = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         logger.error(f"OpenFDA request failed: {str(e)}")
@@ -64,7 +66,9 @@ def search_openfda(
         product_type = ", ".join(openfda.get("product_type", ["Unknown"]))
 
         indications = "\n".join(drug.get("indications_and_usage", ["N/A"]))[:500]
-        warnings = "\n".join(drug.get("warnings", drug.get("boxed_warning", ["N/A"])))[:500]
+        warnings = "\n".join(drug.get("warnings", drug.get("boxed_warning", ["N/A"])))[
+            :500
+        ]
         contraindications = "\n".join(drug.get("contraindications", ["N/A"]))[:500]
         interactions = "\n".join(drug.get("drug_interactions", ["N/A"]))[:500]
         dosage = "\n".join(drug.get("dosage_and_administration", ["N/A"]))[:500]
@@ -105,10 +109,15 @@ def handler(event, context):
     try:
         tool_name = context.client_context.custom.get("bedrockAgentCoreToolName", "")
         delimiter = "___"
-        tool_name = tool_name[tool_name.index(delimiter) + len(delimiter):]
+        tool_name = tool_name[tool_name.index(delimiter) + len(delimiter) :]
 
         if tool_name != "openfda_drug_search":
-            return {"error": f"This Lambda only supports 'openfda_drug_search', received: {tool_name}"}
+            return {
+                "error": (
+                    "This Lambda only supports "
+                    f"'openfda_drug_search', received: {tool_name}"
+                )
+            }
 
         drug_name = event.get("drug_name", "")
         if not drug_name:

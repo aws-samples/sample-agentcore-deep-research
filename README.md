@@ -75,7 +75,7 @@ See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup 
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture-diagram/FAST-architecture-20251201.png)
+![Architecture Diagram](docs/architecture-diagram/correlate-architecture.png)
 
 The architecture uses Amazon Cognito in four places:
 1. User-based login to the frontend web application on CloudFront
@@ -155,6 +155,11 @@ correlate-deep-research/
 Note: this asset represents a proof-of-value for the services included and is not intended as a production-ready solution. You must determine how the AWS Shared Responsibility applies to your specific use case and implement the needed controls to achieve your desired security outcomes. AWS offers a broad set of security tools and configurations to enable our customers.
 
 Ultimately it is your responsibility as the developer to ensure all aspects of the application are secure. We provide security best practices in repository documentation and provide a secure baseline but Amazon holds no responsibility for the security of applications built from this tool.
+
+
+## Built With
+
+This project is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
 
 
 ## License

@@ -102,7 +102,7 @@ export default function ChatInterface() {
           runtimeArn: config.agentRuntimeArn,
           region: config.awsRegion || "us-east-1",
           pattern: (config.agentPattern ||
-            "strands-single-agent") as AgentPattern,
+            "strands-deep-research") as AgentPattern,
         });
 
         setClient(agentClient);

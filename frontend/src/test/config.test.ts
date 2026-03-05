@@ -220,9 +220,7 @@ describe("Configuration Verification Tests", () => {
         resolve(__dirname, "../../index.html"),
         "utf-8",
       );
-      expect(indexHtml).toContain(
-        "<title>Fullstack AgentCore Solution Template</title>",
-      );
+      expect(indexHtml).toContain("<title>Correlate: Deep Research</title>");
     });
 
     it("should have meta description", () => {

@@ -1,5 +1,6 @@
-# Copyright Amazon.com, Inc. or its affiliates. This material is AWS Content under the AWS Enterprise Agreement
-# or AWS Customer Agreement (as applicable) and is provided under the AWS Intellectual Property License.
+# Copyright Amazon.com, Inc. or its affiliates.
+# AWS Content under the AWS Enterprise Agreement or
+# AWS Customer Agreement (as applicable).
 
 from typing import Any
 
@@ -37,7 +38,8 @@ def get_inference_configs() -> tuple[dict[str, Any], dict[str, Any]]:
     -------
     tuple[dict[str, Any], dict[str, Any]]
         Tuple containing:
-        - Inference config dict with temperature, maxTokens, topP and stopSequences parameters
+        - Inference config dict with temperature, maxTokens,
+          topP and stopSequences parameters
         - Reasoning config dict with thinking settings
     """
 
@@ -91,4 +93,6 @@ def get_bedrock_client(region_name: str) -> boto3.client:
         Bedrock client with custom configuration
     """
     config = get_bedrock_config()
-    return boto3.client(service_name="bedrock-runtime", region_name=region_name, config=config)
+    return boto3.client(
+        service_name="bedrock-runtime", region_name=region_name, config=config
+    )

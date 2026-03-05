@@ -1,6 +1,6 @@
 # Deployment Scripts
 
-This directory contains scripts for deploying the Fullstack AgentCore Solution Template
+This directory contains scripts for deploying Correlate
 infrastructure and frontend.
 
 ## Main Deployment Workflow

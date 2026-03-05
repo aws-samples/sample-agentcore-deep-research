@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide walks you through deploying the Fullstack AgentCore Solution Template (FAST) to AWS.
+This guide walks you through deploying Correlate to AWS.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ stack_name_base: your-project-name # Change this to your preferred stack name (m
 admin_user_email: null # Optional: admin@example.com (auto-creates user & emails credentials)
 
 backend:
-  pattern: strands-single-agent # Available patterns: strands-single-agent, langgraph
+  pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
 ```
 
@@ -41,7 +41,7 @@ backend:
 
 ### Deployment Types
 
-FAST supports two deployment types for AgentCore Runtime. Set `deployment_type` in `infra-cdk/config.yaml`:
+Correlate supports two deployment types for AgentCore Runtime. Set `deployment_type` in `infra-cdk/config.yaml`:
 
 | Type | Description |
 |------|-------------|
