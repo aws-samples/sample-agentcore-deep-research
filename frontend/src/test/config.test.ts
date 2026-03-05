@@ -221,7 +221,7 @@ describe("Configuration Verification Tests", () => {
         "utf-8",
       );
       expect(indexHtml).toContain(
-        "<title>Fullstack AgentCore Solution Template</title>",
+        "<title>Correlate: Deep Research</title>",
       );
     });
 

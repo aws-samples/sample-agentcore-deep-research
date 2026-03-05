@@ -98,7 +98,7 @@ export class BackendStack extends cdk.NestedStack {
   }
 
   private createAgentCoreRuntime(config: AppConfig): void {
-    const pattern = config.backend?.pattern || "strands-single-agent"
+    const pattern = config.backend?.pattern || "strands-deep-research"
 
     // Parameters
     this.agentName = new cdk.CfnParameter(this, "AgentName", {

@@ -14,7 +14,7 @@ Usage:
     python scripts/test-agent-docker.py              # Build & run
     python scripts/test-agent-docker.py --build-only # Build only
     python scripts/test-agent-docker.py --skip-build # Run existing image
-    python scripts/test-agent-docker.py --pattern langgraph-single-agent
+    python scripts/test-agent-docker.py --pattern strands-deep-research
 """
 
 import argparse
@@ -44,7 +44,7 @@ from utils import (
 # Globals
 _container_id: str | None = None
 REPO_ROOT = Path(__file__).parent.parent
-IMAGE_NAME = "fast-agent-local"
+IMAGE_NAME = "correlate-agent-local"
 
 
 def build_docker_image(pattern: str) -> bool:
@@ -52,7 +52,7 @@ def build_docker_image(pattern: str) -> bool:
     Build Docker image for the specified pattern.
 
     Args:
-        pattern: Agent pattern name (e.g., 'strands-single-agent')
+        pattern: Agent pattern name (e.g., 'strands-deep-research')
 
     Returns:
         bool: True if build succeeded, False otherwise
@@ -299,7 +299,7 @@ Examples:
   python scripts/test-agent-docker.py                    # Build and run
   python scripts/test-agent-docker.py --build-only       # Build only
   python scripts/test-agent-docker.py --skip-build       # Use existing image
-  python scripts/test-agent-docker.py --pattern langgraph-single-agent
+  python scripts/test-agent-docker.py --pattern strands-deep-research
         """,
     )
 
@@ -326,7 +326,7 @@ def main() -> None:
 
     # Get configuration from stack
     stack_cfg = get_stack_config()
-    pattern = args.pattern or stack_cfg.get("pattern", "strands-single-agent")
+    pattern = args.pattern or stack_cfg.get("pattern", "strands-deep-research")
 
     print(f"Pattern: {pattern}\n")
 

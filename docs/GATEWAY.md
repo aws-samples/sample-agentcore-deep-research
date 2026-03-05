@@ -1,10 +1,10 @@
 # AgentCore Gateway Implementation
 
-This document describes how FAST implements AgentCore Gateway with Lambda targets to provide a scalable, production-ready tool execution architecture.
+This document describes how Correlate implements AgentCore Gateway with Lambda targets to provide a scalable, production-ready tool execution architecture.
 
 ## Overview
 
-FAST uses **AgentCore Gateway with Lambda Targets** to enable agents to access external tools and services. This architecture provides a clean separation between agent logic and tool implementation, allowing for independent scaling and deployment of individual tools.
+Correlate uses **AgentCore Gateway with Lambda Targets** to enable agents to access external tools and services. This architecture provides a clean separation between agent logic and tool implementation, allowing for independent scaling and deployment of individual tools.
 
 ## Architecture Comparison
 
@@ -18,13 +18,13 @@ There are two primary approaches to implementing AgentCore Gateway:
 - Simpler setup for basic scenarios
 - Direct client → gateway communication
 
-#### Lambda Targets (FAST's Choice)
+#### Lambda Targets (Correlate's Choice)
 - Gateway acts as a proxy/router to external Lambda functions
 - Each tool is implemented as a separate Lambda function
 - Client → Gateway → Lambda → Gateway → Client flow
 - Production-ready architecture with enterprise benefits
 
-### Why FAST Uses Lambda Targets
+### Why Correlate Uses Lambda Targets
 
 We chose Lambda targets for the following production advantages:
 
@@ -51,7 +51,7 @@ The gateway is created using AWS CDK L1 constructs with the following configurat
 
 ### Lambda Target Structure
 
-Each Lambda target in FAST follows this pattern:
+Each Lambda target in Correlate follows this pattern:
 
 ```python
 def handler(event, context):
@@ -123,7 +123,7 @@ def lambda_handler(event, context):
         # Route to appropriate tool handler
         if tool_name == "sample_tool":
             name = event.get('name', 'World')
-            result = f"Hello, {name}! This is a sample tool from FAST."
+            result = f"Hello, {name}! This is a sample tool from Correlate."
             return {"result": result}
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
@@ -248,7 +248,7 @@ The gateway integrates with AgentCore Runtime through:
 
 ### Integration with Agents via MCP
 
-Agents connect to the Gateway using the Model Context Protocol (MCP). FAST provides two integration approaches:
+Agents connect to the Gateway using the Model Context Protocol (MCP). Correlate provides two integration approaches:
 
 #### LangGraph with MultiServerMCPClient
 
@@ -280,7 +280,7 @@ graph = create_react_agent(
 )
 ```
 
-**Example:** See `patterns/langgraph-single-agent/langgraph_agent.py` for complete implementation.
+**Example:** See `patterns/strands-deep-research/deep_research_agent.py` for complete implementation.
 
 #### Strands with Direct MCP Session
 
@@ -301,7 +301,7 @@ async with streamablehttp_client(
         # Use tools with agent
 ```
 
-**Example:** See `patterns/strands-single-agent/basic_agent.py` for complete implementation.
+**Example:** See `patterns/strands-deep-research/deep_research_agent.py` for complete implementation.
 
 ## Adding New Tools
 
@@ -444,6 +444,6 @@ const gateway = new bedrockagentcore.CfnGateway(this, "AgentCoreGateway", {
 
 ## Related Documentation
 
-- [Deployment Guide](DEPLOYMENT.md) - How to deploy FAST infrastructure
+- [Deployment Guide](DEPLOYMENT.md) - How to deploy Correlate infrastructure
 - [AWS AgentCore Gateway Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore-gateway.html) - Official AWS documentation
 - [AWS Gateway Lambda Target Documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-add-target-lambda.html) - Lambda target implementation details

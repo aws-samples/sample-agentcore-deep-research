@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Cross-platform frontend deployment script for FAST.
+Cross-platform frontend deployment script.
 
 Deploys the React frontend to AWS Amplify by:
 1. Fetching configuration from CDK stack outputs
@@ -123,7 +123,7 @@ def parse_config_yaml(config_path: Path) -> dict[str, str]:
     Returns:
         Dictionary with stack_name_base and pattern values
     """
-    config = {"stack_name_base": "", "pattern": "strands-single-agent"}
+    config = {"stack_name_base": "", "pattern": "strands-deep-research"}
 
     if not config_path.exists():
         return config
@@ -483,7 +483,7 @@ def main() -> int:
 
     # Get agent pattern from config
     config = parse_config_yaml(config_path)
-    pattern = config.get("pattern", "strands-single-agent")
+    pattern = config.get("pattern", "strands-deep-research")
     log_info(f"Agent pattern: {pattern}")
 
     # Generate aws-exports.json

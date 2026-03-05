@@ -59,7 +59,7 @@ export class ConfigManager {
         stack_name_base: stackNameBase,
         admin_user_email: parsedConfig.admin_user_email || null,
         backend: {
-          pattern: parsedConfig.backend?.pattern || "strands-single-agent",
+          pattern: parsedConfig.backend?.pattern || "strands-deep-research",
           deployment_type: deploymentType,
           model_id: parsedConfig.backend?.model_id,
         },

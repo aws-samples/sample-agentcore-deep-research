@@ -5,7 +5,7 @@ services:
   agent:
     build:
       context: ..
-      dockerfile: patterns/strands-single-agent/Dockerfile
+      dockerfile: patterns/strands-deep-research/Dockerfile
       platforms:
         - linux/arm64
     ports:
@@ -25,7 +25,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - fast-network
+      - correlate-network
 
   frontend:
     build:
@@ -42,8 +42,8 @@ services:
       agent:
         condition: service_healthy
     networks:
-      - fast-network
+      - correlate-network
 
 networks:
-  fast-network:
+  correlate-network:
     driver: bridge

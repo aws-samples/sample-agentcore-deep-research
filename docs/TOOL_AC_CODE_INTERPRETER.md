@@ -1,6 +1,6 @@
 # AgentCore Code Interpreter Integration
 
-This document explains the architectural decisions for integrating Amazon Bedrock AgentCore Code Interpreter into FAST.
+This document explains the architectural decisions for integrating Amazon Bedrock AgentCore Code Interpreter.
 
 ## What is AgentCore Code Interpreter?
 
@@ -16,7 +16,7 @@ Amazon Bedrock AgentCore Code Interpreter is a fully managed capability that ena
 
 ## Why Direct Integration (Not Gateway)?
 
-FAST integrates Code Interpreter **directly into agents** rather than through the Gateway. Here's why:
+The solution integrates Code Interpreter **directly into agents** rather than through the Gateway. Here's why:
 
 ### Approach 1: Direct Integration ✅ (Chosen)
 
@@ -67,25 +67,20 @@ Code Interpreter is a **built-in AgentCore service**, similar to Bedrock models 
 
 ## Implementation Architecture
 
-FAST uses a **layered architecture** for reusability across agent patterns:
+The solution uses a **layered architecture** for reusability across agent patterns:
 
 ```
 tools/code_interpreter/
 └── code_interpreter_tools.py          # Core logic (framework-agnostic)
 
-patterns/strands-single-agent/
-├── strands_code_interpreter.py        # Strands wrapper (@tool decorator)
-└── basic_agent.py                     # Agent implementation
-
-patterns/langgraph-single-agent/
-└── tools/
-    └── langgraph_execute_python.py    # LangGraph wrapper (ready for future)
+patterns/strands-deep-research/
+└── deep_research_agent.py             # Agent implementation
 ```
 
 ### Design Principles
 
-1. **Core logic is framework-agnostic** - No Strands/LangGraph dependencies in `tools/code_interpreter/`
-2. **Pattern-specific wrappers** - Each framework has its own wrapper with appropriate decorators
+1. **Core logic is framework-agnostic** - No Strands dependencies in `tools/code_interpreter/`
+2. **Pattern-specific wrappers** - Framework has its own wrapper with appropriate decorators
 3. **Reusability** - Core tool can be used by any agent pattern
 4. **Maintainability** - Bug fixes in core benefit all patterns
 
@@ -96,30 +91,20 @@ patterns/langgraph-single-agent/
 - Lazy initialization for performance
 - Session management with cleanup support
 
-**Strands Wrapper** (`patterns/strands-single-agent/strands_code_interpreter.py`):
-- Adds Strands `@tool` decorator
-- Delegates to core tool
-- Located at pattern root for easy imports
-
-**Agent Integration** (`patterns/strands-single-agent/basic_agent.py`):
-- Imports wrapper: `from strands_code_interpreter import StrandsCodeInterpreterTools`
-- Registers tool: `tools=[gateway_client, code_tools.execute_python_securely]`
+**Agent Integration** (`patterns/strands-deep-research/deep_research_agent.py`):
+- Registers tools alongside Gateway MCP tools
 
 ### Dockerfile Changes
 
-The Dockerfile copies both core tools and pattern-specific wrappers:
+The Dockerfile copies core tools:
 
 ```dockerfile
 # Copy core tools (reusable)
 COPY tools/ tools/
-
-# Copy pattern-specific wrapper
-COPY patterns/strands-single-agent/strands_code_interpreter.py .
 ```
 
 Working directory is `/app/`, so imports work naturally:
 - `from tools.code_interpreter.code_interpreter_tools import CodeInterpreterTools`
-- `from strands_code_interpreter import StrandsCodeInterpreterTools`
 
 ## Benefits of This Architecture
 
@@ -153,8 +138,8 @@ The tool is registered as `execute_python_securely` to emphasize security vs bui
 
 **Local Docker Build**:
 ```bash
-docker build -f patterns/strands-single-agent/Dockerfile -t test-agent .
-docker run --rm test-agent python -c "from strands_code_interpreter import StrandsCodeInterpreterTools; print('✓ Import successful')"
+docker build -f patterns/strands-deep-research/Dockerfile -t test-agent .
+docker run --rm test-agent python -c "from deep_research_agent import create_deep_research_agent; print('✓ Import successful')"
 ```
 
 **Deployment**:
@@ -178,4 +163,4 @@ Potential improvements:
 
 - [AgentCore Code Interpreter Documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter-tool.html)
 - [AWS IDP Reference Implementation](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws)
-- [FAST Gateway Documentation](./GATEWAY.md)
+- [Gateway Documentation](./GATEWAY.md)
