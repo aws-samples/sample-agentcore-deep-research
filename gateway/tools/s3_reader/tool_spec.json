@@ -1,7 +1,7 @@
 [
   {
     "name": "s3_text_reader",
-    "description": "Read a file from S3. Supports text formats (.txt, .md, .csv, .json, .xml, .log, .yaml, .tsv) and PDF files (.pdf, converted to markdown automatically). Returns the file content up to the specified number of lines. Use this to read documents that the user has provided via S3 file paths.",
+    "description": "Read a file from S3. Supports text formats (.txt, .md, .csv, .json, .xml, .log, .yaml, .tsv) and PDF files (.pdf, converted to markdown automatically). Returns lines from start_line to end_line. Use this to read documents that the user has provided via S3 file paths.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -9,9 +9,13 @@
           "type": "string",
           "description": "S3 URI of the file to read (e.g., 's3://bucket-name/path/to/file.txt')"
         },
-        "max_lines": {
+        "start_line": {
           "type": "integer",
-          "description": "Maximum number of lines to return (default 500, max 5000). Use smaller values for initial exploration, larger for full reads."
+          "description": "First line to return, 1-indexed (default 1)"
+        },
+        "end_line": {
+          "type": "integer",
+          "description": "Last line to return, inclusive (default 500). Max range is 5000 lines per call."
         }
       },
       "required": ["s3_uri"]

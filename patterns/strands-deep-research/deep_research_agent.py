@@ -110,11 +110,9 @@ def load_system_prompt(
         tools_section += (
             "The user has provided these S3 files as data sources. "
             "Use `s3_text_reader` to read them during your research. "
-            "Start with max_lines=100 to explore, then read more "
-            "lines if the content is relevant.\n"
-            "The tool response includes a 'Download link:' URL for "
-            "each file. When citing S3 files, use that download link "
-            "as the source, e.g. [Source: <download_link_url>].\n"
+            "Start with end_line=100 to explore, then read more "
+            "lines if the content is relevant. "
+            "Cite S3 files as [Source: s3://bucket/path/file.ext].\n"
         )
         for uri in s3_file_uris:
             tools_section += f"- `{uri}`\n"
