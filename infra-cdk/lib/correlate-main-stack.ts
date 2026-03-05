@@ -17,8 +17,7 @@ export class CorrelateMainStack extends cdk.Stack {
   public readonly cognitoStack: CognitoStack
 
   constructor(scope: Construct, id: string, props: CorrelateStackProps) {
-    const description =
-      "Correlate: Deep Research - Main Stack (v0.3.1) (uksb-v6dos0t5g8)"
+    const description = "Correlate: Deep Research - Main Stack (v0.3.1) (uksb-v6dos0t5g8)"
     super(scope, id, { ...props, description })
 
     // Step 1: Create the Amplify stack to get the predictable domain

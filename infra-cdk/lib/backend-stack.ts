@@ -891,10 +891,7 @@ export class BackendStack extends cdk.NestedStack {
       )
     )
     const openfdaSpec = JSON.parse(
-      fs.readFileSync(
-        path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"),
-        "utf8"
-      )
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"), "utf8")
     )
 
     // ArXiv Search Target

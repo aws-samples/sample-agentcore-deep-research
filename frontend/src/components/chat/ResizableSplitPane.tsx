@@ -36,7 +36,10 @@ export function ResizableSplitPane({
       const percentage = (x / rect.width) * 100;
 
       // clamp between min and max
-      const clamped = Math.min(Math.max(percentage, minLeftWidth), maxLeftWidth);
+      const clamped = Math.min(
+        Math.max(percentage, minLeftWidth),
+        maxLeftWidth,
+      );
       setLeftWidth(clamped);
     },
     [isDragging, minLeftWidth, maxLeftWidth],
@@ -85,7 +88,10 @@ export function ResizableSplitPane({
       </div>
 
       {/* Right pane */}
-      <div className="h-full overflow-hidden" style={{ width: `${100 - leftWidth}%` }}>
+      <div
+        className="h-full overflow-hidden"
+        style={{ width: `${100 - leftWidth}%` }}
+      >
         {right}
       </div>
     </div>
