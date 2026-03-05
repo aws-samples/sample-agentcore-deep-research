@@ -34,8 +34,8 @@ def test_openfda_search():
         if "Error" in result or "No OpenFDA results" in result:
             print(result)
         else:
-            lines = result.split('\n')
-            print('\n'.join(lines[:20]) + "\n...")
+            lines = result.split("\n")
+            print("\n".join(lines[:20]) + "\n...")
 
     print("\n" + "=" * 60)
     print("OpenFDA search tests completed!")

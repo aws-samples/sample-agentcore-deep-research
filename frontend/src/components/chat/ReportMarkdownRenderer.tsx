@@ -165,7 +165,9 @@ const markdownComponents: Record<string, any> = {
   table({ children }: { children?: React.ReactNode }) {
     return (
       <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">{children}</table>
+        <table className="min-w-full divide-y divide-gray-200">
+          {children}
+        </table>
       </div>
     );
   },
@@ -270,7 +272,10 @@ function CollapsibleSection({
     : "";
 
   return (
-    <div id={section.id} className={`${styles.wrapper} ${newHighlight} rounded-xl transition-all duration-500`}>
+    <div
+      id={section.id}
+      className={`${styles.wrapper} ${newHighlight} rounded-xl transition-all duration-500`}
+    >
       <button onClick={onToggle} className={styles.button}>
         {isCollapsed ? (
           <ChevronRight className={`${styles.icon} shrink-0`} />
@@ -310,7 +315,9 @@ export function ReportMarkdownRenderer({
   isLoading = false,
 }: ReportMarkdownRendererProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [changedSectionIds, setChangedSectionIds] = useState<Set<string>>(new Set());
+  const [changedSectionIds, setChangedSectionIds] = useState<Set<string>>(
+    new Set(),
+  );
   const prevContentRef = useRef<string>("");
   const prevSectionsRef = useRef<Map<string, string>>(new Map());
 
@@ -359,10 +366,7 @@ export function ReportMarkdownRenderer({
   }, [isLoading, changedSectionIds.size]);
 
   // Extract table of contents from H2 sections only (H1 is used as title in panel header)
-  const toc = useMemo(
-    () => sections.filter((s) => s.level === 2),
-    [sections]
-  );
+  const toc = useMemo(() => sections.filter((s) => s.level === 2), [sections]);
 
   const toggleSection = (id: string) => {
     setCollapsedIds((prev) => {

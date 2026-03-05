@@ -10,7 +10,7 @@ from pathlib import Path
 import boto3
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 
-REPORT_FILE_PATH = "/tmp/research_report.md"
+REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108
 REPORTS_BUCKET = os.environ.get("STAGING_BUCKET_NAME", "")
 URL_EXPIRATION = 3600  # 1 hour
 
@@ -56,7 +56,7 @@ class ReportS3UploadHook(HookProvider):
             return None
 
     def upload_report_to_s3(self, event: AfterToolCallEvent) -> None:
-        """Upload report to S3 after file_write or editor completes and add URL to result."""
+        """Upload report to S3 after file_write/editor and add URL to result."""
         tool_name = event.tool_use.get("name", "")
 
         # Only process file write operations (not file_read)
