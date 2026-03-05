@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Download, FileText, Loader2, BookOpen } from "lucide-react";
+import { Download, FileText, Loader2, BookOpen, Link } from "lucide-react";
 import {
   ReportMarkdownRenderer,
   extractReportTitle,
@@ -23,6 +23,23 @@ export function ResearchReportPanel({
     () => extractReportTitle(content) || "Research Report",
     [content],
   );
+
+  // Extract unique [Source: XXX] references from report
+  const references = useMemo(() => {
+    if (!content) return [];
+    const matches = content.matchAll(/\[Source:\s*([^\]]+)\]/g);
+    const seen = new Set<string>();
+    const refs: { label: string; url: string | null }[] = [];
+    for (const m of matches) {
+      const raw = m[1].trim();
+      if (seen.has(raw)) continue;
+      seen.add(raw);
+      // detect if the source is a URL
+      const isUrl = /^https?:\/\//.test(raw);
+      refs.push({ label: raw, url: isUrl ? raw : null });
+    }
+    return refs;
+  }, [content]);
 
   const handleDownload = () => {
     const blob = new Blob([content], { type: "text/markdown" });
@@ -81,6 +98,36 @@ export function ResearchReportPanel({
                 isLoading={isLoading}
               />
             </div>
+
+            {/* References section */}
+            {references.length > 0 && (
+              <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Link className="w-4 h-4 text-gray-500" />
+                  <h3 className="font-semibold text-gray-700">
+                    References ({references.length})
+                  </h3>
+                </div>
+                <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-600">
+                  {references.map((ref, i) => (
+                    <li key={i} className="break-all">
+                      {ref.url ? (
+                        <a
+                          href={ref.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {ref.label}
+                        </a>
+                      ) : (
+                        <span>{ref.label}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
