@@ -669,37 +669,39 @@ export class BackendStack extends cdk.NestedStack {
       })
     )
 
-    // S3 Document Reader Lambda (with BDA)
-    const s3BdaLambda = new lambda.Function(this, "S3BdaReaderLambda", {
+    // S3 File Reader Lambda (text + PDF via pymupdf4llm)
+    const s3ReaderLambda = new lambda.Function(this, "S3BdaReaderLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
-      handler: "s3_bda_reader_lambda.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/s3_bda_reader"), {
-        bundling: this.getPythonBundlingOptions(["boto3"]),
+      handler: "s3_reader_lambda.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/s3_reader"), {
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_13.bundlingImage,
+          command: [
+            "bash",
+            "-c",
+            [
+              "pip install pymupdf4llm --platform manylinux2014_x86_64 --only-binary=:all: -t /asset-output",
+              "pip install boto3 -t /asset-output",
+              "cp -r . /asset-output",
+            ].join(" && "),
+          ],
+        },
       }),
-      timeout: cdk.Duration.minutes(3),
-      environment: {
-        BDA_PROJECT_ARN: "", // Set via SSM or config in production
-      },
+      memorySize: 512,
+      timeout: cdk.Duration.seconds(60),
       logGroup: new logs.LogGroup(this, "S3BdaLambdaLogGroup", {
-        logGroupName: `/aws/lambda/${config.stack_name_base}-s3-bda-reader`,
+        logGroupName: `/aws/lambda/${config.stack_name_base}-s3-reader`,
         retention: logs.RetentionDays.ONE_WEEK,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       }),
     })
 
-    // Grant S3 BDA Lambda access to S3 and BDA
-    s3BdaLambda.addToRolePolicy(
+    // Grant S3 reader Lambda access to read from S3
+    s3ReaderLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["s3:GetObject", "s3:ListBucket", "s3:PutObject"],
+        actions: ["s3:GetObject"],
         resources: ["*"], // Scoped to specific buckets in production
-      })
-    )
-    s3BdaLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["bedrock:InvokeDataAutomationAsync", "bedrock:GetDataAutomationStatus"],
-        resources: ["*"],
       })
     )
 
@@ -760,7 +762,7 @@ export class BackendStack extends cdk.NestedStack {
     arxivLambda.grantInvoke(gatewayRole)
     tavilyLambda.grantInvoke(gatewayRole)
     kbSearchLambda.grantInvoke(gatewayRole)
-    s3BdaLambda.grantInvoke(gatewayRole)
+    s3ReaderLambda.grantInvoke(gatewayRole)
     novaSearchLambda.grantInvoke(gatewayRole)
     openfdaLambda.grantInvoke(gatewayRole)
 
@@ -878,11 +880,8 @@ export class BackendStack extends cdk.NestedStack {
     const kbSearchSpec = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../../gateway/tools/kb_search/tool_spec.json"), "utf8")
     )
-    const s3BdaSpec = JSON.parse(
-      fs.readFileSync(
-        path.join(__dirname, "../../gateway/tools/s3_bda_reader/tool_spec.json"),
-        "utf8"
-      )
+    const s3ReaderSpec = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../gateway/tools/s3_reader/tool_spec.json"), "utf8")
     )
     const novaSearchSpec = JSON.parse(
       fs.readFileSync(
@@ -945,22 +944,22 @@ export class BackendStack extends cdk.NestedStack {
     })
     kbSearchTarget.addDependency(gateway)
 
-    // S3 BDA Document Reader Target
-    const s3BdaTarget = new bedrockagentcore.CfnGatewayTarget(this, "S3BdaReaderTarget", {
+    // S3 File Reader Target
+    const s3ReaderTarget = new bedrockagentcore.CfnGatewayTarget(this, "S3BdaReaderTarget", {
       gatewayIdentifier: gateway.attrGatewayIdentifier,
       name: "s3-bda-reader-target",
-      description: "S3 document reader with BDA",
+      description: "S3 file reader (text and PDF)",
       targetConfiguration: {
         mcp: {
           lambda: {
-            lambdaArn: s3BdaLambda.functionArn,
-            toolSchema: { inlinePayload: s3BdaSpec },
+            lambdaArn: s3ReaderLambda.functionArn,
+            toolSchema: { inlinePayload: s3ReaderSpec },
           },
         },
       },
       credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
     })
-    s3BdaTarget.addDependency(gateway)
+    s3ReaderTarget.addDependency(gateway)
 
     // Nova Web Search Target
     const novaSearchTarget = new bedrockagentcore.CfnGatewayTarget(this, "NovaSearchTarget", {
@@ -1004,7 +1003,7 @@ export class BackendStack extends cdk.NestedStack {
     gateway.node.addDependency(arxivLambda)
     gateway.node.addDependency(tavilyLambda)
     gateway.node.addDependency(kbSearchLambda)
-    gateway.node.addDependency(s3BdaLambda)
+    gateway.node.addDependency(s3ReaderLambda)
     gateway.node.addDependency(novaSearchLambda)
     gateway.node.addDependency(openfdaLambda)
     gateway.node.addDependency(this.machineClient)

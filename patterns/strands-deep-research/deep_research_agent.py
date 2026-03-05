@@ -56,6 +56,11 @@ DATA_SOURCES = {
         "tool": "openfda_drug_search",
         "description": "Search FDA drug label database for pharmaceutical information",
     },
+    "s3": {
+        "name": "S3 Text Reader",
+        "tool": "s3_text_reader",
+        "description": "Read text files from S3 (txt, md, csv, json, etc.)",
+    },
     "kb": {
         "name": "Knowledge Base Search",
         "tool": "knowledge_base_search",
@@ -64,11 +69,14 @@ DATA_SOURCES = {
     },
 }
 
-# Default enabled sources (KB excluded by default as it requires configuration)
+# Default enabled sources (KB and S3 excluded by default)
 DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "arxiv", "openfda"]
 
 
-def load_system_prompt(enabled_sources: list[str] | None = None) -> str:
+def load_system_prompt(
+    enabled_sources: list[str] | None = None,
+    s3_file_uris: list[str] | None = None,
+) -> str:
     """
     Load the system prompt and customize based on enabled data sources.
 
@@ -76,6 +84,8 @@ def load_system_prompt(enabled_sources: list[str] | None = None) -> str:
     ----------
     enabled_sources : list[str] | None
         List of enabled source keys (tavily, nova, arxiv). If None, all are enabled.
+    s3_file_uris : list[str] | None
+        List of S3 URIs provided by the user for the S3 data source.
     """
     with open(SYSTEM_PROMPT_PATH) as f:
         base_prompt = f.read()
@@ -94,8 +104,22 @@ def load_system_prompt(enabled_sources: list[str] | None = None) -> str:
     if not any(s in DATA_SOURCES for s in enabled_sources):
         tools_section += "- No external data sources enabled\n"
 
+    # Add S3 file list when S3 source is enabled
+    if "s3" in enabled_sources and s3_file_uris:
+        tools_section += "\n### Available S3 Files\n"
+        tools_section += (
+            "The user has provided these S3 files as data sources. "
+            "Use `s3_text_reader` to read them during your research. "
+            "Start with max_lines=100 to explore, then read more "
+            "lines if the content is relevant.\n"
+            "The tool response includes a 'Download link:' URL for "
+            "each file. When citing S3 files, use that download link "
+            "as the source, e.g. [Source: <download_link_url>].\n"
+        )
+        for uri in s3_file_uris:
+            tools_section += f"- `{uri}`\n"
+
     # Replace the data retrieval section in the prompt
-    # Find and replace the section between "### Data Retrieval" and the next "##"
     import re
 
     pattern = r"### Data Retrieval \(via Gateway\)\n(?:- .*\n)*"
@@ -139,7 +163,10 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
 
 
 def create_deep_research_agent(
-    user_id: str, session_id: str, enabled_sources: list[str] | None = None
+    user_id: str,
+    session_id: str,
+    enabled_sources: list[str] | None = None,
+    s3_file_uris: list[str] | None = None,
 ) -> Agent:
     """
     Create a deep research agent with Gateway MCP tools and memory.
@@ -151,9 +178,11 @@ def create_deep_research_agent(
     session_id : str
         Session identifier for conversation continuity
     enabled_sources : list[str] | None
-        List of enabled data sources (tavily, nova, arxiv). Default: all enabled.
+        List of enabled data sources. Default: all enabled.
+    s3_file_uris : list[str] | None
+        List of S3 file URIs provided by the user.
     """
-    system_prompt = load_system_prompt(enabled_sources)
+    system_prompt = load_system_prompt(enabled_sources, s3_file_uris)
     print(f"[AGENT] Enabled data sources: {enabled_sources or DEFAULT_ENABLED_SOURCES}")
 
     model_id = os.environ.get(
@@ -251,13 +280,13 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv", "openfda"
+      Valid values: "tavily", "nova", "arxiv", "openfda", "s3"
+    - s3FileUris: List of S3 file URIs (optional, used when "s3" is enabled)
     """
     user_query = payload.get("prompt")
     session_id = payload.get("runtimeSessionId")
-    enabled_sources = payload.get(
-        "enabledSources"
-    )  # Optional: ["tavily", "nova", "arxiv", "openfda"]
+    enabled_sources = payload.get("enabledSources")
+    s3_file_uris = payload.get("s3FileUris")  # Optional: ["s3://bucket/file.txt"]
 
     if not all([user_query, session_id]):
         yield {
@@ -273,8 +302,12 @@ async def agent_stream(payload, context: RequestContext):
         print(f"[STREAM] Starting deep research for user: {user_id}")
         print(f"[STREAM] Query: {user_query}")
         print(f"[STREAM] Enabled sources: {enabled_sources or 'all (default)'}")
+        if s3_file_uris:
+            print(f"[STREAM] S3 files: {s3_file_uris}")
 
-        agent = create_deep_research_agent(user_id, session_id, enabled_sources)
+        agent = create_deep_research_agent(
+            user_id, session_id, enabled_sources, s3_file_uris
+        )
 
         # Use the agent's stream_async method for true token-level streaming
         # Pass session_id in invocation state for the S3 upload hook

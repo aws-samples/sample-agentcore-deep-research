@@ -39,7 +39,12 @@ const DATA_SOURCES = [
   { id: "nova", name: "Nova Search", icon: "🔍", defaultEnabled: true },
   { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: true },
   { id: "openfda", name: "OpenFDA Drugs", icon: "💊", defaultEnabled: true },
+  { id: "s3", name: "S3 Files", icon: "📁", defaultEnabled: false },
 ] as const;
+
+const DEFAULT_SOURCES = Object.fromEntries(
+  DATA_SOURCES.map((s) => [s.id, s.defaultEnabled]),
+);
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -50,8 +55,11 @@ export default function ChatInterface() {
 
   // Data source toggles - initialize from defaults
   const [enabledSources, setEnabledSources] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(DATA_SOURCES.map((s) => [s.id, s.defaultEnabled])),
+    () => ({ ...DEFAULT_SOURCES }),
   );
+
+  // S3 file URIs (one per line)
+  const [s3FileInput, setS3FileInput] = useState<string>("");
 
   // Research report state
   const [reportContent, setReportContent] = useState<string>("");
@@ -182,6 +190,12 @@ export default function ChatInterface() {
       // User identity is extracted server-side from the validated JWT token,
       // not passed as a parameter — prevents impersonation via prompt injection.
       const enabledSourceIds = getEnabledSourceIds();
+      const s3Uris = enabledSources["s3"]
+        ? s3FileInput
+            .split("\n")
+            .map((u) => u.trim())
+            .filter((u) => u.startsWith("s3://"))
+        : undefined;
       await client.invoke(
         userMessage,
         sessionId,
@@ -269,6 +283,7 @@ export default function ChatInterface() {
           }
         },
         enabledSourceIds,
+        s3Uris,
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -338,8 +353,8 @@ export default function ChatInterface() {
     setResearchRound(0);
     setShowReportPanel(false);
     fileWriteCountRef.current = 0;
-    // Note: sessionId stays the same for the component lifecycle
-    // If you want a new session ID, you'd need to remount the component
+    setEnabledSources({ ...DEFAULT_SOURCES });
+    setS3FileInput("");
   };
 
   // Check if this is the initial state (no messages)
@@ -408,6 +423,24 @@ export default function ChatInterface() {
             <p className="text-xs text-gray-400 mt-2">
               Click to toggle data sources
             </p>
+
+            {/* S3 file URIs input */}
+            {enabledSources["s3"] && (
+              <div className="mt-4 max-w-lg mx-auto">
+                <textarea
+                  placeholder={
+                    "s3://bucket/path/to/file.txt\ns3://bucket/another/file.csv"
+                  }
+                  value={s3FileInput}
+                  onChange={(e) => setS3FileInput(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-left placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  One S3 URI per line (supports txt, md, csv, json, pdf, etc.)
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Centered input */}

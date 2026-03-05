@@ -4,12 +4,13 @@ Correlate is a full-stack AI research application built on Amazon Bedrock AgentC
 
 ## Features
 
-- **Multi-Source Research**: Search across Tavily (web), Nova (AWS-powered web search), ArXiv (academic papers), and OpenFDA (drug information)
+- **Multi-Source Research**: Search across Tavily (web), Nova (AWS-powered web search), ArXiv (academic papers), OpenFDA (drug information), and S3 files
+- **S3 File Reader**: Read text files and PDFs directly from S3 (PDFs are auto-converted to markdown)
 - **Iterative 4-Round Workflow**: Generates initial report, enriches with research, deep dives on gaps, and polishes final output
 - **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time
 - **Collapsible Sections**: Navigate long reports with collapsible H1/H2 sections and table of contents
 - **Change Highlighting**: Green highlights show what changed in each report iteration
-- **Proper Citations**: Every factual claim includes inline source citations
+- **Proper Citations**: Every factual claim includes inline source citations with auto-extracted references section
 - **Conversation Memory**: AgentCore Memory maintains context across sessions
 
 
@@ -21,7 +22,8 @@ The application includes Lambda-based tools behind AgentCore Gateway with OAuth 
 2. **Nova Web Search** - AWS-powered web search via Amazon Nova with citations
 3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
 4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
-5. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
+5. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
+6. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
 
 
 ## Deployment
