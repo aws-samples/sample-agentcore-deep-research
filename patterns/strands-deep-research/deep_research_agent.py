@@ -3,8 +3,10 @@ Copyright Amazon.com and Affiliates
 This code is being licensed under the terms of the Amazon Software License available at https://aws.amazon.com/asl/
 """
 
+import asyncio
 import json
 import os
+import time
 import traceback
 from pathlib import Path
 
@@ -106,12 +108,14 @@ def load_system_prompt(
 
     # Add S3 file list when S3 source is enabled
     if "s3" in enabled_sources and s3_file_uris:
-        tools_section += "\n### Available S3 Files\n"
+        tools_section += "\n### Available S3 Files (MUST READ)\n"
         tools_section += (
-            "The user has provided these S3 files as data sources. "
-            "Use `s3_text_reader` to read them during your research. "
-            "Start with end_line=100 to explore, then read more "
-            "lines if the content is relevant. "
+            "**IMPORTANT**: The user explicitly provided these S3 files. "
+            "For each file, first read with end_line=100 to explore. "
+            "If the content is relevant, make ONE more read with a larger range "
+            "(e.g., end_line=500) to get the detail you need. "
+            "Max 2 reads per file. Do NOT read the same file 3+ times.\n"
+            "If the content is not relevant to the query, move on.\n"
             "Cite S3 files as [Source: s3://bucket/path/file.ext].\n"
         )
         for uri in s3_file_uris:
@@ -307,10 +311,45 @@ async def agent_stream(payload, context: RequestContext):
             user_id, session_id, enabled_sources, s3_file_uris
         )
 
-        # Use the agent's stream_async method for true token-level streaming
-        # Pass session_id in invocation state for the S3 upload hook
-        async for event in agent.stream_async(user_query, session_id=session_id):
-            yield json.loads(json.dumps(dict(event), default=str))
+        # Stream agent events with keepalive to prevent HTTP/2 idle timeout.
+        # During tool execution (S3 reads, web searches), no events are emitted,
+        # so we send periodic keepalives to keep the connection alive.
+        # The Strands SDK is fully async, so asyncio.create_task works here.
+        KEEPALIVE_INTERVAL = 15  # seconds
+
+        event_queue: asyncio.Queue = asyncio.Queue()
+        agent_error: list[Exception] = []
+
+        async def run_agent():
+            try:
+                async for event in agent.stream_async(
+                    user_query, session_id=session_id
+                ):
+                    await event_queue.put(event)
+            except Exception as exc:
+                agent_error.append(exc)
+            finally:
+                await event_queue.put(None)  # sentinel
+
+        agent_task = asyncio.create_task(run_agent())
+
+        while True:
+            try:
+                event = await asyncio.wait_for(
+                    event_queue.get(), timeout=KEEPALIVE_INTERVAL
+                )
+                if event is None:
+                    break  # agent finished
+                yield json.loads(json.dumps(dict(event), default=str))
+            except asyncio.TimeoutError:
+                # No event received — send keepalive to prevent connection drop
+                yield {"keepalive": True, "ts": int(time.monotonic())}
+                print("[STREAM] Sent keepalive")
+
+        # Propagate agent errors
+        if agent_error:
+            raise agent_error[0]
+        await agent_task
 
     except Exception as e:
         print(f"[STREAM ERROR] Error in agent_stream: {e}")
