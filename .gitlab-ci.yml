@@ -18,7 +18,6 @@ image: public.ecr.aws/docker/library/python:3.13-bookworm
 stages:
   - developer_tests
   - test # Need this name specifically for ASH scanning
-  - deploy
 
 developer_tests:
   stage: developer_tests
@@ -35,19 +34,3 @@ developer_tests:
 # Override ASH job to depend on developer_tests passing
 ash-sast:
   needs: ["developer_tests"]
-
-# GitLab Pages deployment job - must be named "pages" to trigger Pages deployment
-# Builds MkDocs documentation and publishes to https://<namespace>.gitlab.io/<project-name>/
-pages:
-  stage: deploy  # Runs after tests pass
-  image: public.ecr.aws/docker/library/python:3.13-bookworm  # Python required for mkdocs
-  before_script:
-    - pip install -r .mkdocs/requirements.txt  # Install mkdocs, material theme, and plugins
-  script:
-    - cd .mkdocs
-    - mkdocs build --site-dir ../public  # Build to public/ (required by GitLab Pages)
-  artifacts:
-    paths:
-      - public  # GitLab Pages serves content from this directory
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH  # Deploy only on main/master branch
