@@ -77,7 +77,7 @@ def search_web(
         method="POST",
     )
 
-    with urlopen(req, timeout=30) as resp:
+    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
         response = json.loads(resp.read().decode("utf-8"))
 
     # Format results

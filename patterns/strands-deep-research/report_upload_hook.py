@@ -10,7 +10,7 @@ from pathlib import Path
 import boto3
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 
-REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108
+REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108  # nosec B108
 REPORTS_BUCKET = os.environ.get("STAGING_BUCKET_NAME", "")
 URL_EXPIRATION = 3600  # 1 hour
 
