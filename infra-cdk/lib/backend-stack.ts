@@ -235,7 +235,6 @@ export class BackendStack extends cdk.NestedStack {
     const agentRole = new AgentCoreRole(this, "AgentCoreRole")
 
     // Create memory resource with short-term memory (conversation history) as default
-    // To enable long-term strategies (summaries, preferences, facts), see docs/MEMORY_INTEGRATION.md
     const memory = new cdk.CfnResource(this, "AgentMemory", {
       type: "AWS::BedrockAgentCore::Memory",
       properties: {
