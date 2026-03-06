@@ -3,6 +3,8 @@
 
 FROM node:20-alpine
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 WORKDIR /app
 
 # Copy package files
@@ -14,8 +16,15 @@ RUN npm install
 # Copy source code
 COPY . .
 
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
 # Expose port
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
 
 # Start development server (--host exposes to Docker network)
 CMD ["npm", "run", "dev", "--", "--host"]

@@ -12,4 +12,4 @@ backend:
 # API Keys for research tools (used by strands-deep-research pattern)
 # Get your Tavily API key at: https://tavily.com/
 api_keys:
-  tavily: null # Example: tvly-xxxxxxxxxxxxxxxx
+  tavily: null # Replace with your Tavily API key from https://tavily.com/
