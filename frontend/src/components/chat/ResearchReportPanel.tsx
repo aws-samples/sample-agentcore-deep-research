@@ -104,9 +104,7 @@ export function ResearchReportPanel({
               <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Link className="w-4 h-4 text-gray-500" />
-                  <h3 className="font-semibold text-gray-700">
-                    References ({references.length})
-                  </h3>
+                  <h2 className="font-semibold text-gray-700">References</h2>
                 </div>
                 <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-600">
                   {references.map((ref, i) => (

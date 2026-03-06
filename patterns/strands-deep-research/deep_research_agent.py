@@ -3,10 +3,9 @@ Copyright Amazon.com and Affiliates
 This code is being licensed under the terms of the Amazon Software License available at https://aws.amazon.com/asl/
 """
 
-import asyncio
 import json
 import os
-import time
+import re
 import traceback
 from pathlib import Path
 
@@ -20,8 +19,8 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from report_upload_hook import ReportS3UploadHook
-from safe_bedrock_model import SafeBedrockModel
 from strands import Agent
+from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
@@ -112,9 +111,9 @@ def load_system_prompt(
         tools_section += (
             "**IMPORTANT**: The user explicitly provided these S3 files. "
             "For each file, first read with end_line=100 to explore. "
-            "If the content is relevant, make ONE more read with a larger range "
+            "If the content is relevant, make more reads with a larger range "
             "(e.g., end_line=500) to get the detail you need. "
-            "Max 2 reads per file. Do NOT read the same file 3+ times.\n"
+            "Max 3 reads per file. Do NOT read the same file 4+ times.\n"
             "If the content is not relevant to the query, move on.\n"
             "Cite S3 files as [Source: s3://bucket/path/file.ext].\n"
         )
@@ -122,8 +121,6 @@ def load_system_prompt(
             tools_section += f"- `{uri}`\n"
 
     # Replace the data retrieval section in the prompt
-    import re
-
     pattern = r"### Data Retrieval \(via Gateway\)\n(?:- .*\n)*"
     base_prompt = re.sub(pattern, tools_section, base_prompt)
 
@@ -190,7 +187,7 @@ def create_deep_research_agent(
     model_id = os.environ.get(
         "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
     )
-    bedrock_model = SafeBedrockModel(
+    bedrock_model = BedrockModel(
         model_id=model_id,
         temperature=INFERENCE_CONFIG["temperature"],
         max_tokens=INFERENCE_CONFIG["maxTokens"],
@@ -268,6 +265,33 @@ def create_deep_research_agent(
         raise
 
 
+_REPORT_URL_RE = re.compile(r"\[REPORT_URL:[^\]]+\]")
+
+
+def _truncate_text(text: str, max_len: int) -> str:
+    """Truncate text but preserve [REPORT_URL:...] tag if present."""
+    if len(text) <= max_len:
+        return text
+    match = _REPORT_URL_RE.search(text)
+    suffix = f"\n\n{match.group()}" if match else ""
+    return text[:max_len] + "... (truncated)" + suffix
+
+
+def _truncate_large_fields(d: dict, max_len: int = 3000) -> None:
+    """Truncate large text in tool results in-place."""
+    # truncate message.content[].toolResult.content[].text
+    msg = d.get("message")
+    if isinstance(msg, dict) and isinstance(msg.get("content"), list):
+        for block in msg["content"]:
+            if not isinstance(block, dict):
+                continue
+            tr = block.get("toolResult")
+            if isinstance(tr, dict) and isinstance(tr.get("content"), list):
+                for item in tr["content"]:
+                    if isinstance(item, dict) and isinstance(item.get("text"), str):
+                        item["text"] = _truncate_text(item["text"], max_len)
+
+
 @app.entrypoint
 async def agent_stream(payload, context: RequestContext):
     """
@@ -311,45 +335,36 @@ async def agent_stream(payload, context: RequestContext):
             user_id, session_id, enabled_sources, s3_file_uris
         )
 
-        # Stream agent events with keepalive to prevent HTTP/2 idle timeout.
-        # During tool execution (S3 reads, web searches), no events are emitted,
-        # so we send periodic keepalives to keep the connection alive.
-        # The Strands SDK is fully async, so asyncio.create_task works here.
-        KEEPALIVE_INTERVAL = 15  # seconds
-
-        event_queue: asyncio.Queue = asyncio.Queue()
-        agent_error: list[Exception] = []
-
-        async def run_agent():
-            try:
-                async for event in agent.stream_async(
-                    user_query, session_id=session_id
-                ):
-                    await event_queue.put(event)
-            except Exception as exc:
-                agent_error.append(exc)
-            finally:
-                await event_queue.put(None)  # sentinel
-
-        agent_task = asyncio.create_task(run_agent())
-
-        while True:
-            try:
-                event = await asyncio.wait_for(
-                    event_queue.get(), timeout=KEEPALIVE_INTERVAL
-                )
-                if event is None:
-                    break  # agent finished
-                yield json.loads(json.dumps(dict(event), default=str))
-            except asyncio.TimeoutError:
-                # No event received — send keepalive to prevent connection drop
-                yield {"keepalive": True, "ts": int(time.monotonic())}
-                print("[STREAM] Sent keepalive")
-
-        # Propagate agent errors
-        if agent_error:
-            raise agent_error[0]
-        await agent_task
+        # Stream only fields the frontend needs to avoid AgentCore
+        # ResponseStreamingError at ~105MB cumulative payload.
+        # Frontend parser uses: data, current_tool_use, delta, message,
+        # result, init_event_loop, start_event_loop, start
+        _keep_keys = {
+            "data",
+            "delta",
+            "current_tool_use",
+            "message",
+            "result",
+            "init_event_loop",
+            "start_event_loop",
+            "start",
+            "type",
+        }
+        stream = agent.stream_async(user_query, session_id=session_id)
+        async for event in stream:
+            d = {k: v for k, v in dict(event).items() if k in _keep_keys}
+            if not d:
+                continue
+            # keep only toolUseId and name from current_tool_use
+            if "current_tool_use" in d:
+                ctu = d["current_tool_use"]
+                d["current_tool_use"] = {
+                    "toolUseId": ctu.get("toolUseId"),
+                    "name": ctu.get("name"),
+                }
+            # truncate tool result text but preserve REPORT_URL
+            _truncate_large_fields(d, max_len=3000)
+            yield json.loads(json.dumps(d, default=str))
 
     except Exception as e:
         print(f"[STREAM ERROR] Error in agent_stream: {e}")
