@@ -103,7 +103,6 @@ correlate-deep-research/
 │   │   ├── components/     # React components (shadcn/ui)
 │   │   ├── hooks/          # Custom React hooks
 │   │   ├── lib/            # Utility libraries
-│   │   │   └── agentcore-client/ # AgentCore streaming client
 │   │   ├── services/       # API service layers
 │   │   └── types/          # TypeScript type definitions
 │   ├── public/             # Static assets and aws-exports.json
@@ -122,17 +121,10 @@ correlate-deep-research/
 │       └── Dockerfile              # Container configuration
 ├── gateway/                # Gateway utilities and tools
 │   └── tools/              # Gateway tool implementations
-│       ├── tavily_search/  # Tavily web search Lambda
-│       ├── nova_search/    # Nova web search Lambda
-│       ├── arxiv_search/   # ArXiv paper search Lambda
-│       └── kb_search/      # Knowledge Base search Lambda
 ├── scripts/                # Deployment and test scripts
 │   ├── deploy-frontend.py  # Cross-platform frontend deployment
-│   └── test-*.py          # Various test utilities
+│   └── test-*.py           # Various test utilities
 ├── docs/                   # Documentation source files
-│   ├── DEPLOYMENT.md       # Deployment guide
-│   ├── LOCAL_DEVELOPMENT.md # Local development guide
-│   ├── GATEWAY.md          # Gateway integration guide
 │   └── architecture-diagram/ # Architecture diagrams
 ├── tests/                  # Test suite
 ├── docker-compose.yml      # Local development stack
