@@ -45,7 +45,7 @@ def search_openfda(drug_name: str, max_results: int = 10) -> str:
     url = f"{OPENFDA_DRUG_LABEL_URL}?search={search}&limit={limit}"
 
     if not url.startswith("https://"):
-        return f"Error: invalid URL scheme for OpenFDA request"
+        return "Error: invalid URL scheme for OpenFDA request"
 
     req = Request(url, method="GET")  # noqa: S310  # nosec B310
     try:
