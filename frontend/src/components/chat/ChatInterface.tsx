@@ -66,6 +66,7 @@ export default function ChatInterface() {
   const [researchRound, setResearchRound] = useState<number>(0);
   const [showReportPanel, setShowReportPanel] = useState<boolean>(false);
   const fileWriteCountRef = useRef<number>(0);
+  const lastReportUrlRef = useRef<string | null>(null);
 
   // Get array of enabled source IDs for API
   const getEnabledSourceIds = () =>
@@ -256,11 +257,15 @@ export default function ChatInterface() {
                 tc.result = event.result;
                 tc.status = "complete";
 
-                // Extract report URL from file_write/editor results and fetch from S3
+                // Re-fetch report from S3 after any file_write/editor completes
                 if (tc.name === "file_write" || tc.name === "editor") {
-                  const reportUrl = extractReportUrl(tc.result || "");
-                  if (reportUrl) {
-                    fetchReportContent(reportUrl).then((content) => {
+                  const newUrl = extractReportUrl(tc.result || "");
+                  if (newUrl) {
+                    lastReportUrlRef.current = newUrl;
+                  }
+                  const url = lastReportUrlRef.current;
+                  if (url) {
+                    fetchReportContent(url).then((content) => {
                       if (content) {
                         setReportContent(content);
                       }
