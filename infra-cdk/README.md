@@ -60,12 +60,17 @@ Edit `config.yaml` to customize your deployment:
 ```yaml
 stack_name_base: "Correlate-stack"
 
+admin_user_email: admin@example.com  # Required: Email for the admin user
+
 frontend:
   domain_name: null  # Optional: Set to your custom domain
   certificate_arn: null  # Optional: Set to your ACM certificate ARN
 
 backend:
   pattern: "strands-deep-research"
+
+api_keys:
+  tavily: tvly-xxxxx  # Required: Get your key at https://tavily.com/
 ```
 
 ## Project Structure
