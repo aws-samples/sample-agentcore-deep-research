@@ -10,6 +10,6 @@ backend:
   model_id: global.anthropic.claude-sonnet-4-6 # Model ID for the agent (with cross-region prefix)
 
 # API Keys for research tools (used by strands-deep-research pattern)
-# Get your Tavily API key at: https://tavily.com/
 api_keys:
   tavily: null # Replace with your Tavily API key from https://tavily.com/
+  commodities: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/

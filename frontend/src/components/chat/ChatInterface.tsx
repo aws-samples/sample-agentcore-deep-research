@@ -35,10 +35,11 @@ async function fetchReportContent(url: string): Promise<string | null> {
 
 // Available data sources configuration
 const DATA_SOURCES = [
+  { id: "commodities", name: "AlphaVantage", icon: "📈", defaultEnabled: true },
   { id: "tavily", name: "Tavily Web", icon: "🌐", defaultEnabled: true },
   { id: "nova", name: "Nova Search", icon: "🔍", defaultEnabled: true },
-  { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: true },
-  { id: "openfda", name: "OpenFDA Drugs", icon: "💊", defaultEnabled: true },
+  { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: false },
+  { id: "openfda", name: "OpenFDA Drugs", icon: "💊", defaultEnabled: false },
   { id: "s3", name: "S3 Files", icon: "📁", defaultEnabled: false },
 ] as const;
 

@@ -71,6 +71,7 @@ backend:
 
 api_keys:
   tavily: tvly-xxxxx  # Required: Get your key at https://tavily.com/
+  commodities: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
 ```
 
 ## Project Structure
