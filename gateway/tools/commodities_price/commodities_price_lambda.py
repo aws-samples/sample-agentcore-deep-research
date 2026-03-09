@@ -4,8 +4,8 @@ import logging
 import os
 import time
 from pathlib import Path
-from urllib.request import Request, urlopen
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import boto3
 
@@ -17,10 +17,10 @@ CACHE_DIR = Path("/tmp/av_cache")  # noqa: S108  # nosec B108
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Cache TTLs in seconds
-CACHE_TTL_SPOT = 300          # 5 min for live spot prices
+CACHE_TTL_SPOT = 300  # 5 min for live spot prices
 CACHE_TTL_HISTORICAL = 21600  # 6 hours for historical data
-CACHE_TTL_ECONOMIC = 21600    # 6 hours for economic indicators
-CACHE_TTL_NEWS = 1800         # 30 min for news sentiment
+CACHE_TTL_ECONOMIC = 21600  # 6 hours for economic indicators
+CACHE_TTL_NEWS = 1800  # 30 min for news sentiment
 
 # Rate limiting — persists across invocations via /tmp
 RATE_LIMIT_FILE = CACHE_DIR / "_last_api_call.txt"
@@ -46,27 +46,70 @@ PRECIOUS_METALS = {
     "SILVER": {"symbol": "SILVER", "name": "Silver (XAG/USD)"},
 }
 
-ALL_COMMODITIES = {**{k: v["name"] for k, v in COMMODITY_FUNCTIONS.items()},
-                   **{k: v["name"] for k, v in PRECIOUS_METALS.items()}}
+ALL_COMMODITIES = {
+    **{k: v["name"] for k, v in COMMODITY_FUNCTIONS.items()},
+    **{k: v["name"] for k, v in PRECIOUS_METALS.items()},
+}
 
 # Economic indicators
 ECONOMIC_INDICATORS = {
-    "CPI": {"function": "CPI", "name": "Consumer Price Index", "default_interval": "monthly"},
-    "INFLATION": {"function": "INFLATION", "name": "Inflation Rate", "default_interval": "annual"},
-    "FEDERAL_FUNDS_RATE": {"function": "FEDERAL_FUNDS_RATE", "name": "Federal Funds Rate", "default_interval": "monthly"},
-    "TREASURY_YIELD": {"function": "TREASURY_YIELD", "name": "Treasury Yield", "default_interval": "monthly"},
-    "REAL_GDP": {"function": "REAL_GDP", "name": "Real GDP", "default_interval": "quarterly"},
-    "REAL_GDP_PER_CAPITA": {"function": "REAL_GDP_PER_CAPITA", "name": "Real GDP Per Capita", "default_interval": "quarterly"},
-    "UNEMPLOYMENT": {"function": "UNEMPLOYMENT", "name": "Unemployment Rate", "default_interval": "monthly"},
-    "RETAIL_SALES": {"function": "RETAIL_SALES", "name": "Retail Sales", "default_interval": "monthly"},
-    "NONFARM_PAYROLL": {"function": "NONFARM_PAYROLL", "name": "Nonfarm Payroll", "default_interval": "monthly"},
-    "DURABLE_GOODS": {"function": "DURABLE_GOODS", "name": "Durable Goods Orders", "default_interval": "monthly"},
+    "CPI": {
+        "function": "CPI",
+        "name": "Consumer Price Index",
+        "default_interval": "monthly",
+    },
+    "INFLATION": {
+        "function": "INFLATION",
+        "name": "Inflation Rate",
+        "default_interval": "annual",
+    },
+    "FEDERAL_FUNDS_RATE": {
+        "function": "FEDERAL_FUNDS_RATE",
+        "name": "Federal Funds Rate",
+        "default_interval": "monthly",
+    },
+    "TREASURY_YIELD": {
+        "function": "TREASURY_YIELD",
+        "name": "Treasury Yield",
+        "default_interval": "monthly",
+    },
+    "REAL_GDP": {
+        "function": "REAL_GDP",
+        "name": "Real GDP",
+        "default_interval": "quarterly",
+    },
+    "REAL_GDP_PER_CAPITA": {
+        "function": "REAL_GDP_PER_CAPITA",
+        "name": "Real GDP Per Capita",
+        "default_interval": "quarterly",
+    },
+    "UNEMPLOYMENT": {
+        "function": "UNEMPLOYMENT",
+        "name": "Unemployment Rate",
+        "default_interval": "monthly",
+    },
+    "RETAIL_SALES": {
+        "function": "RETAIL_SALES",
+        "name": "Retail Sales",
+        "default_interval": "monthly",
+    },
+    "NONFARM_PAYROLL": {
+        "function": "NONFARM_PAYROLL",
+        "name": "Nonfarm Payroll",
+        "default_interval": "monthly",
+    },
+    "DURABLE_GOODS": {
+        "function": "DURABLE_GOODS",
+        "name": "Durable Goods Orders",
+        "default_interval": "monthly",
+    },
 }
 
 
 # ============================================================
 # Cache + rate limiting
 # ============================================================
+
 
 def _cache_key(params: dict) -> str:
     cache_params = {k: v for k, v in params.items() if k != "apikey"}
@@ -134,7 +177,7 @@ def fetch_cached(params: dict, ttl: int) -> dict:
         time.sleep(wait)
 
     url = f"{ALPHA_VANTAGE_URL}?{urlencode(params)}"
-    req = Request(url, headers={"Accept": "application/json"}, method="GET")
+    req = Request(url, headers={"Accept": "application/json"}, method="GET")  # noqa: S310
 
     with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
         data = json.loads(resp.read().decode("utf-8"))
@@ -168,6 +211,7 @@ def get_api_key() -> str:
 # Data fetching functions
 # ============================================================
 
+
 def fetch_spot_prices(symbols: list[str], api_key: str) -> str:
     """Fetch latest prices for commodities."""
     output = "## Latest Commodity Prices\n\n"
@@ -177,11 +221,14 @@ def fetch_spot_prices(symbols: list[str], api_key: str) -> str:
 
         if s in PRECIOUS_METALS:
             metal = PRECIOUS_METALS[s]
-            data = fetch_cached({
-                "function": "GOLD_SILVER_SPOT",
-                "symbol": metal["symbol"],
-                "apikey": api_key,
-            }, CACHE_TTL_SPOT)
+            data = fetch_cached(
+                {
+                    "function": "GOLD_SILVER_SPOT",
+                    "symbol": metal["symbol"],
+                    "apikey": api_key,
+                },
+                CACHE_TTL_SPOT,
+            )
 
             error = get_api_error(data)
             if error:
@@ -191,15 +238,21 @@ def fetch_spot_prices(symbols: list[str], api_key: str) -> str:
             else:
                 price = float(data["price"])
                 ts = data.get("timestamp", "unknown")
-                output += f"- **{metal['name']}:** ${price:,.2f} per troy ounce — as of {ts}\n"
+                output += (
+                    f"- **{metal['name']}:** ${price:,.2f}"
+                    f" per troy ounce — as of {ts}\n"
+                )
 
         elif s in COMMODITY_FUNCTIONS:
             commodity = COMMODITY_FUNCTIONS[s]
-            data = fetch_cached({
-                "function": commodity["function"],
-                "interval": "monthly",
-                "apikey": api_key,
-            }, CACHE_TTL_HISTORICAL)
+            data = fetch_cached(
+                {
+                    "function": commodity["function"],
+                    "interval": "monthly",
+                    "apikey": api_key,
+                },
+                CACHE_TTL_HISTORICAL,
+            )
 
             error = get_api_error(data)
             if error:
@@ -211,16 +264,22 @@ def fetch_spot_prices(symbols: list[str], api_key: str) -> str:
                 unit = data.get("unit", "")
                 value = latest.get("value", ".")
                 if value and value != ".":
-                    output += f"- **{name}:** ${float(value):,.2f} ({unit}) — as of {latest.get('date', '?')}\n"
+                    date = latest.get("date", "?")
+                    output += (
+                        f"- **{name}:** ${float(value):,.2f} ({unit}) — as of {date}\n"
+                    )
                 else:
                     output += f"- **{name}:** No price available\n"
         else:
-            output += f"- **{symbol}:** Unknown. Supported: {', '.join(sorted(ALL_COMMODITIES))}\n"
+            supported = ", ".join(sorted(ALL_COMMODITIES))
+            output += f"- **{symbol}:** Unknown. Supported: {supported}\n"
 
     return output + "\n"
 
 
-def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key: str) -> str:
+def fetch_historical(
+    symbols: list[str], start_date: str, end_date: str, api_key: str
+) -> str:
     """Fetch historical prices for a date range."""
     output = f"## Historical Commodity Prices ({start_date} to {end_date})\n\n"
 
@@ -229,12 +288,15 @@ def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key
 
         if s in PRECIOUS_METALS:
             metal = PRECIOUS_METALS[s]
-            data = fetch_cached({
-                "function": "GOLD_SILVER_HISTORY",
-                "symbol": metal["symbol"],
-                "interval": "monthly",
-                "apikey": api_key,
-            }, CACHE_TTL_HISTORICAL)
+            data = fetch_cached(
+                {
+                    "function": "GOLD_SILVER_HISTORY",
+                    "symbol": metal["symbol"],
+                    "interval": "monthly",
+                    "apikey": api_key,
+                },
+                CACHE_TTL_HISTORICAL,
+            )
 
             error = get_api_error(data)
             if error:
@@ -245,7 +307,8 @@ def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key
                 continue
 
             filtered = [
-                p for p in data.get("data", [])
+                p
+                for p in data.get("data", [])
                 if start_date <= p.get("date", "") <= end_date and p.get("price")
             ]
             if not filtered:
@@ -257,11 +320,14 @@ def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key
 
         elif s in COMMODITY_FUNCTIONS:
             commodity = COMMODITY_FUNCTIONS[s]
-            data = fetch_cached({
-                "function": commodity["function"],
-                "interval": "monthly",
-                "apikey": api_key,
-            }, CACHE_TTL_HISTORICAL)
+            data = fetch_cached(
+                {
+                    "function": commodity["function"],
+                    "interval": "monthly",
+                    "apikey": api_key,
+                },
+                CACHE_TTL_HISTORICAL,
+            )
 
             error = get_api_error(data)
             if error:
@@ -271,8 +337,10 @@ def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key
             name = data.get("name", commodity["name"])
             unit = data.get("unit", "")
             filtered = [
-                p for p in data.get("data", [])
-                if start_date <= p.get("date", "") <= end_date and p.get("value", ".") != "."
+                p
+                for p in data.get("data", [])
+                if start_date <= p.get("date", "") <= end_date
+                and p.get("value", ".") != "."
             ]
             if not filtered:
                 output += f"### {name}\nNo data for this date range\n\n"
@@ -281,12 +349,15 @@ def fetch_historical(symbols: list[str], start_date: str, end_date: str, api_key
             output += f"### {name} ({unit})\n"
             output += _format_table(filtered, "value", unit)
         else:
-            output += f"### {symbol}\nUnknown. Supported: {', '.join(sorted(ALL_COMMODITIES))}\n\n"
+            supported = ", ".join(sorted(ALL_COMMODITIES))
+            output += f"### {symbol}\nUnknown. Supported: {supported}\n\n"
 
     return output
 
 
-def fetch_indicators(indicators: list[str], start_date: str, end_date: str, api_key: str) -> str:
+def fetch_indicators(
+    indicators: list[str], start_date: str, end_date: str, api_key: str
+) -> str:
     """Fetch economic indicators."""
     output = "## Economic Indicators"
     if start_date and end_date:
@@ -296,7 +367,8 @@ def fetch_indicators(indicators: list[str], start_date: str, end_date: str, api_
     for indicator in indicators:
         config = ECONOMIC_INDICATORS.get(indicator.upper())
         if not config:
-            output += f"### {indicator}\nUnknown. Supported: {', '.join(sorted(ECONOMIC_INDICATORS))}\n\n"
+            supported = ", ".join(sorted(ECONOMIC_INDICATORS))
+            output += f"### {indicator}\nUnknown. Supported: {supported}\n\n"
             continue
 
         params: dict = {"function": config["function"], "apikey": api_key}
@@ -318,8 +390,10 @@ def fetch_indicators(indicators: list[str], start_date: str, end_date: str, api_
 
         if start_date and end_date:
             filtered = [
-                p for p in points
-                if start_date <= p.get("date", "") <= end_date and p.get("value", ".") != "."
+                p
+                for p in points
+                if start_date <= p.get("date", "") <= end_date
+                and p.get("value", ".") != "."
             ]
         else:
             filtered = [p for p in points if p.get("value", ".") != "."][:12]
@@ -365,10 +439,17 @@ def fetch_news(topics: list[str], limit: int, api_key: str) -> str:
         score = article.get("overall_sentiment_score", 0)
         label = article.get("overall_sentiment_label", "Neutral")
 
-        date_str = f"{published[:4]}-{published[4:6]}-{published[6:8]}" if len(published) >= 8 else published
+        date_str = (
+            f"{published[:4]}-{published[4:6]}-{published[6:8]}"
+            if len(published) >= 8
+            else published
+        )
 
         output += f"### {title}\n"
-        output += f"**Source:** {source} | **Date:** {date_str} | **Sentiment:** {label} ({score:+.3f})\n\n"
+        output += (
+            f"**Source:** {source} | **Date:** {date_str}"
+            f" | **Sentiment:** {label} ({score:+.3f})\n\n"
+        )
         output += f"{summary}...\n\n[Source: {url}]\n\n"
 
     return output
@@ -389,7 +470,7 @@ def _format_table(points: list[dict], value_key: str, unit: str) -> str:
     if values:
         output += f"\n**Min:** {prefix}{min(values):,.2f} | "
         output += f"**Max:** {prefix}{max(values):,.2f} | "
-        output += f"**Avg:** {prefix}{sum(values)/len(values):,.2f} | "
+        output += f"**Avg:** {prefix}{sum(values) / len(values):,.2f} | "
         output += f"**Data points:** {len(values)}\n\n"
 
     return output
@@ -398,6 +479,7 @@ def _format_table(points: list[dict], value_key: str, unit: str) -> str:
 # ============================================================
 # Handler — single unified tool
 # ============================================================
+
 
 def _ensure_list(val) -> list[str]:
     """Coerce a string or list to a list of trimmed strings."""
@@ -424,7 +506,9 @@ def handler(event, context):
         logger.info(f"Processing tool: {tool_name}")
 
         if tool_name != "alphavantage_research":
-            return {"error": f"Unknown tool: {tool_name}. Expected: alphavantage_research"}
+            return {
+                "error": f"Unknown tool: {tool_name}. Expected: alphavantage_research"
+            }
 
         api_key = get_api_key()
         output = ""
@@ -439,7 +523,9 @@ def handler(event, context):
         start_date = event.get("start_date", "")
         end_date = event.get("end_date", "")
         if historical_symbols and start_date and end_date:
-            output += fetch_historical(historical_symbols, start_date, end_date, api_key)
+            output += fetch_historical(
+                historical_symbols, start_date, end_date, api_key
+            )
 
         # 3. Economic indicators
         indicators = _ensure_list(event.get("indicators", []))
@@ -453,7 +539,11 @@ def handler(event, context):
             output += fetch_news(news_topics, news_limit, api_key)
 
         if not output:
-            output = "No data requested. Provide at least one of: spot_symbols, historical_symbols, indicators, or news_topics."
+            output = (
+                "No data requested. Provide at least one of:"
+                " spot_symbols, historical_symbols,"
+                " indicators, or news_topics."
+            )
 
         return {"content": [{"type": "text", "text": output}]}
 

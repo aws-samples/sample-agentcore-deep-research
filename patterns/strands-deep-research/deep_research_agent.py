@@ -71,7 +71,12 @@ DATA_SOURCES = {
     "commodities": {
         "name": "AlphaVantage Research",
         "tool": "alphavantage_research",
-        "description": "All-in-one tool for commodity prices (gold, oil, etc.), economic indicators (CPI, inflation, Fed rate, GDP), and market news sentiment. Combine multiple data types in one call",
+        "description": (
+            "All-in-one tool for commodity prices (gold, oil, etc.),"
+            " economic indicators (CPI, inflation, Fed rate, GDP),"
+            " and market news sentiment."
+            " Combine multiple data types in one call"
+        ),
     },
 }
 
