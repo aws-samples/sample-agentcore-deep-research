@@ -1,14 +1,14 @@
 # Local Development with Docker Compose
 
-This guide explains how to run the full Correlate stack locally using Docker Compose for development purposes.
+This guide explains how to run the full AgentCore Deep Research stack locally using Docker Compose for development purposes.
 
 ## Prerequisites
 
-**Important**: Local development still requires a deployed Correlate stack in AWS for backend dependencies (Memory, Gateway, SSM parameters). Docker Compose only containerizes the frontend and agent - it doesn't replace AWS services.
+**Important**: Local development still requires a deployed AgentCore Deep Research stack in AWS for backend dependencies (Memory, Gateway, SSM parameters). Docker Compose only containerizes the frontend and agent - it doesn't replace AWS services.
 
 ### Required
 
-1. **Deployed FAST Stack**: You must have already deployed Correlate to AWS using:
+1. **Deployed ADR Stack**: You must have already deployed AgentCore Deep Research to AWS using:
    ```bash
    cd infra-cdk
    cdk deploy
