@@ -644,6 +644,44 @@ export class BackendStack extends cdk.NestedStack {
       })
     )
 
+    // Commodities Price Lambda
+    const commoditiesSecretName = `/${config.stack_name_base}/commodities-api-key`
+    if (config.api_keys?.commodities) {
+      new secretsmanager.Secret(this, "CommoditiesApiKeySecret", {
+        secretName: commoditiesSecretName,
+        description: "Alpha Vantage API key for commodities and economic data",
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.commodities),
+      })
+    }
+
+    const commoditiesLambda = new lambda.Function(this, "CommoditiesPriceLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "commodities_price_lambda.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/commodities_price"), {
+        bundling: this.getPythonBundlingOptions(["boto3"]),
+      }),
+      timeout: cdk.Duration.minutes(3),
+      environment: {
+        COMMODITIES_SECRET_NAME: commoditiesSecretName,
+      },
+      logGroup: new logs.LogGroup(this, "CommoditiesLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-commodities-price`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    // Grant Commodities Lambda access to Secrets Manager
+    commoditiesLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: [
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:/${config.stack_name_base}/commodities-api-key*`,
+        ],
+      })
+    )
+
     // Knowledge Base Search Lambda
     const kbSearchLambda = new lambda.Function(this, "KBSearchLambda", {
       runtime: lambda.Runtime.PYTHON_3_13,
@@ -764,6 +802,7 @@ export class BackendStack extends cdk.NestedStack {
     s3ReaderLambda.grantInvoke(gatewayRole)
     novaSearchLambda.grantInvoke(gatewayRole)
     openfdaLambda.grantInvoke(gatewayRole)
+    commoditiesLambda.grantInvoke(gatewayRole)
 
     // Bedrock permissions (region-agnostic)
     gatewayRole.addToPolicy(
@@ -891,6 +930,12 @@ export class BackendStack extends cdk.NestedStack {
     const openfdaSpec = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../../gateway/tools/openfda/tool_spec.json"), "utf8")
     )
+    const commoditiesSpec = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../gateway/tools/commodities_price/tool_spec.json"),
+        "utf8"
+      )
+    )
 
     // ArXiv Search Target
     const arxivTarget = new bedrockagentcore.CfnGatewayTarget(this, "ArxivSearchTarget", {
@@ -994,6 +1039,27 @@ export class BackendStack extends cdk.NestedStack {
     })
     openfdaTarget.addDependency(gateway)
 
+    // Commodities Price Target
+    const commoditiesTarget = new bedrockagentcore.CfnGatewayTarget(
+      this,
+      "CommoditiesPriceTarget",
+      {
+        gatewayIdentifier: gateway.attrGatewayIdentifier,
+        name: "commodities-price-target",
+        description: "Gold, silver, and commodities price lookup",
+        targetConfiguration: {
+          mcp: {
+            lambda: {
+              lambdaArn: commoditiesLambda.functionArn,
+              toolSchema: { inlinePayload: commoditiesSpec },
+            },
+          },
+        },
+        credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+      }
+    )
+    commoditiesTarget.addDependency(gateway)
+
     // ========== END CORRELATE RESEARCH TOOL TARGETS ==========
 
     // Ensure proper creation order
@@ -1005,6 +1071,7 @@ export class BackendStack extends cdk.NestedStack {
     gateway.node.addDependency(s3ReaderLambda)
     gateway.node.addDependency(novaSearchLambda)
     gateway.node.addDependency(openfdaLambda)
+    gateway.node.addDependency(commoditiesLambda)
     gateway.node.addDependency(this.machineClient)
     gateway.node.addDependency(gatewayRole)
 

@@ -5,9 +5,9 @@ Correlate is a full-stack AI research application built on Amazon Bedrock AgentC
 
 ## Features
 
-- **Multi-Source Research**: Search across Tavily (web), Nova (AWS-powered web search), ArXiv (academic papers), OpenFDA (drug information), and S3 files
+- **Multi-Source Research**: Search across Tavily (web), Nova (AWS-powered web search), ArXiv (academic papers), OpenFDA (drug information), AlphaVantage (commodities & economics), and S3 files
 - **S3 File Reader**: Read text files and PDFs directly from S3 (PDFs are auto-converted to markdown)
-- **Iterative 4-Round Workflow**: Generates initial report, enriches with research, deep dives on gaps, and polishes final output
+- **Structured 4-Step Workflow**: Scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
 - **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time
 - **Collapsible Sections**: Navigate long reports with collapsible H1/H2 sections and table of contents
 - **Change Highlighting**: Green highlights show what changed in each report iteration
@@ -23,8 +23,9 @@ The application includes Lambda-based tools behind AgentCore Gateway with OAuth 
 2. **Nova Web Search** - AWS-powered web search via Amazon Nova with citations
 3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
 4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
-5. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
-6. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
+5. **AlphaVantage Research** - Commodity prices (gold, oil, silver, etc.), US economic indicators (CPI, inflation, Fed rate, GDP, unemployment), and market news with sentiment analysis
+6. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
+7. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
 
 
 ## Deployment
@@ -136,13 +137,13 @@ correlate-deep-research/
 
 1. Open the application URL (from CDK outputs)
 2. Log in with Cognito credentials
-3. Toggle data sources (Tavily, Nova, ArXiv) as needed
+3. Toggle data sources (AlphaVantage, Tavily, Nova, ArXiv, etc.) as needed
 4. Enter a research question
 5. Watch as the agent:
-   - Creates an initial report structure (Round 1)
-   - Searches and enriches with findings (Round 2)
-   - Deep dives on gaps (Round 3)
-   - Polishes and presents final report (Round 4)
+   - Scaffolds report structure with key themes (Step 1)
+   - Researches across enabled data sources (Step 2)
+   - Writes all sections with citations (Step 3)
+   - Verifies completeness and fills gaps (Step 4)
 
 
 ## Security
