@@ -68,10 +68,15 @@ DATA_SOURCES = {
         "description": "Query Amazon Bedrock Knowledge Bases",
         "requires_params": True,
     },
+    "commodities": {
+        "name": "AlphaVantage Research",
+        "tool": "alphavantage_research",
+        "description": "All-in-one tool for commodity prices (gold, oil, etc.), economic indicators (CPI, inflation, Fed rate, GDP), and market news sentiment. Combine multiple data types in one call",
+    },
 }
 
 # Default enabled sources (KB and S3 excluded by default)
-DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "arxiv", "openfda"]
+DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "commodities"]
 
 
 def load_system_prompt(
@@ -306,7 +311,7 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv", "openfda", "s3"
+      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "commodities"
     - s3FileUris: List of S3 file URIs (optional, used when "s3" is enabled)
     """
     user_query = payload.get("prompt")
