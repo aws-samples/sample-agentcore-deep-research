@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "correlate-deep-research"
+name = "agentcore-deep-research"
 version = "0.3.1"
-description = "Correlate: Deep Research - AI-powered multi-source research application built on Amazon Bedrock AgentCore"
+description = "AgentCore Deep Research - AI-powered multi-source deep research application"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
@@ -44,14 +44,8 @@ agent-strands = [
 
 # All dependencies for local development
 all = [
-    "correlate-deep-research[dev,agent-strands]",
+    "agentcore-deep-research[dev,agent-strands]",
 ]
-
-[project.urls]
-Homepage = "https://github.com/aws-samples/correlate-deep-research"
-Documentation = "https://github.com/aws-samples/correlate-deep-research/tree/main/docs"
-Repository = "https://github.com/aws-samples/correlate-deep-research"
-Issues = "https://github.com/aws-samples/correlate-deep-research/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

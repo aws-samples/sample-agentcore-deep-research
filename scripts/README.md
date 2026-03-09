@@ -1,7 +1,6 @@
 # Deployment Scripts
 
-This directory contains scripts for deploying Correlate
-infrastructure and frontend.
+This directory contains scripts for deploying AgentCore Deep Research infrastructure and frontend.
 
 ## Main Deployment Workflow
 

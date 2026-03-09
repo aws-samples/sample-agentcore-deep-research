@@ -1,11 +1,11 @@
-# Correlate: Deep Research Agent
+# AgentCore Deep Research Accelerator
 
-Correlate is a full-stack AI research application built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and generates comprehensive reports with proper citations. The application features a modern React frontend with a split-pane interface showing real-time report generation alongside the chat. This asset is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
+AgentCore Deep Research (ADR) is a full-stack agentic AI application for deep research built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and generates comprehensive reports with proper citations. The application features a modern React frontend with a split-pane interface showing real-time report generation alongside the chat. This asset is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
 
 
-## Features
+## ✨ Features
 
-- **Multi-Source Research**: Search across Tavily (web), Nova (AWS-powered web search), ArXiv (academic papers), OpenFDA (drug information), AlphaVantage (commodities & economics), and S3 files
+- **Multi-Source Research**: Search across the enterprise data (S3 or Knowledge Base), the Internet, academic papers, OpenFDA (drug data), AlphaVantage (commodities & economics) and more
 - **S3 File Reader**: Read text files and PDFs directly from S3 (PDFs are auto-converted to markdown)
 - **Structured 4-Step Workflow**: Scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
 - **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time
@@ -15,7 +15,7 @@ Correlate is a full-stack AI research application built on Amazon Bedrock AgentC
 - **Conversation Memory**: AgentCore Memory maintains context across sessions
 
 
-## Gateway Tools
+## 🔧 Gateway Tools
 
 The application includes Lambda-based tools behind AgentCore Gateway with OAuth authentication:
 
@@ -27,10 +27,12 @@ The application includes Lambda-based tools behind AgentCore Gateway with OAuth 
 6. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
 7. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
 
+The modular architecture makes it easy to integrate additional data sources for developers.
 
-## Deployment
 
-Deploying Correlate requires a few CDK commands:
+## 🚀 Deployment
+
+Deploying ADR requires a few CDK commands:
 
 ```bash
 cd infra-cdk
@@ -77,7 +79,7 @@ docker-compose up --build
 See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup instructions.
 
 
-## Architecture
+## ℹ️ Architecture
 
 ![Architecture Diagram](docs/architecture-diagram/correlate-architecture.png)
 
@@ -95,10 +97,10 @@ The architecture uses Amazon Cognito in four places:
 - **Infrastructure**: CDK deployment with Amplify Hosting for frontend and AgentCore backend
 
 
-## Project Structure
+## 📂 Project Structure
 
 ```
-correlate-deep-research/
+agentcore-deep-research/
 ├── frontend/                 # React frontend application
 │   ├── src/
 │   │   ├── components/     # React components (shadcn/ui)
@@ -133,7 +135,7 @@ correlate-deep-research/
 ```
 
 
-## Usage
+## ▶️ Usage
 
 1. Open the application URL (from CDK outputs)
 2. Log in with Cognito credentials
@@ -146,7 +148,7 @@ correlate-deep-research/
    - Verifies completeness and fills gaps (Step 4)
 
 
-## Security
+## 🔒 Security
 
 Note: this asset represents a proof-of-value for the services included and is not intended as a production-ready solution. You must determine how the AWS Shared Responsibility applies to your specific use case and implement the needed controls to achieve your desired security outcomes. AWS offers a broad set of security tools and configurations to enable our customers.
 

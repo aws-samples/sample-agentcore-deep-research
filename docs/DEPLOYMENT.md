@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide walks you through deploying Correlate to AWS.
+This guide walks you through deploying AgentCore Deep Research to AWS.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ backend:
 
 ### Deployment Types
 
-Correlate supports two deployment types for AgentCore Runtime. Set `deployment_type` in `infra-cdk/config.yaml`:
+AgentCore Deep Research supports two deployment types for AgentCore Runtime. Set `deployment_type` in `infra-cdk/config.yaml`:
 
 | Type | Description |
 |------|-------------|
