@@ -29,7 +29,9 @@ export function ChatHeader({
   return (
     <header className="flex items-center justify-between p-4 border-b w-full">
       <div className="flex items-center">
-        <h1 className="text-xl font-bold">{title || "Correlate"}</h1>
+        <h1 className="text-xl font-bold">
+          {title || "AgentCore Deep Research"}
+        </h1>
       </div>
       <div className="flex items-center gap-2">
         <Button

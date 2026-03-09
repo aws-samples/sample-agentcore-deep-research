@@ -58,7 +58,7 @@ npx cdk deploy --all
 Edit `config.yaml` to customize your deployment:
 
 ```yaml
-stack_name_base: "Correlate-stack"
+stack_name_base: "adr-stack"
 
 admin_user_email: admin@example.com  # Required: Email for the admin user
 
@@ -70,7 +70,7 @@ backend:
   pattern: "strands-deep-research"
 
 api_keys:
-  tavily: tvly-xxxxx  # Required: Get your key at https://tavily.com/
+  tavily: tvly-xxxxx  # Optional: Get your key at https://tavily.com/
   commodities: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
 ```
 
@@ -147,7 +147,7 @@ The agent container builds use a specific configuration to handle the repository
 
 **Solution**: Use repository root as build context with optimized file filtering:
 
-1. **Build Context**: Repository root (`/path/to/correlate-deep-research/`)
+1. **Build Context**: Repository root (`/path/to/agentcore-deep-research/`)
 2. **Dockerfile Location**: `patterns/{pattern}/Dockerfile`
 3. **Package Installation**: Install package (`gateway/` + `pyproject.toml`) as proper Python package
 4. **File Filtering**: `.dockerignore` excludes large directories to prevent build hangs
