@@ -1040,20 +1040,24 @@ export class BackendStack extends cdk.NestedStack {
     openfdaTarget.addDependency(gateway)
 
     // Commodities Price Target
-    const commoditiesTarget = new bedrockagentcore.CfnGatewayTarget(this, "CommoditiesPriceTarget", {
-      gatewayIdentifier: gateway.attrGatewayIdentifier,
-      name: "commodities-price-target",
-      description: "Gold, silver, and commodities price lookup",
-      targetConfiguration: {
-        mcp: {
-          lambda: {
-            lambdaArn: commoditiesLambda.functionArn,
-            toolSchema: { inlinePayload: commoditiesSpec },
+    const commoditiesTarget = new bedrockagentcore.CfnGatewayTarget(
+      this,
+      "CommoditiesPriceTarget",
+      {
+        gatewayIdentifier: gateway.attrGatewayIdentifier,
+        name: "commodities-price-target",
+        description: "Gold, silver, and commodities price lookup",
+        targetConfiguration: {
+          mcp: {
+            lambda: {
+              lambdaArn: commoditiesLambda.functionArn,
+              toolSchema: { inlinePayload: commoditiesSpec },
+            },
           },
         },
-      },
-      credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
-    })
+        credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
+      }
+    )
     commoditiesTarget.addDependency(gateway)
 
     // ========== END CORRELATE RESEARCH TOOL TARGETS ==========
