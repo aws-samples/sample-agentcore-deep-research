@@ -16,6 +16,7 @@ export interface AppConfig {
   }
   api_keys?: {
     tavily?: string | null
+    commodities?: string | null
   }
 }
 
@@ -65,6 +66,7 @@ export class ConfigManager {
         },
         api_keys: {
           tavily: parsedConfig.api_keys?.tavily || null,
+          commodities: parsedConfig.api_keys?.commodities || null,
         },
       }
     } catch (error) {

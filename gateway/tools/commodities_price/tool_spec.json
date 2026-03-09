@@ -1,0 +1,44 @@
+[
+  {
+    "name": "alphavantage_research",
+    "description": "All-in-one commodity and economic research tool. Fetches commodity spot prices, historical prices, economic indicators, and market news sentiment in a single call. Use this for any research involving gold, oil, commodities, inflation, interest rates, GDP, or market sentiment. Combine multiple data types in one call to get a comprehensive picture.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "spot_symbols": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Get latest prices for these commodities. Precious metals: GOLD, SILVER. Energy: WTI, BRENT, NATURAL_GAS. Base metals: COPPER, ALUMINUM. Agriculture: WHEAT, CORN, COTTON, SUGAR, COFFEE"
+        },
+        "historical_symbols": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Get historical prices for these commodities (requires start_date and end_date)"
+        },
+        "indicators": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Economic indicators to fetch. Supported: CPI, INFLATION, FEDERAL_FUNDS_RATE, TREASURY_YIELD, REAL_GDP, UNEMPLOYMENT, RETAIL_SALES, NONFARM_PAYROLL, DURABLE_GOODS"
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format (used for historical prices and indicators)"
+        },
+        "end_date": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format"
+        },
+        "news_topics": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Fetch market news filtered by topics: energy_transportation, economy_fiscal, economy_monetary, economy_macro, financial_markets, manufacturing, technology, finance"
+        },
+        "news_limit": {
+          "type": "integer",
+          "description": "Number of news articles to return (max 50). Default: 5"
+        }
+      },
+      "required": []
+    }
+  }
+]
