@@ -114,7 +114,7 @@ ECONOMIC_INDICATORS = {
 def _cache_key(params: dict) -> str:
     cache_params = {k: v for k, v in params.items() if k != "apikey"}
     raw = json.dumps(cache_params, sort_keys=True)
-    return hashlib.md5(raw.encode()).hexdigest()  # noqa: S324  # nosec B303
+    return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()  # noqa: S324
 
 
 def _cache_get(key: str, ttl: int) -> dict | None:
