@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Copyright Amazon.com and Affiliates
-This code is being licensed under the terms of the Amazon Software License available at https://aws.amazon.com/asl/
-"""
+
 
 """
 Test ArXiv search tool via AgentCore Gateway.
