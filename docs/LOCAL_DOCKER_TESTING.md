@@ -52,7 +52,7 @@ python test-scripts/test-agent-docker.py --pattern strands-deep-research
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  Docker Container (ARM64)                           │   │
 │  │  ┌─────────────────────────────────────────────┐   │   │
-│  │  │  Agent (basic_agent.py / langgraph_agent.py)│   │   │
+│  │  │  Agent                                      │   │   │
 │  │  │  - Listens on :8080                         │   │   │
 │  │  │  - Uses passed AWS credentials              │   │   │
 │  │  └─────────────────────────────────────────────┘   │   │
