@@ -1,13 +1,13 @@
 // import * as cdk from 'aws-cdk-lib';
 // import { Template } from 'aws-cdk-lib/assertions';
-// import * as Correlate from '../lib/correlate-main-stack';
+// import * as ADR from '../lib/adr-main-stack';
 
 // example test. To run these tests, uncomment this file along with the
-// example resource in lib/correlate-main-stack.ts
+// example resource in lib/adr-main-stack.ts
 test("SQS Queue Created", () => {
   //   const app = new cdk.App();
   //     // WHEN
-  //   const stack = new Correlate.CorrelateMainStack(app, 'MyTestStack');
+  //   const stack = new ADR.ADRMainStack(app, 'MyTestStack');
   //     // THEN
   //   const template = Template.fromStack(stack);
   //   template.hasResourceProperties('AWS::SQS::Queue', {

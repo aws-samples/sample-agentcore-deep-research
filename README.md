@@ -81,7 +81,7 @@ See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup 
 
 ## ℹ️ Architecture
 
-![Architecture Diagram](docs/architecture-diagram/correlate-architecture.png)
+![Architecture Diagram](docs/architecture-diagram/adr-architecture.png)
 
 The architecture uses Amazon Cognito in four places:
 1. User-based login to the frontend web application on CloudFront

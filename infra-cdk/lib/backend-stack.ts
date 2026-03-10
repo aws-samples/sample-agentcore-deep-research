@@ -588,7 +588,7 @@ export class BackendStack extends cdk.NestedStack {
       }),
     })
 
-    // ========== CORRELATE RESEARCH TOOLS ==========
+    // ========== ADR RESEARCH TOOLS ==========
 
     // ArXiv Search Lambda
     const arxivLambda = new lambda.Function(this, "ArxivSearchLambda", {
@@ -786,7 +786,7 @@ export class BackendStack extends cdk.NestedStack {
       }),
     })
 
-    // ========== END CORRELATE RESEARCH TOOLS ==========
+    // ========== END ADR RESEARCH TOOLS ==========
 
     // Create comprehensive IAM role for gateway
     const gatewayRole = new iam.Role(this, "GatewayRole", {
@@ -900,7 +900,7 @@ export class BackendStack extends cdk.NestedStack {
       ],
     })
 
-    // ========== CORRELATE RESEARCH TOOL TARGETS ==========
+    // ========== ADR RESEARCH TOOL TARGETS ==========
 
     // Load tool specifications
     const arxivSpec = JSON.parse(
@@ -1060,7 +1060,7 @@ export class BackendStack extends cdk.NestedStack {
     )
     commoditiesTarget.addDependency(gateway)
 
-    // ========== END CORRELATE RESEARCH TOOL TARGETS ==========
+    // ========== END ADR RESEARCH TOOL TARGETS ==========
 
     // Ensure proper creation order
     gatewayTarget.addDependency(gateway)

@@ -44,7 +44,7 @@ from utils import (
 # Globals
 _container_id: str | None = None
 REPO_ROOT = Path(__file__).parent.parent
-IMAGE_NAME = "correlate-agent-local"
+IMAGE_NAME = "adr-agent-local"
 
 
 def build_docker_image(pattern: str) -> bool:

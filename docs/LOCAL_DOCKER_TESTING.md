@@ -175,7 +175,7 @@ If you need more control, you can run Docker commands directly:
 ```bash
 # Build image manually
 docker build -f patterns/strands-deep-research/Dockerfile \
-  -t correlate-agent-local \
+  -t adr-agent-local \
   --platform linux/arm64 .
 
 # Run with explicit env vars
@@ -187,7 +187,7 @@ docker run --rm -it -p 8080:8080 \
   -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
-  correlate-agent-local
+  adr-agent-local
 
 # Test with curl (mock JWT with sub=test-user)
 curl -X POST http://localhost:8080/invocations \
@@ -215,7 +215,7 @@ docker run --rm -p 8080:8080 \
   -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
-  correlate-agent-local
+  adr-agent-local
 ```
 
 ## Related Documentation

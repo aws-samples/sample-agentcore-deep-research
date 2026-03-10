@@ -220,7 +220,7 @@ describe("Configuration Verification Tests", () => {
         resolve(__dirname, "../../index.html"),
         "utf-8",
       );
-      expect(indexHtml).toContain("<title>Correlate: Deep Research</title>");
+      expect(indexHtml).toContain("<title>AgentCore Deep Research</title>");
     });
 
     it("should have meta description", () => {

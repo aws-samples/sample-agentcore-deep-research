@@ -18,6 +18,12 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_RESOURCE_DETECTORS=none
+      - OTEL_PYTHON_DISTRO=default
+      - OTEL_PYTHON_CONFIGURATOR=default
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/ping', timeout=2)"]
       interval: 30s
@@ -25,7 +31,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - correlate-network
+      - adr-network
 
   frontend:
     build:
@@ -38,12 +44,13 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - DOCKER_CONTAINER=1
     depends_on:
       agent:
         condition: service_healthy
     networks:
-      - correlate-network
+      - adr-network
 
 networks:
-  correlate-network:
+  adr-network:
     driver: bridge
