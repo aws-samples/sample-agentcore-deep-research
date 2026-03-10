@@ -79,14 +79,14 @@ api_keys:
 ```
 infra-cdk/
 ├── bin/
-│   └── correlate-cdk.ts     # CDK app entry point
+│   └── adr-cdk.ts           # CDK app entry point
 ├── lib/
-│   ├── correlate-main-stack.ts # Main orchestrator stack
+│   ├── adr-main-stack.ts     # Main orchestrator stack
 │   ├── backend-stack.ts     # Backend/AgentCore stack
 │   ├── frontend-stack.ts    # Frontend/CloudFront stack
 │   └── utils/               # Utility functions and constructs
 ├── test/
-│   └── correlate-cdk.test.ts # Unit tests
+│   └── adr-cdk.test.ts      # Unit tests
 ├── cdk.json                 # CDK configuration
 ├── config.yaml              # Application configuration
 ├── package.json

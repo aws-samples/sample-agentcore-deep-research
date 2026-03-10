@@ -7,17 +7,17 @@ import { BackendStack } from "./backend-stack"
 import { AmplifyHostingStack } from "./amplify-hosting-stack"
 import { CognitoStack } from "./cognito-stack"
 
-export interface CorrelateStackProps extends cdk.StackProps {
+export interface ADRStackProps extends cdk.StackProps {
   config: AppConfig
 }
 
-export class CorrelateMainStack extends cdk.Stack {
+export class ADRMainStack extends cdk.Stack {
   public readonly amplifyHostingStack: AmplifyHostingStack
   public readonly backendStack: BackendStack
   public readonly cognitoStack: CognitoStack
 
-  constructor(scope: Construct, id: string, props: CorrelateStackProps) {
-    const description = "Correlate: Deep Research - Main Stack (v0.3.1) (uksb-v6dos0t5g8)"
+  constructor(scope: Construct, id: string, props: ADRStackProps) {
+    const description = "AgentCore Deep Research - Main Stack (v0.3.1) (uksb-v6dos0t5g8)"
     super(scope, id, { ...props, description })
 
     // Step 1: Create the Amplify stack to get the predictable domain

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib"
-import { CorrelateMainStack } from "../lib/correlate-main-stack"
+import { ADRMainStack } from "../lib/adr-main-stack"
 import { ConfigManager } from "../lib/utils/config-manager"
 
 // Load configuration using ConfigManager
@@ -11,8 +11,8 @@ const props = configManager.getProps()
 
 const app = new cdk.App()
 
-// Deploy the Correlate stack
-const amplifyStack = new CorrelateMainStack(app, props.stack_name_base, {
+// Deploy the ADR stack
+const amplifyStack = new ADRMainStack(app, props.stack_name_base, {
   config: props,
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
