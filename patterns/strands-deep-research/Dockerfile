@@ -1,5 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+
 
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 

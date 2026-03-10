@@ -1,8 +1,8 @@
-stack_name_base: ADR-stack
+stack_name_base: adr-stack
 
 # Optional: Set to automatically create an admin user and email credentials
 # If not provided, you'll need to manually create users via AWS Console
-admin_user_email: null
+admin_user_email: kozodoi@amazon.de
 
 backend:
   pattern: strands-deep-research
@@ -11,5 +11,5 @@ backend:
 
 # API Keys for research tools (used by strands-deep-research pattern)
 api_keys:
-  tavily: null # Replace with your Tavily API key from https://tavily.com/
+  tavily: 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 # Replace with your Tavily API key from https://tavily.com/
   commodities: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/
