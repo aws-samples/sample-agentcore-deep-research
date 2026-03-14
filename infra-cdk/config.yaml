@@ -1,15 +1,15 @@
-stack_name_base: adr-stack
+stack_name_base: deep-research
 
 # Optional: Set to automatically create an admin user and email credentials
 # If not provided, you'll need to manually create users via AWS Console
-admin_user_email: kozodoi@amazon.de
+admin_user_email: null
 
 backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
   model_id: global.anthropic.claude-sonnet-4-6 # Model ID for the agent (with cross-region prefix)
 
-# API Keys for research tools (used by strands-deep-research pattern)
+# API Keys for research tools
 api_keys:
-  tavily: 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 # Replace with your Tavily API key from https://tavily.com/
+  tavily: null # Replace with your Tavily API key from https://tavily.com/
   commodities: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/
