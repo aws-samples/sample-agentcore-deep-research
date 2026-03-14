@@ -2,39 +2,18 @@
 
 AgentCore Deep Research template is a sample agentic AI solution for deep research built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and generates comprehensive reports with proper citations. The application features a modern React frontend with a split-pane interface showing real-time report generation alongside the chat. This sample is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
 
-![Workflow](docs/architecture-diagram/workflow.png)
+![Workflow](docs/figures/workflow.png)
 
+**Key Features**
 
-## ✨ Features
-
-- **Multi-Source Research**: Search across the enterprise data (S3 or Knowledge Base), the Internet, academic papers, OpenFDA (drug data), AlphaVantage (commodities & economics) and more
-- **S3 File Reader**: Read text files and PDFs directly from S3 (PDFs are auto-converted to markdown)
-- **Structured 4-Step Workflow**: Scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
-- **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time
-- **Collapsible Sections**: Navigate long reports with collapsible H1/H2 sections and table of contents
-- **Change Highlighting**: Green highlights show what changed in each report iteration
-- **Proper Citations**: Every factual claim includes inline source citations with auto-extracted references section
-- **Conversation Memory**: AgentCore Memory maintains context across sessions
-
-
-## 🔧 Gateway Tools
-
-The application includes Lambda-based tools behind AgentCore Gateway with OAuth authentication:
-
-1. **Tavily Web Search** - Search the web for current information with relevance scoring
-2. **Nova Web Search** - AWS-powered web search via Amazon Nova with citations
-3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
-4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
-5. **AlphaVantage Research** - Commodity prices (gold, oil, silver, etc.), US economic indicators (CPI, inflation, Fed rate, GDP, unemployment), and market news with sentiment analysis
-6. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
-7. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
-
-The modular architecture makes it easy to integrate additional data sources for developers.
-
+- **Multi-Source Retrieval**: Search across the enterprise data (S3 or Knowledge Base) and public sources (Internet, academic papers, OpenFDA, AlphaVantage and more)
+- **Iterative Research Workflow**: AI agent scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
+- **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time and allows follow-up questions
+- **Fact-Checking and Citations**: Every factual claim includes inline source citations with the references section
 
 ## 🚀 Deployment
 
-Deploying ADR requires a few CDK commands:
+Deploying AgentCore Deep Research stack requires a few CDK commands:
 
 ```bash
 cd infra-cdk
@@ -47,7 +26,53 @@ python scripts/deploy-frontend.py
 
 See the [deployment guide](docs/DEPLOYMENT.md) for detailed instructions.
 
-### Local Development
+## ▶️ Usage
+
+1. Open the application URL (from CDK outputs)
+2. Log in with Cognito credentials
+3. Toggle data sources (AlphaVantage, Tavily, Nova, ArXiv, etc.) as needed
+4. Enter a research question
+5. Watch as the agent:
+   - Scaffolds report structure with key themes
+   - Researches across enabled data sources
+   - Writes all sections with citations
+   - Verifies completeness and fills gaps
+6. Ask follow-up questions and download the report
+
+
+## ℹ️ Architecture
+
+![Architecture Diagram](docs/figures/adr-architecture.png)
+
+The architecture uses Amazon Cognito in four places:
+1. User-based login to the frontend web application on CloudFront
+2. Token-based authentication for the frontend to access AgentCore Runtime
+3. Token-based authentication for the agents in AgentCore Runtime to access AgentCore Gateway
+4. Token-based authentication when making API requests to API Gateway.
+
+### Gateway Tools
+
+The application includes multiple Lambda-based tools behind AgentCore Gateway with OAuth authentication:
+
+1. **Tavily Web Search** - Search the web for current information with relevance scoring
+2. **Nova Web Search** - AWS-powered web search via Amazon Nova with citations
+3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
+4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
+5. **AlphaVantage Research** - Commodity prices (gold, oil, silver, etc.), US economic indicators (CPI, inflation, Fed rate, GDP, unemployment), and market news with sentiment analysis
+6. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
+7. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
+
+The modular architecture makes it easy to integrate additional data sources for developers.
+
+### Tech Stack
+
+- **Frontend**: React with TypeScript, Vite, Tailwind CSS, and shadcn components
+- **Agent**: Strands Agents SDK with BedrockModel
+- **Authentication**: AWS Cognito User Pool with OAuth support
+- **Infrastructure**: CDK deployment with Amplify Hosting for frontend and AgentCore backend
+
+
+## 💻 Local Development
 
 Local development requires a deployed stack because the agent depends on AWS services that cannot run locally:
 - **AgentCore Memory** - stores conversation history
@@ -79,24 +104,6 @@ docker-compose up --build
 - `AWS_DEFAULT_REGION`: The region where you deployed the stack (e.g., `us-east-1`)
 
 See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup instructions.
-
-
-## ℹ️ Architecture
-
-![Architecture Diagram](docs/architecture-diagram/adr-architecture.png)
-
-The architecture uses Amazon Cognito in four places:
-1. User-based login to the frontend web application on CloudFront
-2. Token-based authentication for the frontend to access AgentCore Runtime
-3. Token-based authentication for the agents in AgentCore Runtime to access AgentCore Gateway
-4. Token-based authentication when making API requests to API Gateway.
-
-### Tech Stack
-
-- **Frontend**: React with TypeScript, Vite, Tailwind CSS, and shadcn components
-- **Agent**: Strands Agents SDK with BedrockModel
-- **Authentication**: AWS Cognito User Pool with OAuth support
-- **Infrastructure**: CDK deployment with Amplify Hosting for frontend and AgentCore backend
 
 
 ## 📂 Project Structure
@@ -136,22 +143,14 @@ agentcore-deep-research/
 └── README.md
 ```
 
-
-## ▶️ Usage
-
-1. Open the application URL (from CDK outputs)
-2. Log in with Cognito credentials
-3. Toggle data sources (AlphaVantage, Tavily, Nova, ArXiv, etc.) as needed
-4. Enter a research question
-5. Watch as the agent:
-   - Scaffolds report structure with key themes (Step 1)
-   - Researches across enabled data sources (Step 2)
-   - Writes all sections with citations (Step 3)
-   - Verifies completeness and fills gaps (Step 4)
-
-
 ## 🔒 Security
 
 Note: this asset represents a proof-of-value for the services included and is not intended as a production-ready solution. You must determine how the AWS Shared Responsibility applies to your specific use case and implement the needed controls to achieve your desired security outcomes. AWS offers a broad set of security tools and configurations to enable our customers.
 
 Ultimately it is your responsibility as the developer to ensure all aspects of the application are secure. We provide security best practices in repository documentation and provide a secure baseline but Amazon holds no responsibility for the security of applications built from this tool.
+
+## 👤 Team
+
+| ![image](docs/figures/team/nikita.jpeg) | ![image](docs/figures/team/aiham.jpeg) | ![image](docs/figures/team/jack.jpeg) | ![image](docs/figures/team/elizaveta.jpeg) |
+|---|---|---|---|
+| [Nikita Kozodoi](https://www.linkedin.com/in/kozodoi/) | [Aiham Taleb](https://www.linkedin.com/in/aihamtaleb/) | [Jack Butler](https://www.linkedin.com/in/jackbutler-a/) | [Elizaveta Zinovyeva](https://www.linkedin.com/in/zinov-liza/) |
