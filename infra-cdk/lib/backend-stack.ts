@@ -658,11 +658,11 @@ export class BackendStack extends cdk.NestedStack {
 
     // Commodities Price Lambda
     const commoditiesSecretName = `/${config.stack_name_base}/commodities-api-key`
-    if (config.api_keys?.commodities) {
+    if (config.api_keys?.alphavantage) {
       new secretsmanager.Secret(this, "CommoditiesApiKeySecret", {
         secretName: commoditiesSecretName,
         description: "Alpha Vantage API key for commodities and economic data",
-        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.commodities),
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.alphavantage),
       })
     }
 

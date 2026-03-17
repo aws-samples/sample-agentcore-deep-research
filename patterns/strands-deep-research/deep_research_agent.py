@@ -40,7 +40,7 @@ ALL_DATA_SOURCES = {
         "description": "Search the web for current information",
     },
     "nova": {
-        "name": "Nova Web Search",
+        "name": "Nova Web Grounding",
         "tool": "nova_web_search",
         "description": "Web search via Amazon Nova with citations",
     },
@@ -334,7 +334,7 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "commodities"
+      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "alphavantage"
     - s3FileUris: List of S3 file URIs (optional, used when "s3" is enabled)
     """
     user_query = payload.get("prompt")
