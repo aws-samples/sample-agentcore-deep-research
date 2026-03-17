@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
 "use client";
 import { useAuth as useOidcAuth } from "react-oidc-context";
 import { useEffect, useState } from "react";
