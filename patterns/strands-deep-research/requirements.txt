@@ -1,6 +1,6 @@
 # Deep research agent dependencies with pinned versions
-strands-agents==1.29.0
+strands-agents==1.30.0
 strands-agents-tools==0.2.22
 mcp==1.26.0
-bedrock-agentcore[strands-agents]==1.4.3
+bedrock-agentcore[strands-agents]==1.4.6
 PyJWT[crypto]>=2.10.1

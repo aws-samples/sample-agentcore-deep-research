@@ -17,7 +17,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from report_upload_hook import ReportS3UploadHook
 from strands import Agent
-from strands.models import BedrockModel
+from strands.models import BedrockModel, CacheConfig
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
@@ -200,8 +200,7 @@ def create_deep_research_agent(
         max_tokens=INFERENCE_CONFIG["maxTokens"],
         streaming=True,
         boto_client_config=BEDROCK_CONFIG,
-        cache_prompt="default",
-        cache_tools="default",
+        cache_config=CacheConfig(strategy="auto"),
     )
 
     memory_id = os.environ.get("MEMORY_ID")
