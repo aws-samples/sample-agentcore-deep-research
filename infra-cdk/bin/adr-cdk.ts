@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
 import * as cdk from "aws-cdk-lib"
 import { ADRMainStack } from "../lib/adr-main-stack"
 import { ConfigManager } from "../lib/utils/config-manager"
