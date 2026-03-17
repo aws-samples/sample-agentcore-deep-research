@@ -24,7 +24,7 @@ export interface AppConfig {
   tools?: Record<string, ToolConfig>
   api_keys?: {
     tavily?: string | null
-    commodities?: string | null
+    alphavantage?: string | null
   }
 }
 
@@ -94,7 +94,7 @@ export class ConfigManager {
         tools,
         api_keys: {
           tavily: parsedConfig.api_keys?.tavily || null,
-          commodities: parsedConfig.api_keys?.commodities || null,
+          alphavantage: parsedConfig.api_keys?.alphavantage || null,
         },
       }
     } catch (error) {

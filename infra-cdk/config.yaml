@@ -40,4 +40,4 @@ tools:
 # API Keys for research tools
 api_keys:
   tavily: null # Replace with your Tavily API key from https://tavily.com/
-  commodities: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/
+  alphavantage: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/

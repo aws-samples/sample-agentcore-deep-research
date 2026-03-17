@@ -39,7 +39,7 @@ async function fetchReportContent(url: string): Promise<string | null> {
 const TOOL_METADATA: Record<string, { name: string; icon: string }> = {
   alphavantage: { name: "AlphaVantage", icon: "📈" },
   tavily: { name: "Tavily Web", icon: "🌐" },
-  nova: { name: "Nova Search", icon: "🔍" },
+  nova: { name: "Nova Web Grounding", icon: "🔍" },
   arxiv: { name: "ArXiv Papers", icon: "📚" },
   openfda: { name: "OpenFDA Drugs", icon: "💊" },
   s3: { name: "S3 Files", icon: "📁" },

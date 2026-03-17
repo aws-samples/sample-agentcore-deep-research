@@ -80,7 +80,7 @@ tools:
 
 api_keys:
   tavily: tvly-xxxxx  # Optional: Get your key at https://tavily.com/
-  commodities: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
+  alphavantage: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
 ```
 
 ## Project Structure
