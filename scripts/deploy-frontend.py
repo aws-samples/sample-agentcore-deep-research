@@ -113,7 +113,7 @@ def check_prerequisite(command: str) -> bool:
     return shutil.which(command) is not None
 
 
-def parse_config_yaml(config_path: Path) -> dict[str, str]:
+def parse_config_yaml(config_path: Path) -> dict:
     """
     Parse config.yaml using regex (no PyYAML dependency).
 
@@ -121,9 +121,13 @@ def parse_config_yaml(config_path: Path) -> dict[str, str]:
         config_path: Path to config.yaml file
 
     Returns:
-        Dictionary with stack_name_base and pattern values
+        Dictionary with stack_name_base, pattern, and tools values
     """
-    config = {"stack_name_base": "", "pattern": "strands-deep-research"}
+    config: dict = {
+        "stack_name_base": "",
+        "pattern": "strands-deep-research",
+        "tools": {},
+    }
 
     if not config_path.exists():
         return config
@@ -139,6 +143,28 @@ def parse_config_yaml(config_path: Path) -> dict[str, str]:
     match = re.search(r"pattern:\s*(\S+)", content)
     if match:
         config["pattern"] = match.group(1).split("#")[0].strip().strip("\"'")
+
+    # Extract tools config (tool_name -> {enabled, default_on})
+    tools_section = re.search(r"^tools:\s*\n((?:[ \t]+\S.*\n)*)", content, re.MULTILINE)
+    if tools_section:
+        tools_text = tools_section.group(1)
+        current_tool = None
+        for line in tools_text.split("\n"):
+            # Match tool name (2-space indented)
+            tool_match = re.match(r"^  (\w+):\s*$", line)
+            if tool_match:
+                current_tool = tool_match.group(1)
+                config["tools"][current_tool] = {"enabled": True, "default_on": False}
+                continue
+            if current_tool:
+                # Match enabled/default_on (4-space indented)
+                prop_match = re.match(
+                    r"^    (enabled|default_on):\s*(true|false)", line
+                )
+                if prop_match:
+                    config["tools"][current_tool][prop_match.group(1)] = (
+                        prop_match.group(2) == "true"
+                    )
 
     return config
 
@@ -341,6 +367,7 @@ def generate_aws_exports(
     region: str,
     pattern: str,
     frontend_dir: Path,
+    tools: dict | None = None,
 ) -> None:
     """
     Generate aws-exports.json configuration file.
@@ -351,6 +378,7 @@ def generate_aws_exports(
         region: AWS region
         pattern: Agent pattern name
         frontend_dir: Path to frontend directory
+        tools: Tools configuration from config.yaml
     """
     required = [
         "CognitoClientId",
@@ -364,7 +392,7 @@ def generate_aws_exports(
     if missing:
         raise ValueError(f"Missing required stack outputs: {', '.join(missing)}")
 
-    aws_exports = {
+    aws_exports: dict = {
         "authority": f"https://cognito-idp.{region}.amazonaws.com/{outputs['CognitoUserPoolId']}",
         "client_id": outputs["CognitoClientId"],
         "redirect_uri": outputs["AmplifyUrl"],
@@ -377,6 +405,8 @@ def generate_aws_exports(
         "feedbackApiUrl": outputs["FeedbackApiUrl"],
         "agentPattern": pattern,
     }
+    if tools:
+        aws_exports["tools"] = tools
 
     public_dir = frontend_dir / "public"
     public_dir.mkdir(parents=True, exist_ok=True)
@@ -481,15 +511,16 @@ def main() -> int:
     log_success(f"Staging Bucket: {deployment_bucket}")
     log_success(f"Region: {region}")
 
-    # Get agent pattern from config
+    # Get agent pattern and tools config
     config = parse_config_yaml(config_path)
     pattern = config.get("pattern", "strands-deep-research")
+    tools = config.get("tools", {})
     log_info(f"Agent pattern: {pattern}")
 
     # Generate aws-exports.json
     log_info("Generating aws-exports.json...")
     try:
-        generate_aws_exports(stack_name, outputs, region, pattern, frontend_dir)
+        generate_aws_exports(stack_name, outputs, region, pattern, frontend_dir, tools)
     except ValueError as e:
         log_error(str(e))
         return 1
