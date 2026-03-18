@@ -55,7 +55,7 @@ The architecture uses Amazon Cognito in four places:
 The application includes multiple Lambda-based tools behind AgentCore Gateway with OAuth authentication:
 
 1. **Tavily Web Search** - Search the web for current information with relevance scoring
-2. **Nova Web Search** - AWS-powered web search via Amazon Nova with citations
+2. **Nova Web Grounding** - AWS-powered web search via Amazon Nova with citations
 3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
 4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
 5. **AlphaVantage Research** - Commodity prices (gold, oil, silver, etc.), US economic indicators (CPI, inflation, Fed rate, GDP, unemployment), and market news with sentiment analysis

@@ -32,15 +32,15 @@ app = BedrockAgentCoreApp()
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
-# Available data sources with their tool names
-DATA_SOURCES = {
+# All known data sources with their tool names
+ALL_DATA_SOURCES = {
     "tavily": {
         "name": "Tavily Web Search",
         "tool": "tavily_web_search",
         "description": "Search the web for current information",
     },
     "nova": {
-        "name": "Nova Web Search",
+        "name": "Nova Web Grounding",
         "tool": "nova_web_search",
         "description": "Web search via Amazon Nova with citations",
     },
@@ -59,13 +59,13 @@ DATA_SOURCES = {
         "tool": "s3_text_reader",
         "description": "Read text files from S3 (txt, md, csv, json, etc.)",
     },
-    "kb": {
+    "bedrock_kb": {
         "name": "Knowledge Base Search",
         "tool": "knowledge_base_search",
         "description": "Query Amazon Bedrock Knowledge Bases",
         "requires_params": True,
     },
-    "commodities": {
+    "alphavantage": {
         "name": "AlphaVantage Research",
         "tool": "alphavantage_research",
         "description": (
@@ -77,8 +77,29 @@ DATA_SOURCES = {
     },
 }
 
-# Default enabled sources (KB and S3 excluded by default)
-DEFAULT_ENABLED_SOURCES = ["tavily", "nova", "commodities"]
+
+def _load_tools_config() -> dict:
+    """Load tools configuration from TOOLS_CONFIG env var set by CDK."""
+    raw = os.environ.get("TOOLS_CONFIG", "{}")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+
+TOOLS_CONFIG = _load_tools_config()
+
+# Filter DATA_SOURCES to only include enabled tools
+DATA_SOURCES = {
+    key: source
+    for key, source in ALL_DATA_SOURCES.items()
+    if TOOLS_CONFIG.get(key, {}).get("enabled", True)
+}
+
+# Default enabled sources derived from tools config (default_on=true)
+DEFAULT_ENABLED_SOURCES = [
+    key for key in DATA_SOURCES if TOOLS_CONFIG.get(key, {}).get("default_on", False)
+]
 
 
 def load_system_prompt(
@@ -312,7 +333,7 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "commodities"
+      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "alphavantage"
     - s3FileUris: List of S3 file URIs (optional, used when "s3" is enabled)
     """
     user_query = payload.get("prompt")

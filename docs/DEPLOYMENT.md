@@ -33,6 +33,20 @@ admin_user_email: null # Optional: admin@example.com (auto-creates user & emails
 backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
+
+# Research tools: enabled = deployed, default_on = toggled on in UI by default
+tools:
+  tavily:
+    enabled: true
+    default_on: true
+  nova:
+    enabled: true
+    default_on: true
+  arxiv:
+    enabled: true
+    default_on: false
+   ...
+   # Set enabled: false to skip deploying a tool entirely
 ```
 
 **Important**:

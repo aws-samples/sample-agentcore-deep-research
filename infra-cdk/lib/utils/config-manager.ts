@@ -8,6 +8,11 @@ const MAX_STACK_NAME_BASE_LENGTH = 35
 
 export type DeploymentType = "docker" | "zip"
 
+export interface ToolConfig {
+  enabled: boolean
+  default_on: boolean
+}
+
 export interface AppConfig {
   stack_name_base: string
   admin_user_email?: string | null
@@ -16,9 +21,10 @@ export interface AppConfig {
     deployment_type: DeploymentType
     model_id?: string
   }
+  tools?: Record<string, ToolConfig>
   api_keys?: {
     tavily?: string | null
-    commodities?: string | null
+    alphavantage?: string | null
   }
 }
 
@@ -58,6 +64,25 @@ export class ConfigManager {
         )
       }
 
+      // Parse tools config with defaults
+      const defaultTools: Record<string, ToolConfig> = {
+        tavily: { enabled: true, default_on: true },
+        nova: { enabled: true, default_on: true },
+        arxiv: { enabled: true, default_on: false },
+        openfda: { enabled: true, default_on: false },
+        s3: { enabled: true, default_on: false },
+        alphavantage: { enabled: true, default_on: true },
+        bedrock_kb: { enabled: false, default_on: false },
+      }
+      const tools: Record<string, ToolConfig> = {}
+      for (const [key, defaults] of Object.entries(defaultTools)) {
+        const raw = (parsedConfig as any).tools?.[key]
+        tools[key] = {
+          enabled: raw?.enabled ?? defaults.enabled,
+          default_on: raw?.default_on ?? defaults.default_on,
+        }
+      }
+
       return {
         stack_name_base: stackNameBase,
         admin_user_email: parsedConfig.admin_user_email || null,
@@ -66,9 +91,10 @@ export class ConfigManager {
           deployment_type: deploymentType,
           model_id: parsedConfig.backend?.model_id,
         },
+        tools,
         api_keys: {
           tavily: parsedConfig.api_keys?.tavily || null,
-          commodities: parsedConfig.api_keys?.commodities || null,
+          alphavantage: parsedConfig.api_keys?.alphavantage || null,
         },
       }
     } catch (error) {
