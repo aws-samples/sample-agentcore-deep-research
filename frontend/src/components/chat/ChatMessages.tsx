@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 interface ChatMessagesProps {
   messages: Message[];
   messagesEndRef: RefObject<HTMLDivElement | null>;
+  containerRef?: RefObject<HTMLDivElement | null>;
   sessionId: string;
   isLoading?: boolean;
   onFeedbackSubmit: (
@@ -22,7 +23,7 @@ function ThinkingIndicator() {
     <div className="flex items-start gap-3 animate-fade-in">
       <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-2xl rounded-bl-none">
         <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-        <span className="text-sm text-gray-600">Thinking...</span>
+        <span className="text-sm text-gray-600">Searching...</span>
       </div>
     </div>
   );
@@ -31,6 +32,7 @@ function ThinkingIndicator() {
 export function ChatMessages({
   messages,
   messagesEndRef,
+  containerRef,
   sessionId,
   isLoading = false,
   onFeedbackSubmit,
@@ -46,6 +48,7 @@ export function ChatMessages({
 
   return (
     <div
+      ref={containerRef}
       className={`h-full p-4 space-y-4 w-full ${
         messages.length > 0 ? "overflow-y-auto" : "overflow-hidden"
       }`}

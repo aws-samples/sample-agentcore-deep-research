@@ -119,6 +119,21 @@ export default function ChatInterface() {
 
   // Ref for message container to enable auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+
+  // Track user scroll position to pause/resume auto-scroll
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Consider "at bottom" if within 100px of the bottom
+      userScrolledUpRef.current = scrollHeight - scrollTop - clientHeight > 100;
+    };
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Register default tool renderer (wildcard "*")
   useDefaultTool(({ name, args, status, result }) => (
@@ -173,7 +188,9 @@ export default function ChatInterface() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const sendMessage = async (userMessage: string) => {
@@ -400,6 +417,7 @@ export default function ChatInterface() {
     setMessages([]);
     setInput("");
     setError(null);
+    setIsLoading(false);
     setReportContent("");
     setResearchRound(0);
     setShowReportPanel(false);
@@ -453,8 +471,8 @@ export default function ChatInterface() {
               AgentCore Deep Research
             </h2>
             <p className="text-gray-600 mt-2">
-              Ask a research question and I'll search across multiple sources to
-              create a comprehensive report
+              Ask a question and I will search across multiple sources to create
+              a comprehensive report
             </p>
 
             {/* Data source toggles */}
@@ -527,6 +545,7 @@ export default function ChatInterface() {
                   <ChatMessages
                     messages={messages}
                     messagesEndRef={messagesEndRef}
+                    containerRef={messagesContainerRef}
                     sessionId={sessionId}
                     isLoading={isLoading}
                     onFeedbackSubmit={handleFeedbackSubmit}
