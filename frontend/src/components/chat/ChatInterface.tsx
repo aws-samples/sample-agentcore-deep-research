@@ -68,7 +68,7 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<AgentCoreClient | null>(null);
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
 
   // Tools config loaded from aws-exports.json
   const [toolsConfig, setToolsConfig] =
@@ -128,7 +128,6 @@ export default function ChatInterface() {
     if (!container) return;
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      // Consider "at bottom" if within 100px of the bottom
       userScrolledUpRef.current = scrollHeight - scrollTop - clientHeight > 100;
     };
     container.addEventListener("scroll", handleScroll);
@@ -354,6 +353,9 @@ export default function ChatInterface() {
         s3Uris,
       );
     } catch (err) {
+      // Silently ignore aborted requests (user clicked New Research)
+      if (err instanceof DOMException && err.name === "AbortError") return;
+
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(`Failed to get response: ${errorMessage}`);
       console.error("Error invoking AgentCore:", err);
@@ -414,6 +416,8 @@ export default function ChatInterface() {
 
   // Start a new chat (generates new session ID)
   const startNewChat = () => {
+    client?.abort();
+    setSessionId(crypto.randomUUID());
     setMessages([]);
     setInput("");
     setError(null);
@@ -422,7 +426,13 @@ export default function ChatInterface() {
     setResearchRound(0);
     setShowReportPanel(false);
     fileWriteCountRef.current = 0;
-    setEnabledSources({ ...DEFAULT_SOURCES });
+    const defaults: Record<string, boolean> = {};
+    for (const [id, cfg] of Object.entries(toolsConfig)) {
+      if (cfg.enabled) {
+        defaults[id] = cfg.default_on;
+      }
+    }
+    setEnabledSources(defaults);
     setS3FileInput("");
   };
 
@@ -465,8 +475,8 @@ export default function ChatInterface() {
               AgentCore Deep Research
             </h2>
             <p className="text-gray-600 mt-2">
-              Ask a question and I will search across multiple sources to create
-              a comprehensive report
+              Ask a research question and I'll search across multiple sources to
+              create a comprehensive report
             </p>
 
             {/* Data source toggles */}

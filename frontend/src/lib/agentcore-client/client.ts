@@ -29,6 +29,14 @@ export class AgentCoreClient {
     return crypto.randomUUID();
   }
 
+  // Abort any in-flight stream
+  abort(): void {
+    this._abortController?.abort();
+    this._abortController = null;
+  }
+
+  private _abortController: AbortController | null = null;
+
   async invoke(
     query: string,
     sessionId: string,
@@ -39,6 +47,10 @@ export class AgentCoreClient {
   ): Promise<void> {
     if (!accessToken) throw new Error("No valid access token found.");
     if (!this.runtimeArn) throw new Error("Agent Runtime ARN not configured.");
+
+    // Abort any previous in-flight request
+    this._abortController?.abort();
+    this._abortController = new AbortController();
 
     const endpoint = `https://bedrock-agentcore.${this.region}.amazonaws.com`;
     const escapedArn = encodeURIComponent(this.runtimeArn);
@@ -74,6 +86,7 @@ export class AgentCoreClient {
         "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
       },
       body: JSON.stringify(payload),
+      signal: this._abortController.signal,
     });
 
     if (!response.ok) {

@@ -84,7 +84,7 @@ Example: "The market grew by 15% [Source: https://example.com/report]"
 - `editor`: Populate and update sections one at a time (Steps 3-4). This is your primary writing tool
 
 ### Data Retrieval (via Gateway)
-Different data sources that can be searched and read.
+These are your available search tools. You can use them to gather information. Call them by their exact name as listed below.
 
 ## Important Guidelines
 
