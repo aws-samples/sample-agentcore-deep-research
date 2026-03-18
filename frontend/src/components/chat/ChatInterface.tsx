@@ -422,13 +422,7 @@ export default function ChatInterface() {
     setResearchRound(0);
     setShowReportPanel(false);
     fileWriteCountRef.current = 0;
-    const defaults: Record<string, boolean> = {};
-    for (const [id, cfg] of Object.entries(toolsConfig)) {
-      if (cfg.enabled) {
-        defaults[id] = cfg.default_on;
-      }
-    }
-    setEnabledSources(defaults);
+    setEnabledSources({ ...DEFAULT_SOURCES });
     setS3FileInput("");
   };
 
