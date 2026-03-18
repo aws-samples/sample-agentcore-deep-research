@@ -62,16 +62,25 @@ stack_name_base: "adr-stack"
 
 admin_user_email: admin@example.com  # Required: Email for the admin user
 
-frontend:
-  domain_name: null  # Optional: Set to your custom domain
-  certificate_arn: null  # Optional: Set to your ACM certificate ARN
-
 backend:
   pattern: "strands-deep-research"
 
+# Research tools: enabled = deployed, default_on = toggled on in UI by default
+tools:
+  tavily:
+    enabled: true
+    default_on: true
+  nova:
+    enabled: true
+    default_on: true
+  arxiv:
+    enabled: true
+    default_on: false
+  ...
+
 api_keys:
   tavily: tvly-xxxxx  # Optional: Get your key at https://tavily.com/
-  commodities: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
+  alphavantage: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
 ```
 
 ## Project Structure

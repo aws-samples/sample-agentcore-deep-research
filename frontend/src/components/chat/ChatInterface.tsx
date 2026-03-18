@@ -35,19 +35,33 @@ async function fetchReportContent(url: string): Promise<string | null> {
   }
 }
 
-// Available data sources configuration
-const DATA_SOURCES = [
-  { id: "commodities", name: "AlphaVantage", icon: "📈", defaultEnabled: true },
-  { id: "tavily", name: "Tavily Web", icon: "🌐", defaultEnabled: true },
-  { id: "nova", name: "Nova Search", icon: "🔍", defaultEnabled: true },
-  { id: "arxiv", name: "ArXiv Papers", icon: "📚", defaultEnabled: false },
-  { id: "openfda", name: "OpenFDA Drugs", icon: "💊", defaultEnabled: false },
-  { id: "s3", name: "S3 Files", icon: "📁", defaultEnabled: false },
-] as const;
+// Tool metadata (display names and icons)
+const TOOL_METADATA: Record<string, { name: string; icon: string }> = {
+  alphavantage: { name: "AlphaVantage", icon: "📈" },
+  tavily: { name: "Tavily Web", icon: "🌐" },
+  nova: { name: "Nova Web Grounding", icon: "🔍" },
+  arxiv: { name: "ArXiv Papers", icon: "📚" },
+  openfda: { name: "OpenFDA Drugs", icon: "💊" },
+  s3: { name: "S3 Files", icon: "📁" },
+  bedrock_kb: { name: "Bedrock KB", icon: "🧠" },
+};
 
-const DEFAULT_SOURCES = Object.fromEntries(
-  DATA_SOURCES.map((s) => [s.id, s.defaultEnabled]),
-);
+// Tool config from aws-exports.json (populated on mount)
+interface ToolConfig {
+  enabled: boolean;
+  default_on: boolean;
+}
+
+// Fallback defaults if tools config is not in aws-exports.json
+const FALLBACK_TOOLS: Record<string, ToolConfig> = {
+  alphavantage: { enabled: false, default_on: false },
+  tavily: { enabled: false, default_on: false },
+  nova: { enabled: true, default_on: true },
+  arxiv: { enabled: true, default_on: false },
+  openfda: { enabled: true, default_on: false },
+  s3: { enabled: true, default_on: false },
+  bedrock_kb: { enabled: false, default_on: false },
+};
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -56,9 +70,24 @@ export default function ChatInterface() {
   const [client, setClient] = useState<AgentCoreClient | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID());
 
+  // Tools config loaded from aws-exports.json
+  const [toolsConfig, setToolsConfig] =
+    useState<Record<string, ToolConfig>>(FALLBACK_TOOLS);
+
+  // Derived: visible data sources (enabled tools only)
+  const dataSources = Object.entries(toolsConfig)
+    .filter(([, cfg]) => cfg.enabled)
+    .filter(([id]) => TOOL_METADATA[id])
+    .map(([id, cfg]) => ({
+      id,
+      name: TOOL_METADATA[id].name,
+      icon: TOOL_METADATA[id].icon,
+      defaultEnabled: cfg.default_on,
+    }));
+
   // Data source toggles - initialize from defaults
   const [enabledSources, setEnabledSources] = useState<Record<string, boolean>>(
-    () => ({ ...DEFAULT_SOURCES }),
+    {},
   );
 
   // S3 file URIs (one per line)
@@ -118,6 +147,20 @@ export default function ChatInterface() {
         });
 
         setClient(agentClient);
+
+        // Load tools config from aws-exports.json
+        const tools: Record<string, ToolConfig> =
+          config.tools || FALLBACK_TOOLS;
+        setToolsConfig(tools);
+
+        // Initialize enabled sources from tools config
+        const defaults: Record<string, boolean> = {};
+        for (const [id, cfg] of Object.entries(tools)) {
+          if (cfg.enabled) {
+            defaults[id] = cfg.default_on;
+          }
+        }
+        setEnabledSources(defaults);
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Unknown error";
@@ -361,7 +404,13 @@ export default function ChatInterface() {
     setResearchRound(0);
     setShowReportPanel(false);
     fileWriteCountRef.current = 0;
-    setEnabledSources({ ...DEFAULT_SOURCES });
+    const defaults: Record<string, boolean> = {};
+    for (const [id, cfg] of Object.entries(toolsConfig)) {
+      if (cfg.enabled) {
+        defaults[id] = cfg.default_on;
+      }
+    }
+    setEnabledSources(defaults);
     setS3FileInput("");
   };
 
@@ -410,7 +459,7 @@ export default function ChatInterface() {
 
             {/* Data source toggles */}
             <div className="flex flex-wrap justify-center gap-3 mt-6">
-              {DATA_SOURCES.map((source) => (
+              {dataSources.map((source) => (
                 <button
                   key={source.id}
                   onClick={() => toggleSource(source.id)}
