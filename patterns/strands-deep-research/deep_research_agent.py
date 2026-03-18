@@ -155,13 +155,23 @@ def load_system_prompt(
     return base_prompt
 
 
-def create_gateway_mcp_client(access_token: str) -> MCPClient:
+def create_gateway_mcp_client(
+    access_token: str,
+    enabled_sources: list[str] | None = None,
+) -> MCPClient:
     """
     Create MCP client for AgentCore Gateway with OAuth2 authentication.
 
     MCP (Model Context Protocol) is how agents communicate with tool providers.
     This creates a client that can talk to the AgentCore Gateway using the provided
-    access token for authentication.
+    access token for authentication. Only tools matching enabled_sources are loaded.
+
+    Parameters
+    ----------
+    access_token : str
+        OAuth2 bearer token for gateway authentication
+    enabled_sources : list[str] | None
+        List of enabled source keys. If None, all tools are loaded.
     """
     stack_name = os.environ.get("STACK_NAME")
     if not stack_name:
@@ -177,11 +187,22 @@ def create_gateway_mcp_client(access_token: str) -> MCPClient:
     gateway_url = get_ssm_parameter(f"/{stack_name}/gateway_url")
     print(f"[AGENT] Gateway URL from SSM: {gateway_url}")
 
+    # Build tool filter from enabled sources
+    tool_filters = None
+    if enabled_sources is not None:
+        allowed_tool_names = [
+            DATA_SOURCES[key]["tool"] for key in enabled_sources if key in DATA_SOURCES
+        ]
+        if allowed_tool_names:
+            tool_filters = {"allowed": allowed_tool_names}
+            print(f"[AGENT] Tool filter: allowing {allowed_tool_names}")
+
     # Create MCP client with Bearer token authentication
     gateway_client = MCPClient(
         lambda: streamablehttp_client(
             url=gateway_url, headers={"Authorization": f"Bearer {access_token}"}
         ),
+        tool_filters=tool_filters,
         prefix="gateway",
     )
 
@@ -253,9 +274,9 @@ def create_deep_research_agent(
         access_token = get_gateway_access_token()
         print(f"[AGENT] Got access token: {access_token[:20]}...")
 
-        # Create Gateway MCP client with authentication
+        # Create Gateway MCP client with authentication (filtered to enabled sources)
         print("[AGENT] Step 2: Creating Gateway MCP client...")
-        gateway_client = create_gateway_mcp_client(access_token)
+        gateway_client = create_gateway_mcp_client(access_token, enabled_sources)
         print("[AGENT] Gateway MCP client created successfully")
 
         # Add Gateway client to tools
