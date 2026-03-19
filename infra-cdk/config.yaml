@@ -6,6 +6,8 @@ stack_name_base: deep-research
 # If not provided, you'll need to manually create users via AWS Console
 admin_user_email: null
 
+auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy (when using npm run deploy)
+
 backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip

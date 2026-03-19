@@ -9,7 +9,8 @@ Before deploying, ensure you have:
 - **Node.js 20+** installed (see [AWS guide for installing Node.js on EC2](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-up-node-on-ec2-instance.html))
 - **AWS CLI** configured with credentials (`aws configure`) - see [AWS CLI Configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html)
 - **AWS CDK CLI** installed: `npm install -g aws-cdk` (see [CDK Getting Started guide](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html))
-- **Python 3.11 or above+** (standard library only - no virtual environment needed for deployment)
+- **Python 3.10+** - required for deployment scripts
+- **uv** - Python package manager used for running scripts: `curl -LsSf https://astral.sh/uv/install.sh | sh` (see [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - **Docker** - Required for all deployments. See [Install Docker Engine](https://docs.docker.com/engine/install/). Verify with `docker ps`. Alternatively, [Finch](https://github.com/runfinch/finch) can be used on Mac. See below if you have a non-ARM machine.
 - An AWS account with sufficient permissions to create:
   - S3 buckets
@@ -29,6 +30,8 @@ Edit `infra-cdk/config.yaml` to customize your deployment:
 stack_name_base: your-project-name # Change this to your preferred stack name (max 35 chars)
 
 admin_user_email: null # Optional: admin@example.com (auto-creates user & emails credentials)
+
+auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy
 
 backend:
   pattern: strands-deep-research
@@ -85,9 +88,14 @@ Here are the commands to deploy backend and frontend:
 cd infra-cdk
 npm install
 cdk bootstrap # Once ever
-cdk deploy
-cd ..
-python scripts/deploy-frontend.py
+npm run deploy
+```
+
+This runs `cdk deploy` and then automatically deploys the frontend if `auto_deploy_frontend: true` is set in `config.yaml` (enabled by default). To deploy them separately:
+
+```bash
+cdk deploy                    # Backend only
+npm run deploy:frontend       # Frontend only
 ```
 
 ### 1. Install Dependencies
@@ -109,36 +117,22 @@ If this is your first time using CDK in this AWS account/region:
 cdk bootstrap
 ```
 
-### 3. Deploy backend with CDK
+### 3. Deploy backend and frontend
 
 Build and deploy the complete stack:
 
 ```bash
-cdk deploy
+npm run deploy
 ```
 
-The deployment will:
+This will:
 
-1. Create a Cognito User Pool for authentication
-1. Build and push the agent container to ECR
-1. Create the AgentCore runtime
-1. Set up CloudFront distribution for the frontend
+1. Run `cdk deploy` to provision the backend (Cognito, AgentCore runtime, Gateway tools, etc.)
+2. If `auto_deploy_frontend: true` in `config.yaml`, automatically deploy the frontend to Amplify Hosting
+
+The frontend deployment generates `aws-exports.json` from CDK stack outputs (including tool configuration), builds the React app, and uploads it to Amplify.
 
 **Note**: The deployment takes approximately 5-10 minutes due to container building and AgentCore setup.
-
-### 4. Deploy frontend
-
-```bash
-# From root directory
-python scripts/deploy-frontend.py
-```
-
-This script automatically:
-
-- Generates fresh `aws-exports.json` from CDK stack outputs (see below for more information about `aws-exports.json`)
-- Installs/updates npm dependencies if needed
-- Builds the frontend
-- Deploys to AWS Amplify Hosting
 
 You will see the URL for application in the script's output, which will look similar to this:
 
@@ -146,7 +140,14 @@ You will see the URL for application in the script's output, which will look sim
 ℹ App URL: https://main.d123abc456def7.amplifyapp.com
 ```
 
-### 5. Create a Cognito User (if necessary)
+To deploy backend or frontend independently:
+
+```bash
+cdk deploy                    # Backend only
+npm run deploy:frontend       # Frontend only
+```
+
+### 4. Create a Cognito User (if necessary)
 
 **If you provided `admin_user_email` in config:**
 
@@ -166,7 +167,7 @@ You will see the URL for application in the script's output, which will look sim
    - **Mark email as verified**: Check this box
 7. Click "Create user"
 
-### 6. Access the Application
+### 5. Access the Application
 
 1. Open the Amplify Hosting URL in your browser
 1. Sign in with the Cognito user you created
@@ -176,19 +177,25 @@ You will see the URL for application in the script's output, which will look sim
 
 ### Updating the Application
 
-To update the frontend code:
+To update both backend and frontend:
 
-```bash
-# From root directory
-python scripts/deploy-frontend.py
-```
-
-To update the backend agent:
-
-**Docker deployment:**
 ```bash
 cd infra-cdk
-cdk deploy --all
+npm run deploy
+```
+
+To update only the frontend (e.g., after changing tool flags in `config.yaml`):
+
+```bash
+cd infra-cdk
+npm run deploy:frontend
+```
+
+To update only the backend:
+
+```bash
+cd infra-cdk
+cdk deploy
 ```
 
 ### Monitoring and Logs
@@ -302,7 +309,7 @@ The `aws-exports.json` file is a critical configuration file that enables the Re
 
 **What is aws-exports.json?**
 
-The `aws-exports.json` file contains authentication configuration that the React application reads to properly configure Cognito Authentication. It's created automatically by the deployment script and placed in `frontend/public/aws-exports.json`.
+The `aws-exports.json` file contains authentication and tool configuration that the React application reads at runtime. It's created automatically by the frontend deployment script and placed in `frontend/public/aws-exports.json`.
 
 **Why is it necessary?**
 
@@ -311,7 +318,8 @@ This configuration file is essential because:
 - It provides the React application with the correct Cognito User Pool and Client IDs
 - It specifies the authentication endpoints and redirect URIs
 - It configures the authentication flow parameters
-- Without this file, Cognito authentication will not work
+- It includes tool configuration (which tools are enabled and toggled on by default in the UI)
+- Without this file, Cognito authentication will not work and tool toggles will fall back to defaults
 
 **How is it created?**
 
@@ -330,8 +338,12 @@ The file is automatically generated by `deploy-frontend.py` which:
   "post_logout_redirect_uri": "https://your-amplify-url",
   "response_type": "code",
   "scope": "email openid profile",
-  "automaticSilentRenew": true
+  "automaticSilentRenew": true,
+  "tools": {
+    "tavily": { "enabled": true, "default_on": true },
+    "bedrock_kb": { "enabled": false, "default_on": false }
+  }
 }
 ```
 
-**Important**: You should not manually edit this file as it's regenerated on each deployment. If authentication isn't working, redeploy the frontend to ensure you have the latest configuration.
+**Important**: You should not manually edit this file as it's regenerated on each deployment. If authentication isn't working or tool toggles aren't reflecting your `config.yaml` changes, redeploy the frontend with `npm run deploy:frontend` (or use `npm run deploy` to deploy everything).
