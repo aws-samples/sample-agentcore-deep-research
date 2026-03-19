@@ -700,6 +700,7 @@ export class BackendStack extends cdk.NestedStack {
     // Knowledge Base Search Lambda
     let kbSearchLambda: lambda.Function | undefined
     if (isToolEnabled("bedrock_kb")) {
+      const kbId = config.tools?.bedrock_kb?.knowledge_base_id
       kbSearchLambda = new lambda.Function(this, "KBSearchLambda", {
         runtime: lambda.Runtime.PYTHON_3_13,
         handler: "kb_search_lambda.handler",
@@ -712,6 +713,7 @@ export class BackendStack extends cdk.NestedStack {
           retention: logs.RetentionDays.ONE_WEEK,
           removalPolicy: cdk.RemovalPolicy.DESTROY,
         }),
+        ...(kbId ? { environment: { DEFAULT_KNOWLEDGE_BASE_ID: kbId } } : {}),
       })
 
       // Grant KB Search Lambda access to Bedrock Knowledge Bases

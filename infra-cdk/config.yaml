@@ -36,6 +36,7 @@ tools:
   bedrock_kb:
     enabled: false
     default_on: false
+    knowledge_base_id: null # Replace with your Bedrock Knowledge Base ID
 
 # API Keys for research tools
 api_keys:
