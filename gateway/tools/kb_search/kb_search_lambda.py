@@ -63,13 +63,13 @@ def search_knowledge_base(
         location = result.get("location", {})
         location_type = location.get("type", "UNKNOWN")
 
-        source_info = "Unknown source"
+        source_info = "[Knowledge Base] Unknown source"
         if location_type == "S3":
             s3_loc = location.get("s3Location", {})
-            source_info = s3_loc.get("uri", "Unknown S3 URI")
+            source_info = f"[Knowledge Base] {s3_loc.get('uri', 'Unknown S3 URI')}"
         elif location_type == "WEB":
             web_loc = location.get("webLocation", {})
-            source_info = web_loc.get("url", "Unknown URL")
+            source_info = f"[Knowledge Base] {web_loc.get('url', 'Unknown URL')}"
 
         # Truncate content if too long
         if len(content) > 800:
@@ -123,7 +123,10 @@ def handler(event, context):
                 os.environ.get("DEFAULT_KNOWLEDGE_BASE_ID", ""),
             )
             if not knowledge_base_id:
-                return {"error": "Missing required parameter: knowledge_base_id. Set it in config.yaml under tools.bedrock_kb.knowledge_base_id"}
+                return {
+                    "error": "Missing knowledge_base_id. "
+                    "Configure it in config.yaml: tools.bedrock_kb.knowledge_base_id"
+                }
 
             max_results = event.get("max_results", 10)
 
