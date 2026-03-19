@@ -29,7 +29,7 @@ tools:
     default_on: false
   alphavantage:
     enabled: true
-    default_on: true
+    default_on: false
   s3:
     enabled: true
     default_on: false
