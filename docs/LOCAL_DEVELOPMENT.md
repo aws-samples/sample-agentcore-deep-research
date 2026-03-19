@@ -11,7 +11,7 @@ This guide explains how to run the full AgentCore Deep Research stack locally us
 1. **Deployed ADR Stack**: You must have already deployed AgentCore Deep Research to AWS using:
    ```bash
    cd infra-cdk
-   cdk deploy
+   npm run deploy
    ```
 
 2. **AWS Credentials**: AWS credentials **must be exported as environment variables** — the Docker containers cannot read from `~/.aws/credentials` or `~/.aws/config`:
@@ -183,9 +183,9 @@ This Docker Compose setup is for development only. For production deployment, us
 
 ```bash
 cd infra-cdk
-cdk deploy
-cd ..
-python scripts/deploy-frontend.py
+npm run deploy            # Backend + frontend (if auto_deploy_frontend: true in config.yaml)
+npm run deploy:frontend   # Frontend only
+cdk deploy                # Backend only
 ```
 
 ## Next Steps
