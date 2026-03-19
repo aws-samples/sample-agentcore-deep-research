@@ -15,8 +15,6 @@ if (config.auto_deploy_frontend) {
   console.log("\n>> auto_deploy_frontend is enabled — deploying frontend...\n")
   execSync("uv run python ../scripts/deploy-frontend.py", { stdio: "inherit" })
 } else {
-  console.log(
-    "\n>> Skipping frontend deploy (auto_deploy_frontend is not enabled in config.yaml)."
-  )
+  console.log("\n>> Skipping frontend deploy (auto_deploy_frontend is not enabled in config.yaml).")
   console.log("   To deploy frontend manually, run: npm run deploy:frontend\n")
 }
