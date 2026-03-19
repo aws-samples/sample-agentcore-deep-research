@@ -13,7 +13,9 @@ AgentCore Deep Research template is a sample agentic AI solution for deep resear
 
 ## 🚀 Deployment
 
-Deploying AgentCore Deep Research stack requires a few CDK commands:
+**Prerequisites**: Node.js 20+, AWS CLI, [AWS CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html), Python 3.10+, [uv](https://docs.astral.sh/uv/), and Docker. See the [deployment guide](docs/DEPLOYMENT.md) for details.
+
+Deploying AgentCore Deep Research stack requires a few commands:
 
 ```bash
 cd infra-cdk

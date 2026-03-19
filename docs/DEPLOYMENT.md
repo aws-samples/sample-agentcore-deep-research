@@ -9,7 +9,8 @@ Before deploying, ensure you have:
 - **Node.js 20+** installed (see [AWS guide for installing Node.js on EC2](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-up-node-on-ec2-instance.html))
 - **AWS CLI** configured with credentials (`aws configure`) - see [AWS CLI Configuration guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html)
 - **AWS CDK CLI** installed: `npm install -g aws-cdk` (see [CDK Getting Started guide](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html))
-- **Python 3.11 or above+** (standard library only - no virtual environment needed for deployment)
+- **Python 3.10+** - required for deployment scripts
+- **uv** - Python package manager used for running scripts: `curl -LsSf https://astral.sh/uv/install.sh | sh` (see [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - **Docker** - Required for all deployments. See [Install Docker Engine](https://docs.docker.com/engine/install/). Verify with `docker ps`. Alternatively, [Finch](https://github.com/runfinch/finch) can be used on Mac. See below if you have a non-ARM machine.
 - An AWS account with sufficient permissions to create:
   - S3 buckets
