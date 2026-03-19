@@ -31,7 +31,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+      className="p-1 text-muted-foreground hover:text-foreground transition-colors"
       aria-label="Copy code"
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -105,13 +105,13 @@ const markdownComponents: Record<string, any> = {
   h2: () => null,
   h3({ children }: { children?: React.ReactNode }) {
     return (
-      <h3 className="text-base font-semibold text-gray-700 mt-4 mb-2 pl-2 border-l-3 border-blue-300">
+      <h3 className="text-base font-semibold text-foreground mt-4 mb-2 pl-2 border-l-3 border-blue-300 dark:border-blue-600">
         {children}
       </h3>
     );
   },
   p({ children }: { children?: React.ReactNode }) {
-    return <p className="my-2.5 text-gray-700 leading-relaxed">{children}</p>;
+    return <p className="my-2.5 text-foreground leading-relaxed">{children}</p>;
   },
   a({ href, children }: { href?: string; children?: React.ReactNode }) {
     const text = String(children);
@@ -123,7 +123,7 @@ const markdownComponents: Record<string, any> = {
         rel="noopener noreferrer"
         className={`inline-flex items-center gap-1 ${
           isSource
-            ? "text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200 hover:bg-amber-100 no-underline"
+            ? "text-xs px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 no-underline"
             : "text-blue-600 hover:text-blue-800 underline decoration-blue-300 hover:decoration-blue-500"
         } transition-colors`}
       >
@@ -142,14 +142,14 @@ const markdownComponents: Record<string, any> = {
   },
   ul({ children }: { children?: React.ReactNode }) {
     return (
-      <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-gray-700">
+      <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-foreground">
         {children}
       </ul>
     );
   },
   ol({ children }: { children?: React.ReactNode }) {
     return (
-      <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-gray-700">
+      <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-foreground">
         {children}
       </ol>
     );
@@ -159,33 +159,31 @@ const markdownComponents: Record<string, any> = {
   },
   blockquote({ children }: { children?: React.ReactNode }) {
     return (
-      <blockquote className="my-3 pl-4 border-l-4 border-blue-300 bg-blue-50/50 py-2 pr-3 rounded-r-lg text-gray-600 italic">
+      <blockquote className="my-3 pl-4 border-l-4 border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 py-2 pr-3 rounded-r-lg text-muted-foreground italic">
         {children}
       </blockquote>
     );
   },
   table({ children }: { children?: React.ReactNode }) {
     return (
-      <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          {children}
-        </table>
+      <div className="my-4 overflow-x-auto rounded-lg border border-border shadow-sm">
+        <table className="min-w-full divide-y divide-border">{children}</table>
       </div>
     );
   },
   thead({ children }: { children?: React.ReactNode }) {
-    return <thead className="bg-gray-50">{children}</thead>;
+    return <thead className="bg-muted/50">{children}</thead>;
   },
   th({ children }: { children?: React.ReactNode }) {
     return (
-      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+      <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         {children}
       </th>
     );
   },
   td({ children }: { children?: React.ReactNode }) {
     return (
-      <td className="px-4 py-2.5 text-sm text-gray-700 border-t border-gray-100">
+      <td className="px-4 py-2.5 text-sm text-foreground border-t border-border/50">
         {children}
       </td>
     );
@@ -201,9 +199,9 @@ const markdownComponents: Record<string, any> = {
     const codeString = String(children).replace(/\n$/, "");
     if (match) {
       return (
-        <div className="my-3 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+        <div className="my-3 rounded-lg overflow-hidden border border-border shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 bg-muted border-b border-border">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               {match[1]}
             </span>
             <CopyButton text={codeString} />
@@ -225,7 +223,7 @@ const markdownComponents: Record<string, any> = {
       );
     }
     return (
-      <code className="px-1.5 py-0.5 bg-gray-100 text-gray-800 rounded text-[0.85em] font-mono border border-gray-200">
+      <code className="px-1.5 py-0.5 bg-muted text-foreground rounded text-[0.85em] font-mono border border-border">
         {children}
       </code>
     );
@@ -234,7 +232,7 @@ const markdownComponents: Record<string, any> = {
     return <>{children}</>;
   },
   hr() {
-    return <hr className="my-6 border-t-2 border-gray-200" />;
+    return <hr className="my-6 border-t-2 border-border" />;
   },
 };
 
@@ -256,15 +254,15 @@ function CollapsibleSection({
       ? {
           wrapper: "mt-6 mb-4 scroll-mt-4",
           button:
-            "w-full flex items-center gap-2 px-3 py-3 rounded-xl bg-gradient-to-r from-blue-100 via-blue-50 to-transparent hover:from-blue-200 transition-all text-left group border-b-2 border-blue-200",
-          text: "text-xl font-bold text-gray-900 group-hover:text-blue-800 transition-colors",
+            "w-full flex items-center gap-2 px-3 py-3 rounded-xl bg-gradient-to-r from-blue-100 via-blue-50 to-transparent dark:from-blue-900/40 dark:via-blue-950/20 dark:to-transparent hover:from-blue-200 dark:hover:from-blue-900/60 transition-all text-left group border-b-2 border-blue-200 dark:border-blue-800",
+          text: "text-xl font-bold text-foreground group-hover:text-blue-800 dark:group-hover:text-blue-300 transition-colors",
           icon: "w-5 h-5 text-blue-600",
         }
       : {
           wrapper: "mt-5 mb-3 scroll-mt-4",
           button:
-            "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-50 via-blue-50/50 to-transparent hover:from-blue-100 transition-all text-left group",
-          text: "text-lg font-semibold text-gray-800 group-hover:text-blue-700 transition-colors",
+            "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-50 via-blue-50/50 to-transparent dark:from-blue-950/30 dark:via-blue-950/15 dark:to-transparent hover:from-blue-100 dark:hover:from-blue-950/50 transition-all text-left group",
+          text: "text-lg font-semibold text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors",
           icon: "w-5 h-5 text-blue-500",
         };
 
@@ -401,8 +399,8 @@ export function ReportMarkdownRenderer({
     <div className="report-markdown">
       {/* Table of Contents */}
       {toc.length > 3 && (
-        <nav className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <h4 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+        <nav className="mb-6 p-4 bg-muted/50 rounded-xl border border-border">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Contents
           </h4>
           <ul className="space-y-1.5">
@@ -413,7 +411,7 @@ export function ReportMarkdownRenderer({
               >
                 <button
                   onClick={() => scrollToSection(section.id)}
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors text-left"
+                  className="text-sm text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
                 >
                   {section.title}
                   {changedSectionIds.has(section.id) && (
@@ -464,7 +462,7 @@ export function ReportMarkdownRenderer({
           // Non-collapsible fallback for H2
           return (
             <div key={section.id} id={section.id} className="mb-4 scroll-mt-4">
-              <h2 className="text-lg font-semibold text-gray-800 mt-5 mb-3 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-transparent">
+              <h2 className="text-lg font-semibold text-foreground mt-5 mb-3 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/30 dark:to-transparent">
                 {section.title}
               </h2>
               {section.content && (

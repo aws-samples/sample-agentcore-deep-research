@@ -1,17 +1,24 @@
 [
   {
     "name": "arxiv_search",
-    "description": "Search ArXiv for academic papers. Returns paper titles, authors, abstracts, and PDF links. Useful for finding research papers on scientific and technical topics.",
+    "description": "Search arXiv for academic papers or retrieve specific papers by ID. Returns paper titles, authors, abstracts, categories, and PDF links. Supports arXiv query syntax with field prefixes (ti: for title, au: for author, abs: for abstract, cat: for category, all: for all fields) and boolean operators (AND, OR, ANDNOT). Examples: 'ti:transformer AND cat:cs.LG', 'au:Bengio AND abs:attention'. Common categories: cs.AI (AI), cs.CL (NLP), cs.CV (Computer Vision), cs.LG (Machine Learning), stat.ML (Statistics ML). Use sort_by='date' for recent papers, 'relevance' for keyword searches.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "query": {
           "type": "string",
-          "description": "Search query for finding papers (e.g., 'large language models', 'reinforcement learning')"
+          "description": "Search query. Supports plain keywords (e.g., 'large language models') or arXiv query syntax with field prefixes and boolean operators (e.g., 'ti:RLHF AND cat:cs.CL', 'au:\"Yann LeCun\" AND abs:self-supervised'). Required unless arxiv_ids is provided."
+        },
+        "arxiv_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of arXiv paper IDs to retrieve directly (e.g., ['2309.10668', '2406.04093']). When provided, query is ignored."
         },
         "max_results": {
           "type": "integer",
-          "description": "Maximum number of results to return (default 10, max 50)"
+          "description": "Maximum number of results to return (default 10, max 200)"
         },
         "sort_by": {
           "type": "string",
@@ -23,10 +30,10 @@
           "items": {
             "type": "string"
           },
-          "description": "ArXiv categories to filter by (e.g., ['cs.AI', 'cs.LG', 'cs.CL'])"
+          "description": "arXiv categories to filter by (e.g., ['cs.AI', 'cs.LG', 'cs.CL']). Applied as OR filter on top of the query."
         }
       },
-      "required": ["query"]
+      "required": []
     }
   }
 ]

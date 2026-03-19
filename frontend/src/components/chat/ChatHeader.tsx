@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
@@ -15,6 +16,22 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem("theme");
+    if (stored) return stored === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  return [dark, () => setDark((d) => !d)] as const;
+}
+
 type ChatHeaderProps = {
   title?: string | undefined;
   onNewChat: () => void;
@@ -27,6 +44,7 @@ export function ChatHeader({
   canStartNewChat,
 }: ChatHeaderProps) {
   const { isAuthenticated, signOut } = useAuth();
+  const [dark, toggleDark] = useDarkMode();
 
   return (
     <header className="flex items-center justify-between p-4 border-b w-full">
@@ -36,6 +54,14 @@ export function ChatHeader({
         </h1>
       </div>
       <div className="flex items-center gap-2">
+        <Button
+          onClick={toggleDark}
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle dark mode"
+        >
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
         <Button
           onClick={onNewChat}
           variant="outline"

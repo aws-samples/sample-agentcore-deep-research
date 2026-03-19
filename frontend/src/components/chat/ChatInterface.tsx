@@ -68,7 +68,7 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<AgentCoreClient | null>(null);
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
 
   // Tools config loaded from aws-exports.json
   const [toolsConfig, setToolsConfig] =
@@ -119,6 +119,20 @@ export default function ChatInterface() {
 
   // Ref for message container to enable auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+
+  // Track user scroll position to pause/resume auto-scroll
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      userScrolledUpRef.current = scrollHeight - scrollTop - clientHeight > 100;
+    };
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Register default tool renderer (wildcard "*")
   useDefaultTool(({ name, args, status, result }) => (
@@ -173,7 +187,9 @@ export default function ChatInterface() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const sendMessage = async (userMessage: string) => {
@@ -337,6 +353,9 @@ export default function ChatInterface() {
         s3Uris,
       );
     } catch (err) {
+      // Silently ignore aborted requests (user clicked New Research)
+      if (err instanceof DOMException && err.name === "AbortError") return;
+
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(`Failed to get response: ${errorMessage}`);
       console.error("Error invoking AgentCore:", err);
@@ -397,9 +416,12 @@ export default function ChatInterface() {
 
   // Start a new chat (generates new session ID)
   const startNewChat = () => {
+    client?.abort();
+    setSessionId(crypto.randomUUID());
     setMessages([]);
     setInput("");
     setError(null);
+    setIsLoading(false);
     setReportContent("");
     setResearchRound(0);
     setShowReportPanel(false);
@@ -434,8 +456,8 @@ export default function ChatInterface() {
           canStartNewChat={hasAssistantMessages}
         />
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-4 mt-2">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="bg-red-50 dark:bg-red-950/50 border-l-4 border-red-500 p-4 mx-4 mt-2">
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           </div>
         )}
       </div>
@@ -449,12 +471,12 @@ export default function ChatInterface() {
 
           {/* Centered welcome message */}
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
+            <h2 className="text-2xl font-bold text-foreground">
               AgentCore Deep Research
             </h2>
-            <p className="text-gray-600 mt-2">
-              Ask a research question and I'll search across multiple sources to
-              create a comprehensive report
+            <p className="text-muted-foreground mt-2">
+              Ask a question and I will search across multiple sources to create
+              a comprehensive report
             </p>
 
             {/* Data source toggles */}
@@ -465,8 +487,8 @@ export default function ChatInterface() {
                   onClick={() => toggleSource(source.id)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     enabledSources[source.id]
-                      ? "bg-blue-100 text-blue-800 border-2 border-blue-300"
-                      : "bg-gray-100 text-gray-400 border-2 border-transparent"
+                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-2 border-blue-300 dark:border-blue-700"
+                      : "bg-muted text-muted-foreground border-2 border-transparent"
                   }`}
                 >
                   <span className="mr-1">{source.icon}</span>
@@ -477,7 +499,7 @@ export default function ChatInterface() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Click to toggle data sources
             </p>
 
@@ -491,9 +513,9 @@ export default function ChatInterface() {
                   value={s3FileInput}
                   onChange={(e) => setS3FileInput(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-left placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono text-left placeholder:text-muted-foreground bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   One S3 URI per line (supports txt, md, csv, json, pdf, etc.)
                 </p>
               </div>
@@ -527,13 +549,14 @@ export default function ChatInterface() {
                   <ChatMessages
                     messages={messages}
                     messagesEndRef={messagesEndRef}
+                    containerRef={messagesContainerRef}
                     sessionId={sessionId}
                     isLoading={isLoading}
                     onFeedbackSubmit={handleFeedbackSubmit}
                   />
                 </div>
                 {/* Chat input */}
-                <div className="flex-none p-2 border-t bg-white">
+                <div className="flex-none p-2 border-t border-border bg-background">
                   <ChatInput
                     input={input}
                     setInput={setInput}

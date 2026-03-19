@@ -36,6 +36,10 @@ def search_web(
     max_results: int = 10,
     search_depth: str = "basic",
     include_answer: bool = True,
+    topic: str = "general",
+    days: int | None = None,
+    include_domains: list[str] | None = None,
+    exclude_domains: list[str] | None = None,
 ) -> str:
     """
     Search the web using Tavily REST API directly.
@@ -50,6 +54,14 @@ def search_web(
         Search depth: "basic" for fast results, "advanced" for thorough search
     include_answer : bool
         Whether to include an AI-generated answer summary
+    topic : str
+        Search topic: "general", "news", or "finance"
+    days : int or None
+        Only return results from the last N days
+    include_domains : list[str] or None
+        Only include results from these domains
+    exclude_domains : list[str] or None
+        Exclude results from these domains
 
     Returns
     -------
@@ -58,14 +70,21 @@ def search_web(
     """
     api_key = get_tavily_api_key()
 
-    payload = {
+    payload: dict = {
         "api_key": api_key,
         "query": query,
         "max_results": min(max_results, 20),
         "search_depth": search_depth,
         "include_answer": include_answer,
         "include_raw_content": False,
+        "topic": topic,
     }
+    if days is not None:
+        payload["days"] = days
+    if include_domains:
+        payload["include_domains"] = include_domains
+    if exclude_domains:
+        payload["exclude_domains"] = exclude_domains
 
     req = Request(
         TAVILY_API_URL,
@@ -140,15 +159,15 @@ def handler(event, context):
             if not query:
                 return {"error": "Missing required parameter: query"}
 
-            max_results = event.get("max_results", 10)
-            search_depth = event.get("search_depth", "basic")
-            include_answer = event.get("include_answer", True)
-
             result = search_web(
                 query=query,
-                max_results=max_results,
-                search_depth=search_depth,
-                include_answer=include_answer,
+                max_results=event.get("max_results", 10),
+                search_depth=event.get("search_depth", "basic"),
+                include_answer=event.get("include_answer", True),
+                topic=event.get("topic", "general"),
+                days=event.get("days"),
+                include_domains=event.get("include_domains"),
+                exclude_domains=event.get("exclude_domains"),
             )
 
             return {"content": [{"type": "text", "text": result}]}
