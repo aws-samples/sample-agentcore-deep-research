@@ -126,6 +126,7 @@ def parse_config_yaml(config_path: Path) -> dict:
     config: dict = {
         "stack_name_base": "",
         "pattern": "strands-deep-research",
+        "auto_deploy_frontend": False,
         "tools": {},
     }
 
@@ -143,6 +144,11 @@ def parse_config_yaml(config_path: Path) -> dict:
     match = re.search(r"pattern:\s*(\S+)", content)
     if match:
         config["pattern"] = match.group(1).split("#")[0].strip().strip("\"'")
+
+    # Extract auto_deploy_frontend flag
+    match = re.search(r"^auto_deploy_frontend:\s*(true|false)", content, re.MULTILINE)
+    if match:
+        config["auto_deploy_frontend"] = match.group(1) == "true"
 
     # Extract tools config (tool_name -> {enabled, default_on})
     tools_section = re.search(r"^tools:\s*\n((?:[ \t]+\S.*\n)*)", content, re.MULTILINE)
