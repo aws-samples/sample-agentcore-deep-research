@@ -11,14 +11,14 @@
         },
         "knowledge_base_id": {
           "type": "string",
-          "description": "The ID of the Bedrock Knowledge Base to search"
+          "description": "The ID of the Bedrock Knowledge Base to search. Optional if a default is configured."
         },
         "max_results": {
           "type": "integer",
           "description": "Maximum number of chunks to return (default 10, max 25)"
         }
       },
-      "required": ["query", "knowledge_base_id"]
+      "required": ["query"]
     }
   }
 ]
