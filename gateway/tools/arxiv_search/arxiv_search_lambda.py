@@ -51,11 +51,17 @@ def search_arxiv(
         # ID lookup mode
         search = arxiv.Search(id_list=arxiv_ids)
     else:
-        # Query search mode
+        # Wrap plain text queries with all: prefix for proper matching
         search_query = query
+        has_field_prefix = any(
+            f"{p}:" in query
+            for p in ("ti", "au", "abs", "cat", "all", "co", "jr", "id")
+        )
+        if not has_field_prefix and search_query:
+            search_query = f"all:{search_query}"
         if categories:
-            category_filter = " OR ".join([f"cat:{cat}" for cat in categories])
-            search_query = f"({query}) AND ({category_filter})"
+            cat_filter = " OR ".join([f"cat:{cat}" for cat in categories])
+            search_query = f"({search_query}) AND ({cat_filter})"
 
         search = arxiv.Search(
             query=search_query,
@@ -64,7 +70,11 @@ def search_arxiv(
             sort_order=arxiv.SortOrder.Descending,
         )
 
-    client = arxiv.Client()
+    client = arxiv.Client(
+        page_size=max_results if not arxiv_ids else 20,
+        delay_seconds=1.0,
+        num_retries=1,
+    )
     results = list(client.results(search))
 
     if not results:
