@@ -19,9 +19,15 @@ Deploying AgentCore Deep Research stack requires a few CDK commands:
 cd infra-cdk
 npm install
 cdk bootstrap  # Once per account/region
-cdk deploy
-cd ..
-python scripts/deploy-frontend.py
+npm run deploy
+```
+
+Available deploy commands (run from `infra-cdk/`):
+
+```bash
+npm run deploy            # Backend + frontend (if auto_deploy_frontend: true in config.yaml)
+npm run deploy:frontend   # Frontend only
+cdk deploy                # Backend only
 ```
 
 See the [deployment guide](docs/DEPLOYMENT.md) for detailed instructions.
@@ -80,7 +86,7 @@ Local development requires a deployed stack because the agent depends on AWS ser
 - **SSM Parameters** - stores configuration (Gateway URL, client IDs)
 - **Secrets Manager** - stores Gateway authentication credentials
 
-You must first deploy the stack with `cdk deploy`, then you can run the frontend and agent locally using Docker Compose while connecting to these deployed AWS resources:
+You must first deploy the stack with `npm run deploy` (from `infra-cdk/`), then you can run the frontend and agent locally using Docker Compose while connecting to these deployed AWS resources:
 
 ```bash
 # Set required environment variables (see below for how to find these)
