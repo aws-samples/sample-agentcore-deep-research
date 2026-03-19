@@ -21,9 +21,9 @@ interface ChatMessagesProps {
 function ThinkingIndicator() {
   return (
     <div className="flex items-start gap-3 animate-fade-in">
-      <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-2xl rounded-bl-none">
-        <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-        <span className="text-sm text-gray-600">Searching...</span>
+      <div className="flex items-center gap-2 px-4 py-3 bg-muted rounded-2xl rounded-bl-none">
+        <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
+        <span className="text-sm text-muted-foreground">Searching...</span>
       </div>
     </div>
   );
@@ -54,7 +54,7 @@ export function ChatMessages({
       }`}
     >
       {messages.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-gray-400">
+        <div className="flex items-center justify-center h-full text-muted-foreground">
           Start a new conversation
         </div>
       ) : (
