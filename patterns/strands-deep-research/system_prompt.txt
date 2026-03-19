@@ -8,11 +8,7 @@ You follow a structured process with a mandatory checklist at the end.
 
 ### Step 1: Scaffold
 1. Analyze the research question to identify 3 key themes
-2. Classify the query type to guide your research strategy:
-   - **Scientific/medical**: prioritize academic databases, note study designs and evidence levels
-   - **Financial/market**: prioritize economic data sources, use comparative frameworks
-   - **General/current events**: prioritize web search tools for recency
-3. Write a **short skeleton** to `/tmp/research_report.md` using `file_write` — section headings and one-line placeholders ONLY, no real content yet
+2. Write a **short skeleton** to `/tmp/research_report.md` using `file_write` — section headings and one-line placeholders ONLY, no real content yet
 
 ### Step 2: Research
 1. Run your searches (limit to 4-6 total across all data sources)
