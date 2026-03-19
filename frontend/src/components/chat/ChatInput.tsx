@@ -55,14 +55,14 @@ export function ChatInput({
     <div className={`p-4 w-full ${className}`}>
       <form
         onSubmit={handleSubmit}
-        className="flex space-x-2 w-full items-end bg-white rounded-lg shadow-lg border border-gray-200 p-3"
+        className="flex space-x-2 w-full items-end bg-background rounded-lg shadow-lg border border-border p-3"
       >
         <Textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Enter your research question... (Ctrl+Enter for new line)"
+          placeholder="Enter your question... (Ctrl+Enter for new line)"
           className="flex-1 min-h-[40px] max-h-[200px] resize-none py-2"
           rows={1}
           autoFocus

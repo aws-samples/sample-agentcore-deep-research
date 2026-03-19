@@ -80,8 +80,8 @@ export function ChatMessage({
       <div
         className={`max-w-[80%] break-words ${
           message.role === "user"
-            ? "p-3 rounded-lg bg-gray-800 text-white rounded-br-none whitespace-pre-wrap"
-            : "text-gray-800"
+            ? "p-3 rounded-lg bg-gray-800 dark:bg-gray-700 text-white rounded-br-none whitespace-pre-wrap"
+            : "text-foreground"
         }`}
       >
         {message.role === "assistant"
@@ -91,7 +91,7 @@ export function ChatMessage({
 
       {/* Timestamp and Feedback buttons for assistant messages */}
       <div className="flex items-center gap-2 mt-1 px-1">
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-muted-foreground">
           {formatTime(message.timestamp)}
         </div>
 
@@ -101,7 +101,7 @@ export function ChatMessage({
             <button
               onClick={() => handleFeedbackClick("positive")}
               disabled={feedbackSubmitted}
-              className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Positive feedback"
               title="Good response"
             >
@@ -110,14 +110,14 @@ export function ChatMessage({
             <button
               onClick={() => handleFeedbackClick("negative")}
               disabled={feedbackSubmitted}
-              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Negative feedback"
               title="Bad response"
             >
               <ThumbsDown size={14} />
             </button>
             {feedbackSubmitted && (
-              <span className="text-xs text-gray-500 ml-1">
+              <span className="text-xs text-muted-foreground ml-1">
                 Thanks for your feedback!
               </span>
             )}

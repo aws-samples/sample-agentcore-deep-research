@@ -79,13 +79,13 @@ export function ResizableSplitPane({
 
       {/* Divider */}
       <div
-        className={`flex-none w-1.5 cursor-col-resize bg-gray-200 hover:bg-blue-400 transition-colors ${
+        className={`flex-none w-1.5 cursor-col-resize bg-border hover:bg-blue-400 dark:hover:bg-blue-600 transition-colors ${
           isDragging ? "bg-blue-500" : ""
         }`}
         onMouseDown={handleMouseDown}
       >
         <div className="h-full w-full flex items-center justify-center">
-          <div className="w-0.5 h-8 bg-gray-400 rounded-full" />
+          <div className="w-0.5 h-8 bg-muted-foreground/50 rounded-full" />
         </div>
       </div>
 
