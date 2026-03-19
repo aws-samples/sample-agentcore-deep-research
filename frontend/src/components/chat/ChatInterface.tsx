@@ -456,8 +456,8 @@ export default function ChatInterface() {
           canStartNewChat={hasAssistantMessages}
         />
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-4 mt-2">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="bg-red-50 dark:bg-red-950/50 border-l-4 border-red-500 p-4 mx-4 mt-2">
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           </div>
         )}
       </div>
@@ -471,12 +471,12 @@ export default function ChatInterface() {
 
           {/* Centered welcome message */}
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
+            <h2 className="text-2xl font-bold text-foreground">
               AgentCore Deep Research
             </h2>
-            <p className="text-gray-600 mt-2">
-              Ask a research question and I'll search across multiple sources to
-              create a comprehensive report
+            <p className="text-muted-foreground mt-2">
+              Ask a question and I will search across multiple sources to create
+              a comprehensive report
             </p>
 
             {/* Data source toggles */}
@@ -487,8 +487,8 @@ export default function ChatInterface() {
                   onClick={() => toggleSource(source.id)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     enabledSources[source.id]
-                      ? "bg-blue-100 text-blue-800 border-2 border-blue-300"
-                      : "bg-gray-100 text-gray-400 border-2 border-transparent"
+                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-2 border-blue-300 dark:border-blue-700"
+                      : "bg-muted text-muted-foreground border-2 border-transparent"
                   }`}
                 >
                   <span className="mr-1">{source.icon}</span>
@@ -499,7 +499,7 @@ export default function ChatInterface() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Click to toggle data sources
             </p>
 
@@ -513,9 +513,9 @@ export default function ChatInterface() {
                   value={s3FileInput}
                   onChange={(e) => setS3FileInput(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-left placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono text-left placeholder:text-muted-foreground bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   One S3 URI per line (supports txt, md, csv, json, pdf, etc.)
                 </p>
               </div>
@@ -556,7 +556,7 @@ export default function ChatInterface() {
                   />
                 </div>
                 {/* Chat input */}
-                <div className="flex-none p-2 border-t bg-white">
+                <div className="flex-none p-2 border-t border-border bg-background">
                   <ChatInput
                     input={input}
                     setInput={setInput}

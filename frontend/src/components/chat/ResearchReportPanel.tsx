@@ -56,23 +56,23 @@ export function ResearchReportPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
       {/* Header */}
-      <div className="flex-none flex items-center justify-between px-4 py-3 border-b bg-white shadow-sm">
+      <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-border bg-background shadow-sm">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="p-1.5 bg-blue-100 rounded-lg shrink-0">
+          <div className="p-1.5 bg-blue-100 dark:bg-blue-900/40 rounded-lg shrink-0">
             <FileText className="w-5 h-5 text-blue-600" />
           </div>
           <h2
-            className="font-semibold text-gray-800 truncate"
+            className="font-semibold text-foreground truncate"
             title={reportTitle}
           >
             {reportTitle}
           </h2>
           {isLoading && (
-            <div className="flex items-center gap-2 ml-3 px-3 py-1 bg-gradient-to-r from-blue-100 to-blue-50 rounded-full border border-blue-200 shrink-0">
-              <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-              <span className="text-sm text-blue-700 font-medium">
+            <div className="flex items-center gap-2 ml-3 px-3 py-1 bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-950/30 rounded-full border border-blue-200 dark:border-blue-800 shrink-0">
+              <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
+              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
                 Version {currentRound}
               </span>
             </div>
@@ -81,7 +81,7 @@ export function ResearchReportPanel({
         {content && (
           <button
             onClick={handleDownload}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm shrink-0 ml-2"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm shrink-0 ml-2"
           >
             <Download className="w-4 h-4" />
             Download
@@ -93,7 +93,7 @@ export function ResearchReportPanel({
       <div className="grow overflow-auto">
         {content ? (
           <div className="p-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-background rounded-2xl shadow-sm border border-border p-6">
               <ReportMarkdownRenderer
                 content={content}
                 collapsibleSections={true}
@@ -103,12 +103,12 @@ export function ResearchReportPanel({
 
             {/* References section */}
             {references.length > 0 && (
-              <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="mt-4 bg-background rounded-2xl shadow-sm border border-border p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Link className="w-4 h-4 text-gray-500" />
-                  <h2 className="font-semibold text-gray-700">References</h2>
+                  <Link className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="font-semibold text-foreground">References</h2>
                 </div>
-                <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-600">
+                <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
                   {references.map((ref, i) => (
                     <li key={i} className="break-all">
                       {ref.url ? (
@@ -130,14 +130,14 @@ export function ResearchReportPanel({
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
-              <BookOpen className="w-16 h-16 text-gray-300" />
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <div className="p-6 bg-background rounded-2xl shadow-sm border border-border mb-4">
+              <BookOpen className="w-16 h-16 text-muted-foreground/50" />
             </div>
-            <p className="text-lg font-medium text-gray-500">
+            <p className="text-lg font-medium text-muted-foreground">
               Generating report...
             </p>
-            <p className="text-sm mt-1 text-gray-400 max-w-xs text-center">
+            <p className="text-sm mt-1 text-muted-foreground/70 max-w-xs text-center">
               The research report will appear here as it's being generated
             </p>
           </div>
