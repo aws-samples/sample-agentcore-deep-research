@@ -123,14 +123,17 @@ def load_system_prompt(
         enabled_sources = DEFAULT_ENABLED_SOURCES
 
     # Build the data retrieval tools section
-    # Tool names are prefixed with "gateway___" by the MCP client
+    # Gateway tools appear in your tool schema with a "gateway___" prefix.
+    # List them by description so the model matches them to schema tools.
     tools_section = "### Data Retrieval (via Gateway)\n"
+    tools_section += (
+        "The following Gateway tools are available in your tool schema "
+        "(their names start with `gateway___`). Use them to search for data:\n"
+    )
     for source_key in enabled_sources:
         if source_key in DATA_SOURCES:
             source = DATA_SOURCES[source_key]
-            tools_section += (
-                f"- `gateway___{source['tool']}`: {source['description']}\n"
-            )
+            tools_section += f"- {source['name']}: {source['description']}\n"
 
     # If no sources enabled, add a note
     if not any(s in DATA_SOURCES for s in enabled_sources):
@@ -191,13 +194,18 @@ def create_gateway_mcp_client(
     print(f"[AGENT] Gateway URL from SSM: {gateway_url}")
 
     # Build tool filter from enabled sources
+    # Gateway MCP tool names are "{target-name}___{tool-name}",
+    # so we use regex to match the tool name suffix
     tool_filters = None
     if enabled_sources is not None:
         allowed_tool_names = [
             DATA_SOURCES[key]["tool"] for key in enabled_sources if key in DATA_SOURCES
         ]
         if allowed_tool_names:
-            tool_filters = {"allowed": allowed_tool_names}
+            pattern = re.compile(
+                r"^.*___(" + "|".join(re.escape(n) for n in allowed_tool_names) + r")$"
+            )
+            tool_filters = {"allowed": [pattern]}
             print(f"[AGENT] Tool filter: allowing {allowed_tool_names}")
 
     # Create MCP client with Bearer token authentication
