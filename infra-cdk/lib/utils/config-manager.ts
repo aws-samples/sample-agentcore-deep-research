@@ -16,6 +16,7 @@ export interface ToolConfig {
 export interface AppConfig {
   stack_name_base: string
   admin_user_email?: string | null
+  auto_deploy_frontend?: boolean
   backend: {
     pattern: string
     deployment_type: DeploymentType
@@ -86,6 +87,7 @@ export class ConfigManager {
       return {
         stack_name_base: stackNameBase,
         admin_user_email: parsedConfig.admin_user_email || null,
+        auto_deploy_frontend: parsedConfig.auto_deploy_frontend ?? false,
         backend: {
           pattern: parsedConfig.backend?.pattern || "strands-deep-research",
           deployment_type: deploymentType,

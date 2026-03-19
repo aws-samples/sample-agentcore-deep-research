@@ -8,7 +8,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "deploy": "cdk deploy --require-approval never && node scripts/post-deploy.js",
+    "deploy:frontend": "python3 ../scripts/deploy-frontend.py"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
