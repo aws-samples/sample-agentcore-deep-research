@@ -11,6 +11,7 @@ export type DeploymentType = "docker" | "zip"
 export interface ToolConfig {
   enabled: boolean
   default_on: boolean
+  knowledge_base_id?: string | null
 }
 
 export interface AppConfig {
@@ -80,6 +81,7 @@ export class ConfigManager {
         tools[key] = {
           enabled: raw?.enabled ?? defaults.enabled,
           default_on: raw?.default_on ?? defaults.default_on,
+          ...(raw?.knowledge_base_id ? { knowledge_base_id: raw.knowledge_base_id } : {}),
         }
       }
 

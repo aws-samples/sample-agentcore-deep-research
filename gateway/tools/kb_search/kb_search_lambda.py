@@ -118,9 +118,12 @@ def handler(event, context):
             if not query:
                 return {"error": "Missing required parameter: query"}
 
-            knowledge_base_id = event.get("knowledge_base_id", "")
+            knowledge_base_id = event.get(
+                "knowledge_base_id",
+                os.environ.get("DEFAULT_KNOWLEDGE_BASE_ID", ""),
+            )
             if not knowledge_base_id:
-                return {"error": "Missing required parameter: knowledge_base_id"}
+                return {"error": "Missing required parameter: knowledge_base_id. Set it in config.yaml under tools.bedrock_kb.knowledge_base_id"}
 
             max_results = event.get("max_results", 10)
 
