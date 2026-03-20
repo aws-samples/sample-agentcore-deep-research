@@ -60,7 +60,7 @@ def test_tavily_rest():
         method="POST",
     )
 
-    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
+    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
         result = json.loads(resp.read().decode("utf-8"))
 
     print("\n=== Tavily REST Results ===")

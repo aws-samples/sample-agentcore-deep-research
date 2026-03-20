@@ -27,9 +27,11 @@ def search_pubmed(query: str, max_results: int = 10) -> str:
         }
     )
     search_url = f"{ESEARCH_URL}?{search_params}"
-    req = Request(search_url, method="GET")  # noqa: S310
+    if not search_url.startswith("https://"):
+        return "Error: invalid URL scheme for PubMed request"
+    req = Request(search_url, method="GET")
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             search_data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching PubMed: {e}"
@@ -48,9 +50,11 @@ def search_pubmed(query: str, max_results: int = 10) -> str:
         }
     )
     fetch_url = f"{EFETCH_URL}?{fetch_params}"
-    req = Request(fetch_url, method="GET")  # noqa: S310
+    if not fetch_url.startswith("https://"):
+        return "Error: invalid URL scheme for PubMed request"
+    req = Request(fetch_url, method="GET")
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             xml_data = resp.read().decode("utf-8")
     except Exception as e:
         return f"Error fetching PubMed articles: {e}"
