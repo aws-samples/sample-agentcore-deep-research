@@ -17,30 +17,43 @@ backend:
 # enabled: whether the tool is deployed and available (true/false)
 # default_on: whether the tool is toggled on by default in the UI (true/false)
 tools:
-  tavily:
-    enabled: true
-    default_on: true
-  nova:
-    enabled: true
-    default_on: true
-  arxiv:
-    enabled: true
-    default_on: false
-  openfda:
-    enabled: true
-    default_on: false
   alphavantage:
     enabled: true
     default_on: false
-  s3:
+  arxiv:
     enabled: true
     default_on: false
   bedrock_kb:
     enabled: false
     default_on: false
     knowledge_base_id: null # Replace with your Bedrock Knowledge Base ID
+  clinicaltrials:
+    enabled: false
+    default_on: false 
+  edgar:
+    enabled: true
+    default_on: false
+  fred:
+    enabled: false
+    default_on: false
+  nova:
+    enabled: true
+    default_on: true
+  openfda:
+    enabled: true
+    default_on: false
+  pubmed:
+    enabled: true
+    default_on: false
+  tavily:
+    enabled: true
+    default_on: true
+  s3:
+    enabled: true
+    default_on: false
 
 # API Keys for research tools
 api_keys:
   tavily: null # Replace with your Tavily API key from https://tavily.com/
   alphavantage: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/
+  fred: null # Replace with your FRED API key from https://fredaccount.stlouisfed.org

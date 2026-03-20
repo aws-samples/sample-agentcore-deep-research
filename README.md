@@ -6,7 +6,7 @@ AgentCore Deep Research template is a sample agentic AI solution for deep resear
 
 **Key Features**
 
-- **Multi-Source Retrieval**: Search across the enterprise data (S3 or Knowledge Base) and public sources (Internet, academic papers, OpenFDA, AlphaVantage and more)
+- **Multi-Source Retrieval**: Search across enterprise data (S3 or Knowledge Base) and public sources (Internet, academic papers, OpenFDA, AlphaVantage, FRED, PubMed, SEC EDGAR, ClinicalTrials.gov, and more)
 - **Iterative Research Workflow**: AI agent scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
 - **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time and allows follow-up questions
 - **Fact-Checking and Citations**: Every factual claim includes inline source citations with the references section
@@ -63,13 +63,17 @@ The architecture uses Amazon Cognito in four places:
 
 The application includes multiple Lambda-based tools behind AgentCore Gateway with OAuth authentication:
 
-1. **Tavily Web Search** - Search the web for current information with relevance scoring
+1. **Tavily Web Search** - Search the web for current information with relevance scoring and domain filtering
 2. **Nova Web Grounding** - AWS-powered web search via Amazon Nova with citations
-3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords
+3. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords with category filtering
 4. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
 5. **AlphaVantage Research** - Commodity prices (gold, oil, silver, etc.), US economic indicators (CPI, inflation, Fed rate, GDP, unemployment), and market news with sentiment analysis
-6. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
-7. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
+6. **FRED Economic Search** - Search 800,000+ economic time series from the Federal Reserve (GDP, unemployment, CPI, Fed funds rate, Treasury yields, and more)
+7. **PubMed Search** - Search peer-reviewed biomedical literature for abstracts, journal articles, and meta-analyses
+8. **SEC EDGAR Search** - Search SEC company filings (10-K, 10-Q, 8-K) with optional full-text content retrieval
+9. **ClinicalTrials.gov Search** - Search clinical studies worldwide by condition, intervention, phase, and recruitment status
+10. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
+11. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
 
 The modular architecture makes it easy to integrate additional data sources for developers.
 

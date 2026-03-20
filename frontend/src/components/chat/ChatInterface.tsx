@@ -44,6 +44,10 @@ const TOOL_METADATA: Record<string, { name: string; icon: string }> = {
   openfda: { name: "OpenFDA Drugs", icon: "💊" },
   s3: { name: "S3 Files", icon: "📁" },
   bedrock_kb: { name: "Bedrock KB", icon: "🧠" },
+  pubmed: { name: "PubMed", icon: "🏥" },
+  clinicaltrials: { name: "ClinicalTrials", icon: "🔬" },
+  fred: { name: "FRED Economic", icon: "🏦" },
+  edgar: { name: "SEC EDGAR", icon: "🏛️" },
 };
 
 // Tool config from aws-exports.json (populated on mount)
@@ -61,6 +65,10 @@ const FALLBACK_TOOLS: Record<string, ToolConfig> = {
   openfda: { enabled: true, default_on: false },
   s3: { enabled: true, default_on: false },
   bedrock_kb: { enabled: false, default_on: false },
+  pubmed: { enabled: true, default_on: false },
+  clinicaltrials: { enabled: true, default_on: false },
+  fred: { enabled: true, default_on: false },
+  edgar: { enabled: true, default_on: false },
 };
 
 export default function ChatInterface() {
