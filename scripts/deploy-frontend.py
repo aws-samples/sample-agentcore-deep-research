@@ -150,27 +150,46 @@ def parse_config_yaml(config_path: Path) -> dict:
     if match:
         config["auto_deploy_frontend"] = match.group(1) == "true"
 
-    # Extract tools config (tool_name -> {enabled, default_on})
+    # Extract tools config (tool_name -> {enabled, default_on, required: {...}})
     tools_section = re.search(r"^tools:\s*\n((?:[ \t]+\S.*\n)*)", content, re.MULTILINE)
     if tools_section:
         tools_text = tools_section.group(1)
         current_tool = None
+        in_required = False
         for line in tools_text.split("\n"):
             # Match tool name (2-space indented)
             tool_match = re.match(r"^  (\w+):\s*$", line)
             if tool_match:
                 current_tool = tool_match.group(1)
-                config["tools"][current_tool] = {"enabled": True, "default_on": False}
+                in_required = False
+                config["tools"][current_tool] = {
+                    "enabled": True,
+                    "default_on": False,
+                }
                 continue
-            if current_tool:
-                # Match enabled/default_on (4-space indented)
-                prop_match = re.match(
-                    r"^    (enabled|default_on):\s*(true|false)", line
-                )
-                if prop_match:
-                    config["tools"][current_tool][prop_match.group(1)] = (
-                        prop_match.group(2) == "true"
+            if not current_tool:
+                continue
+            # Match "required:" block start (4-space indented)
+            if re.match(r"^    required:\s*$", line):
+                in_required = True
+                config["tools"][current_tool]["required"] = {}
+                continue
+            if in_required:
+                # Match required fields (6-space indented)
+                req_match = re.match(r"^      (\w+):\s*(\S+)", line)
+                if req_match:
+                    val = req_match.group(2).split("#")[0].strip().strip("\"'")
+                    config["tools"][current_tool]["required"][req_match.group(1)] = (
+                        val if val != "null" else None
                     )
+                    continue
+                in_required = False
+            # Match enabled/default_on booleans (4-space indented)
+            prop_match = re.match(r"^    (enabled|default_on):\s*(true|false)", line)
+            if prop_match:
+                config["tools"][current_tool][prop_match.group(1)] = (
+                    prop_match.group(2) == "true"
+                )
 
     return config
 

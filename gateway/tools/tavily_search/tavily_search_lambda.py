@@ -13,6 +13,10 @@ logger.setLevel(logging.INFO)
 TAVILY_API_URL = "https://api.tavily.com/search"
 
 
+class ApiKeyNotConfiguredError(Exception):
+    """Raised when the API key secret is not found in Secrets Manager."""
+
+
 def get_tavily_api_key() -> str:
     """
     Retrieve Tavily API key from AWS Secrets Manager.
@@ -26,7 +30,14 @@ def get_tavily_api_key() -> str:
     region = os.environ.get("AWS_REGION", "us-east-1")
 
     client = boto3.client("secretsmanager", region_name=region)
-    response = client.get_secret_value(SecretId=secret_name)
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+    except client.exceptions.ResourceNotFoundException:
+        raise ApiKeyNotConfiguredError(
+            "Tavily API key is not configured. "
+            "Please set the api_key field under tools.tavily.required "
+            "in config.yaml and redeploy."
+        ) from None
 
     return response["SecretString"]
 
@@ -178,6 +189,9 @@ def handler(event, context):
                 f"received: {tool_name}"
             }
 
+    except ApiKeyNotConfiguredError as e:
+        logger.warning(str(e))
+        return {"error": str(e)}
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return {"error": f"Internal server error: {str(e)}"}

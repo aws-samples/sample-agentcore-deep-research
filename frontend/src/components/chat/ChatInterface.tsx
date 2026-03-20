@@ -9,6 +9,7 @@ import { ChatMessages } from "./ChatMessages";
 import { Message, MessageSegment, ToolCall } from "./types";
 import { ResearchReportPanel } from "./ResearchReportPanel";
 import { ResizableSplitPane } from "./ResizableSplitPane";
+import { DataSourceBar } from "./DataSourceBar";
 
 import { useGlobal } from "@/app/context/GlobalContext";
 import { AgentCoreClient } from "@/lib/agentcore-client";
@@ -35,21 +36,6 @@ async function fetchReportContent(url: string): Promise<string | null> {
   }
 }
 
-// Tool metadata (display names and icons)
-const TOOL_METADATA: Record<string, { name: string; icon: string }> = {
-  alphavantage: { name: "AlphaVantage", icon: "📈" },
-  tavily: { name: "Tavily Web", icon: "🌐" },
-  nova: { name: "Nova Web Grounding", icon: "🔍" },
-  arxiv: { name: "ArXiv Papers", icon: "📚" },
-  openfda: { name: "OpenFDA Drugs", icon: "💊" },
-  s3: { name: "S3 Files", icon: "📁" },
-  bedrock_kb: { name: "Bedrock KB", icon: "🧠" },
-  pubmed: { name: "PubMed", icon: "🏥" },
-  clinicaltrials: { name: "ClinicalTrials", icon: "🔬" },
-  fred: { name: "FRED Economic", icon: "🏦" },
-  edgar: { name: "SEC EDGAR", icon: "🏛️" },
-};
-
 // Tool config from aws-exports.json (populated on mount)
 interface ToolConfig {
   enabled: boolean;
@@ -59,16 +45,16 @@ interface ToolConfig {
 // Fallback defaults if tools config is not in aws-exports.json
 const FALLBACK_TOOLS: Record<string, ToolConfig> = {
   alphavantage: { enabled: false, default_on: false },
-  tavily: { enabled: false, default_on: false },
-  nova: { enabled: true, default_on: true },
   arxiv: { enabled: true, default_on: false },
-  openfda: { enabled: true, default_on: false },
-  s3: { enabled: true, default_on: false },
   bedrock_kb: { enabled: false, default_on: false },
-  pubmed: { enabled: true, default_on: false },
   clinicaltrials: { enabled: true, default_on: false },
-  fred: { enabled: true, default_on: false },
   edgar: { enabled: true, default_on: false },
+  fred: { enabled: true, default_on: false },
+  nova: { enabled: true, default_on: true },
+  openfda: { enabled: true, default_on: false },
+  pubmed: { enabled: true, default_on: false },
+  s3: { enabled: true, default_on: false },
+  tavily: { enabled: false, default_on: false },
 };
 
 export default function ChatInterface() {
@@ -81,17 +67,6 @@ export default function ChatInterface() {
   // Tools config loaded from aws-exports.json
   const [toolsConfig, setToolsConfig] =
     useState<Record<string, ToolConfig>>(FALLBACK_TOOLS);
-
-  // Derived: visible data sources (enabled tools only)
-  const dataSources = Object.entries(toolsConfig)
-    .filter(([, cfg]) => cfg.enabled)
-    .filter(([id]) => TOOL_METADATA[id])
-    .map(([id, cfg]) => ({
-      id,
-      name: TOOL_METADATA[id].name,
-      icon: TOOL_METADATA[id].icon,
-      defaultEnabled: cfg.default_on,
-    }));
 
   // Data source toggles - initialize from defaults
   const [enabledSources, setEnabledSources] = useState<Record<string, boolean>>(
@@ -116,10 +91,24 @@ export default function ChatInterface() {
 
   // Toggle a data source
   const toggleSource = (sourceId: string) => {
+    // Only toggle if deployed
+    const cfg = toolsConfig[sourceId];
+    if (!cfg?.enabled) return;
     setEnabledSources((prev) => ({
       ...prev,
       [sourceId]: !prev[sourceId],
     }));
+  };
+
+  // Reset data sources to defaults
+  const resetSources = () => {
+    const defaults: Record<string, boolean> = {};
+    for (const [id, cfg] of Object.entries(toolsConfig)) {
+      if (cfg.enabled) {
+        defaults[id] = cfg.default_on;
+      }
+    }
+    setEnabledSources(defaults);
   };
 
   const { isLoading, setIsLoading } = useGlobal();
@@ -455,6 +444,18 @@ export default function ChatInterface() {
   // Show split view when report panel should be visible (triggered on first file_write/editor start)
   const showSplitView = showReportPanel;
 
+  // Reusable data source bar
+  const dataSourceBar = (
+    <DataSourceBar
+      toolsConfig={toolsConfig}
+      enabledSources={enabledSources}
+      onToggle={toggleSource}
+      onReset={resetSources}
+      s3FileInput={s3FileInput}
+      onS3FileInputChange={setS3FileInput}
+    />
+  );
+
   return (
     <div className="flex flex-col h-screen w-full">
       {/* Fixed header */}
@@ -486,58 +487,17 @@ export default function ChatInterface() {
               Ask a question and I will search across multiple sources to create
               a comprehensive report
             </p>
-
-            {/* Data source toggles */}
-            <div className="flex flex-wrap justify-center gap-3 mt-6">
-              {dataSources.map((source) => (
-                <button
-                  key={source.id}
-                  onClick={() => toggleSource(source.id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    enabledSources[source.id]
-                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-2 border-blue-300 dark:border-blue-700"
-                      : "bg-muted text-muted-foreground border-2 border-transparent"
-                  }`}
-                >
-                  <span className="mr-1">{source.icon}</span>
-                  {source.name}
-                  <span className="ml-2">
-                    {enabledSources[source.id] ? "✓" : "○"}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Click to toggle data sources
-            </p>
-
-            {/* S3 file URIs input */}
-            {enabledSources["s3"] && (
-              <div className="mt-4 max-w-lg mx-auto">
-                <textarea
-                  placeholder={
-                    "s3://bucket/path/to/file.txt\ns3://bucket/another/file.csv"
-                  }
-                  value={s3FileInput}
-                  onChange={(e) => setS3FileInput(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono text-left placeholder:text-muted-foreground bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  One S3 URI per line (supports txt, md, csv, json, pdf, etc.)
-                </p>
-              </div>
-            )}
           </div>
 
-          {/* Centered input */}
-          <div className="px-4 mb-16 max-w-4xl mx-auto w-full">
+          {/* Centered input + data sources */}
+          <div className="px-4 mb-16 max-w-4xl mx-auto w-full space-y-3">
             <ChatInput
               input={input}
               setInput={setInput}
               handleSubmit={handleSubmit}
               isLoading={isLoading}
             />
+            <div className="px-4">{dataSourceBar}</div>
           </div>
 
           {/* Empty space below */}
@@ -599,7 +559,7 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* Fixed input area at bottom */}
+          {/* Fixed input area at bottom with data sources */}
           <div className="flex-none">
             <div className="max-w-4xl mx-auto w-full">
               <ChatInput
@@ -608,6 +568,7 @@ export default function ChatInterface() {
                 handleSubmit={handleSubmit}
                 isLoading={isLoading}
               />
+              <div className="px-4 pb-3">{dataSourceBar}</div>
             </div>
           </div>
         </>

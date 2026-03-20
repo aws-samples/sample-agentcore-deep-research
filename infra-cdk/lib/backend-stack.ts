@@ -616,11 +616,11 @@ export class BackendStack extends cdk.NestedStack {
 
     // Create Tavily API key secret if provided in config
     const tavilySecretName = `/${config.stack_name_base}/tavily-api-key`
-    if (config.api_keys?.tavily) {
+    if (config.tools?.tavily?.required?.api_key) {
       new secretsmanager.Secret(this, "TavilyApiKeySecret", {
         secretName: tavilySecretName,
         description: "Tavily API key for web search",
-        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.tavily),
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.tools.tavily.required.api_key),
       })
     }
 
@@ -658,11 +658,13 @@ export class BackendStack extends cdk.NestedStack {
 
     // Commodities Price Lambda
     const commoditiesSecretName = `/${config.stack_name_base}/commodities-api-key`
-    if (config.api_keys?.alphavantage) {
+    if (config.tools?.alphavantage?.required?.api_key) {
       new secretsmanager.Secret(this, "CommoditiesApiKeySecret", {
         secretName: commoditiesSecretName,
         description: "Alpha Vantage API key for commodities and economic data",
-        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.alphavantage),
+        secretStringValue: cdk.SecretValue.unsafePlainText(
+          config.tools.alphavantage.required.api_key
+        ),
       })
     }
 
@@ -700,7 +702,7 @@ export class BackendStack extends cdk.NestedStack {
     // Knowledge Base Search Lambda
     let kbSearchLambda: lambda.Function | undefined
     if (isToolEnabled("bedrock_kb")) {
-      const kbId = config.tools?.bedrock_kb?.knowledge_base_id
+      const kbId = config.tools?.bedrock_kb?.required?.knowledge_base_id
       kbSearchLambda = new lambda.Function(this, "KBSearchLambda", {
         runtime: lambda.Runtime.PYTHON_3_13,
         handler: "kb_search_lambda.handler",
@@ -839,9 +841,12 @@ export class BackendStack extends cdk.NestedStack {
       clinicaltrialsLambda = new lambda.Function(this, "ClinicalTrialsSearchLambda", {
         runtime: lambda.Runtime.PYTHON_3_13,
         handler: "clinicaltrials_search_lambda.handler",
-        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/clinicaltrials_search"), {
-          bundling: this.getPythonBundlingOptions([]),
-        }),
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "../../gateway/tools/clinicaltrials_search"),
+          {
+            bundling: this.getPythonBundlingOptions([]),
+          }
+        ),
         timeout: cdk.Duration.seconds(60),
         logGroup: new logs.LogGroup(this, "ClinicalTrialsLambdaLogGroup", {
           logGroupName: `/aws/lambda/${config.stack_name_base}-clinicaltrials-search`,
@@ -853,11 +858,11 @@ export class BackendStack extends cdk.NestedStack {
 
     // FRED Economic Data Lambda
     const fredSecretName = `/${config.stack_name_base}/fred-api-key`
-    if (config.api_keys?.fred) {
+    if (config.tools?.fred?.required?.api_key) {
       new secretsmanager.Secret(this, "FredApiKeySecret", {
         secretName: fredSecretName,
         description: "FRED API key for economic data",
-        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.fred),
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.tools.fred.required.api_key),
       })
     }
 

@@ -33,29 +33,30 @@ cp infra-cdk/.config_example.yaml infra-cdk/config.yaml
 Then edit `infra-cdk/config.yaml` to customize your deployment:
 
 ```yaml
-stack_name_base: your-project-name # Change this to your preferred stack name (max 35 chars)
+stack_name_base: your-project-name  # Change this to your preferred stack name (max 35 chars)
 
-admin_user_email: null # Optional: admin@example.com (auto-creates user & emails credentials)
+# Optional: Set to automatically create an admin user and email credentials
+# If not provided, you'll need to manually create users via AWS Console
+admin_user_email: null
 
-auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy
+auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy (when using npm run deploy)
 
 backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
+  model_id: bedrock-model-id # Model ID for the agent (with cross-region prefix)
 
-# Research tools: enabled = deployed, default_on = toggled on in UI by default
+# Research tools configuration
+# enabled: whether the tool is deployed and available (true/false)
+# default_on: whether the tool is toggled on by default in the UI (true/false)
+# required: fields that must be non-null for the tool to work
 tools:
-  tavily:
-    enabled: true
-    default_on: true
-  nova:
-    enabled: true
-    default_on: true
-  arxiv:
+  alphavantage: # Commodity prices, economic indicators, and market news
     enabled: true
     default_on: false
+    required:
+      api_key: null # Get your key from https://www.alphavantage.co/
    ...
-   # Set enabled: false to skip deploying a tool entirely
 ```
 
 **Important**:
@@ -63,33 +64,26 @@ tools:
 - Maximum length is 35 characters (due to AWS AgentCore runtime naming constraints)
 - If `config.yaml` is not found, the deployment will fall back to `.config_example.yaml` defaults
 
+
 ### 2. API Keys and Data Sources
 
 Some research tools require external API keys obtained through free registration. Others use public APIs or your AWS account directly. The table below summarizes what is needed for each tool:
 
-| Tool | External API? | API Key Required? | Registration Needed? | Provider | Config Location |
-|------|---------------|-------------------|----------------------|----------|-----------------|
-| Tavily Web Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [tavily.com](https://tavily.com/) | `api_keys.tavily` in `config.yaml` |
-| AlphaVantage | ✅ Yes | ✅ Yes | Yes — sign up for API key | [alphavantage.co](https://www.alphavantage.co/) | `api_keys.alphavantage` in `config.yaml` |
-| ArXiv Search | ✅ Yes | ❌ No | No | [arxiv.org](https://arxiv.org/) | N/A |
-| OpenFDA Drug Search | ✅ Yes | ❌ No | No | [open.fda.gov](https://open.fda.gov/) | N/A |
-| FRED Economic Search | ✅ Yes | ❌ No | No | [fred.stlouisfed.org](https://fred.stlouisfed.org/) | N/A |
-| PubMed Search | ✅ Yes | ❌ No | No | [pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov/) | N/A |
-| SEC EDGAR Search | ✅ Yes | ❌ No | No | [efts.sec.gov](https://efts.sec.gov/) | N/A |
-| ClinicalTrials.gov Search | ✅ Yes | ❌ No | No | [clinicaltrials.gov](https://clinicaltrials.gov/) | N/A |
-| Nova Web Grounding | ❌ No (AWS) | ❌ No | No | N/A | N/A |
-| S3 File Reader | ❌ No (AWS) | ❌ No | No | N/A | N/A |
-| Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs setup) | No | N/A | `tools.bedrock_kb.knowledge_base_id` in `config.yaml` |
+| Tool | External API? | API Key Required? | Registration Needed? | Provider |
+|------|---------------|-------------------|----------------------|----------|
+| AlphaVantage | ✅ Yes | ✅ Yes | Yes — sign up for API key | [alphavantage.co](https://www.alphavantage.co/) |
+| ArXiv Search | ✅ Yes | ❌ No | No | [arxiv.org](https://arxiv.org/) |
+| Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs KB ID) | No | AWS |
+| ClinicalTrials.gov Search | ✅ Yes | ❌ No | No | [clinicaltrials.gov](https://clinicaltrials.gov/) |
+| FRED Economic Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [fredaccount.stlouisfed.org](https://fredaccount.stlouisfed.org) |
+| Nova Web Grounding | ❌ No (AWS) | ❌ No | No | AWS |
+| OpenFDA Drug Search | ✅ Yes | ❌ No | No | [open.fda.gov](https://open.fda.gov/) |
+| PubMed Search | ✅ Yes | ❌ No | No | [pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov/) |
+| S3 File Reader | ❌ No (AWS) | ❌ No | No | AWS |
+| SEC EDGAR Search | ✅ Yes | ❌ No | No | [efts.sec.gov](https://efts.sec.gov/) |
+| Tavily Web Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [tavily.com](https://tavily.com/) |
 
-For tools that require API keys, register at the links above, then add your keys to `infra-cdk/config.yaml`:
-
-```yaml
-api_keys:
-  tavily: your-tavily-api-key       # from https://tavily.com/
-  alphavantage: your-alphavantage-key # from https://www.alphavantage.co/
-```
-
-The CDK deployment automatically stores these keys in AWS Secrets Manager. If you leave a key as `null`, the corresponding tool will deploy but fail at runtime when invoked.
+For tools that require API keys, register at the links above, then add your keys to `infra-cdk/config.yaml`. The CDK deployment automatically stores these keys in AWS Secrets Manager. If you leave a key as `null`, the corresponding tool will deploy but fail at runtime when invoked.
 
 ### Deployment Types
 
