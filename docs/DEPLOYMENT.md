@@ -56,6 +56,30 @@ tools:
 - Change `stack_name_base` to a unique name for your project to avoid conflicts
 - Maximum length is 35 characters (due to AWS AgentCore runtime naming constraints)
 
+### 2. API Keys and Data Sources
+
+Some research tools require external API keys obtained through free registration. Others use public APIs or your AWS account directly. The table below summarizes what is needed for each tool:
+
+| Tool | External API? | API Key Required? | Registration Needed? | Provider | Config Location |
+|------|---------------|-------------------|----------------------|----------|-----------------|
+| Tavily Web Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [tavily.com](https://tavily.com/) | `api_keys.tavily` in `config.yaml` |
+| AlphaVantage | ✅ Yes | ✅ Yes | Yes — sign up for API key | [alphavantage.co](https://www.alphavantage.co/) | `api_keys.alphavantage` in `config.yaml` |
+| ArXiv Search | ✅ Yes | ❌ No | No | [arxiv.org](https://arxiv.org/) | N/A |
+| OpenFDA Drug Search | ✅ Yes | ❌ No | No | [open.fda.gov](https://open.fda.gov/) | N/A |
+| Nova Web Grounding | ❌ No (AWS) | ❌ No | No | N/A | N/A |
+| S3 File Reader | ❌ No (AWS) | ❌ No | No | N/A | N/A |
+| Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs setup) | No | N/A | `tools.bedrock_kb.knowledge_base_id` in `config.yaml` |
+
+For tools that require API keys, register at the links above, then add your keys to `infra-cdk/config.yaml`:
+
+```yaml
+api_keys:
+  tavily: your-tavily-api-key       # from https://tavily.com/
+  alphavantage: your-alphavantage-key # from https://www.alphavantage.co/
+```
+
+The CDK deployment automatically stores these keys in AWS Secrets Manager. If you leave a key as `null`, the corresponding tool will deploy but fail at runtime when invoked.
+
 ### Deployment Types
 
 AgentCore Deep Research supports two deployment types for AgentCore Runtime. Set `deployment_type` in `infra-cdk/config.yaml`:
