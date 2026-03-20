@@ -27,9 +27,9 @@ def search_pubmed(query: str, max_results: int = 10) -> str:
         }
     )
     search_url = f"{ESEARCH_URL}?{search_params}"
-    req = Request(search_url, method="GET")
+    req = Request(search_url, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             search_data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching PubMed: {e}"
@@ -48,9 +48,9 @@ def search_pubmed(query: str, max_results: int = 10) -> str:
         }
     )
     fetch_url = f"{EFETCH_URL}?{fetch_params}"
-    req = Request(fetch_url, method="GET")
+    req = Request(fetch_url, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             xml_data = resp.read().decode("utf-8")
     except Exception as e:
         return f"Error fetching PubMed articles: {e}"
