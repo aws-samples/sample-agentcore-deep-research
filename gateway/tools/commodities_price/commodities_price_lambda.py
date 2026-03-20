@@ -181,7 +181,7 @@ def fetch_cached(params: dict, ttl: int) -> dict:
     url = f"{ALPHA_VANTAGE_URL}?{urlencode(params)}"
     req = Request(url, headers={"Accept": "application/json"}, method="GET")  # noqa: S310
 
-    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
+    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
         data = json.loads(resp.read().decode("utf-8"))
     _set_last_api_time()
 

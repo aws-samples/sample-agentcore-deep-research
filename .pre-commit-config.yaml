@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         exclude: |
@@ -20,13 +20,13 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
+    rev: v0.25
     hooks:
       - id: validate-pyproject
         files: pyproject\.toml$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.34.0
+    rev: v1.44.0
     hooks:
       - id: typos
         exclude: |
@@ -39,7 +39,7 @@ repos:
           )$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.3
+    rev: v0.15.7
     hooks:
       - id: ruff
         args: [--exit-non-zero-on-fix, --config=pyproject.toml, --fix]
@@ -68,7 +68,7 @@ repos:
           - prettier-plugin-organize-imports@3.2.3
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         additional_dependencies: [types-PyYAML==6.0.12.20250516, types-requests==2.32.4.20250611, types-retry==0.9.9.20250322]
@@ -85,15 +85,15 @@ repos:
           )$
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.100.0
+    rev: v1.105.0
     hooks:
       - id: terraform_fmt
         files: .*\.tf$
 
   - repo: https://github.com/awslabs/automated-security-helper.git
-    rev: v3.2.2
+    rev: v3.2.4
     hooks:
     - id: ash
-      name: scan files using ash
+      name: security scan using ash subset
       language_version: python3.12
       stages: [ manual ]

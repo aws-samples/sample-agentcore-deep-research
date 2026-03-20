@@ -104,7 +104,7 @@ def search_web(
         method="POST",
     )
 
-    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
+    with urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
         response = json.loads(resp.read().decode("utf-8"))
 
     # Format results
