@@ -78,9 +78,6 @@ tools:
     default_on: false
   ...
 
-api_keys:
-  tavily: tvly-xxxxx  # Optional: Get your key at https://tavily.com/
-  alphavantage: xxxxx  # Optional: Get your free key at https://www.alphavantage.co/support/#api-key
 ```
 
 ## Project Structure

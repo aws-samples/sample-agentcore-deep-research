@@ -11,7 +11,7 @@ export type DeploymentType = "docker" | "zip"
 export interface ToolConfig {
   enabled: boolean
   default_on: boolean
-  knowledge_base_id?: string | null
+  required?: Record<string, string | null>
 }
 
 export interface AppConfig {
@@ -24,11 +24,6 @@ export interface AppConfig {
     model_id?: string
   }
   tools?: Record<string, ToolConfig>
-  api_keys?: {
-    tavily?: string | null
-    alphavantage?: string | null
-    fred?: string | null
-  }
 }
 
 export class ConfigManager {
@@ -82,10 +77,11 @@ export class ConfigManager {
       const tools: Record<string, ToolConfig> = {}
       for (const [key, raw] of Object.entries((parsedConfig as any).tools ?? {})) {
         const t = raw as any
+        const required = t?.required as Record<string, string | null> | undefined
         tools[key] = {
           enabled: t?.enabled ?? true,
           default_on: t?.default_on ?? false,
-          ...(t?.knowledge_base_id ? { knowledge_base_id: t.knowledge_base_id } : {}),
+          ...(required ? { required } : {}),
         }
       }
 
@@ -99,11 +95,6 @@ export class ConfigManager {
           model_id: parsedConfig.backend?.model_id,
         },
         tools,
-        api_keys: {
-          tavily: parsedConfig.api_keys?.tavily || null,
-          alphavantage: parsedConfig.api_keys?.alphavantage || null,
-          fred: parsedConfig.api_keys?.fred || null,
-        },
       }
     } catch (error) {
       throw new Error(`Failed to parse configuration file ${configPath}: ${error}`)
