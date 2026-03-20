@@ -11,6 +11,8 @@ AgentCore Deep Research template is a sample agentic AI solution for deep resear
 - **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time and allows follow-up questions
 - **Fact-Checking and Citations**: Every factual claim includes inline source citations with the references section
 
+
+
 ## 🚀 Deployment
 
 **Prerequisites**: Node.js 20+, AWS CLI, [AWS CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html), Python 3.10+, [uv](https://docs.astral.sh/uv/), and Docker. See the [deployment guide](docs/DEPLOYMENT.md) for details.
@@ -36,6 +38,8 @@ cdk deploy                # Backend only
 See the [deployment guide](docs/DEPLOYMENT.md) for detailed instructions.
 
 ## ▶️ Usage
+
+![UI Screenshot](docs/figures/ui-screenshot.jpg)
 
 1. Open the application URL (from CDK outputs)
 2. Log in with Cognito credentials
