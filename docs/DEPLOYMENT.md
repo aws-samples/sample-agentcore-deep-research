@@ -73,6 +73,10 @@ Some research tools require external API keys obtained through free registration
 | AlphaVantage | ✅ Yes | ✅ Yes | Yes — sign up for API key | [alphavantage.co](https://www.alphavantage.co/) | `api_keys.alphavantage` in `config.yaml` |
 | ArXiv Search | ✅ Yes | ❌ No | No | [arxiv.org](https://arxiv.org/) | N/A |
 | OpenFDA Drug Search | ✅ Yes | ❌ No | No | [open.fda.gov](https://open.fda.gov/) | N/A |
+| FRED Economic Search | ✅ Yes | ❌ No | No | [fred.stlouisfed.org](https://fred.stlouisfed.org/) | N/A |
+| PubMed Search | ✅ Yes | ❌ No | No | [pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov/) | N/A |
+| SEC EDGAR Search | ✅ Yes | ❌ No | No | [efts.sec.gov](https://efts.sec.gov/) | N/A |
+| ClinicalTrials.gov Search | ✅ Yes | ❌ No | No | [clinicaltrials.gov](https://clinicaltrials.gov/) | N/A |
 | Nova Web Grounding | ❌ No (AWS) | ❌ No | No | N/A | N/A |
 | S3 File Reader | ❌ No (AWS) | ❌ No | No | N/A | N/A |
 | Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs setup) | No | N/A | `tools.bedrock_kb.knowledge_base_id` in `config.yaml` |

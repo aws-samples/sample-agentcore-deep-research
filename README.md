@@ -77,7 +77,7 @@ The application includes multiple Lambda-based tools behind AgentCore Gateway wi
 
 The modular architecture makes it easy to integrate additional data sources for developers.
 
-> **Note:** Several tools connect to external (non-AWS) APIs: Tavily, ArXiv, OpenFDA, and AlphaVantage. Of these, Tavily and AlphaVantage require API keys obtained through external registration. All external APIs, whether free or paid, are subject to the terms and conditions of their respective providers. We are not responsible for the availability, accuracy, or usage policies of third-party APIs. Please review each provider's terms before use. See the [deployment guide](docs/DEPLOYMENT.md) for stack setup instructions and which tools require API keys.
+> **Note:** Several tools connect to external (non-AWS) APIs: Tavily, ArXiv, OpenFDA, AlphaVantage, FRED, PubMed, SEC EDGAR, and ClinicalTrials.gov. Of these, Tavily and AlphaVantage require API keys obtained through external registration. All external APIs, whether free or paid, are subject to the terms and conditions of their respective providers. We are not responsible for the availability, accuracy, or usage policies of third-party APIs. Please review each provider's terms before use. See the [deployment guide](docs/DEPLOYMENT.md) for stack setup instructions and which tools require API keys.
 
 ### Tech Stack
 
