@@ -73,13 +73,13 @@ Some research tools require external API keys obtained through free registration
 |------|---------------|-------------------|----------------------|----------|
 | AlphaVantage | ✅ Yes | ✅ Yes | Yes — sign up for API key | [alphavantage.co](https://www.alphavantage.co/) |
 | ArXiv Search | ✅ Yes | ❌ No | No | [arxiv.org](https://arxiv.org/) |
-| Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs KB ID) | No | N/A |
+| Bedrock Knowledge Base | ❌ No (AWS) | ❌ No (needs KB ID) | No | AWS |
 | ClinicalTrials.gov Search | ✅ Yes | ❌ No | No | [clinicaltrials.gov](https://clinicaltrials.gov/) |
 | FRED Economic Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [fredaccount.stlouisfed.org](https://fredaccount.stlouisfed.org) |
-| Nova Web Grounding | ❌ No (AWS) | ❌ No | No | N/A |
+| Nova Web Grounding | ❌ No (AWS) | ❌ No | No | AWS |
 | OpenFDA Drug Search | ✅ Yes | ❌ No | No | [open.fda.gov](https://open.fda.gov/) |
 | PubMed Search | ✅ Yes | ❌ No | No | [pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov/) |
-| S3 File Reader | ❌ No (AWS) | ❌ No | No | N/A |
+| S3 File Reader | ❌ No (AWS) | ❌ No | No | AWS |
 | SEC EDGAR Search | ✅ Yes | ❌ No | No | [efts.sec.gov](https://efts.sec.gov/) |
 | Tavily Web Search | ✅ Yes | ✅ Yes | Yes — sign up for API key | [tavily.com](https://tavily.com/) |
 
