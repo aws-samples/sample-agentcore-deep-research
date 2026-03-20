@@ -1,6 +1,6 @@
 # AgentCore Deep Research Accelerator
 
-AgentCore Deep Research template is a sample agentic AI solution for deep research built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and generates comprehensive reports with proper citations. The application features a modern React frontend with a split-pane interface showing real-time report generation alongside the chat. This sample is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
+AgentCore Deep Research is a sample AI solution for deep research built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and creates comprehensive reports with proper citations. The app features a modern React frontend showing real-time report generation alongside the chat. This sample is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
 
 ![Workflow](docs/figures/workflow.png)
 
