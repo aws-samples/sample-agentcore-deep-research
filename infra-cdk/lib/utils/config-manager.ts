@@ -27,6 +27,7 @@ export interface AppConfig {
   api_keys?: {
     tavily?: string | null
     alphavantage?: string | null
+    fred?: string | null
   }
 }
 
@@ -77,23 +78,14 @@ export class ConfigManager {
         )
       }
 
-      // Parse tools config with defaults
-      const defaultTools: Record<string, ToolConfig> = {
-        tavily: { enabled: true, default_on: true },
-        nova: { enabled: true, default_on: true },
-        arxiv: { enabled: true, default_on: false },
-        openfda: { enabled: true, default_on: false },
-        s3: { enabled: true, default_on: false },
-        alphavantage: { enabled: true, default_on: true },
-        bedrock_kb: { enabled: false, default_on: false },
-      }
+      // Parse tools config directly from config.yaml
       const tools: Record<string, ToolConfig> = {}
-      for (const [key, defaults] of Object.entries(defaultTools)) {
-        const raw = (parsedConfig as any).tools?.[key]
+      for (const [key, raw] of Object.entries((parsedConfig as any).tools ?? {})) {
+        const t = raw as any
         tools[key] = {
-          enabled: raw?.enabled ?? defaults.enabled,
-          default_on: raw?.default_on ?? defaults.default_on,
-          ...(raw?.knowledge_base_id ? { knowledge_base_id: raw.knowledge_base_id } : {}),
+          enabled: t?.enabled ?? true,
+          default_on: t?.default_on ?? false,
+          ...(t?.knowledge_base_id ? { knowledge_base_id: t.knowledge_base_id } : {}),
         }
       }
 
@@ -110,6 +102,7 @@ export class ConfigManager {
         api_keys: {
           tavily: parsedConfig.api_keys?.tavily || null,
           alphavantage: parsedConfig.api_keys?.alphavantage || null,
+          fred: parsedConfig.api_keys?.fred || null,
         },
       }
     } catch (error) {

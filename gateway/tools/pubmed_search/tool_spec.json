@@ -1,0 +1,20 @@
+[
+  {
+    "name": "pubmed_search",
+    "description": "Search PubMed for peer-reviewed biomedical literature. Returns titles, abstracts, journal names, PMIDs, and URLs. Use for understanding the science behind a topic — mechanisms, efficacy evidence, review articles, and meta-analyses. Pair with clinicaltrials_search to get both published evidence and ongoing trial data.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query. Use plain keywords for broad searches (e.g., 'CAR-T solid tumors efficacy'). For precision, use PubMed field tags: [ti] title, [mh] MeSH terms, [tiab] title/abstract, [dp] date. Boolean AND/OR/NOT supported."
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum results to return (default 10, max 50)"
+        }
+      },
+      "required": ["query"]
+    }
+  }
+]
