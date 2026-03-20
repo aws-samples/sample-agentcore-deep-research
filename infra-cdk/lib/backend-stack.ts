@@ -815,6 +815,100 @@ export class BackendStack extends cdk.NestedStack {
       })
     }
 
+    // PubMed Search Lambda
+    let pubmedLambda: lambda.Function | undefined
+    if (isToolEnabled("pubmed")) {
+      pubmedLambda = new lambda.Function(this, "PubMedSearchLambda", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "pubmed_search_lambda.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/pubmed_search"), {
+          bundling: this.getPythonBundlingOptions([]),
+        }),
+        timeout: cdk.Duration.seconds(60),
+        logGroup: new logs.LogGroup(this, "PubMedLambdaLogGroup", {
+          logGroupName: `/aws/lambda/${config.stack_name_base}-pubmed-search`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      })
+    }
+
+    // ClinicalTrials.gov Search Lambda
+    let clinicaltrialsLambda: lambda.Function | undefined
+    if (isToolEnabled("clinicaltrials")) {
+      clinicaltrialsLambda = new lambda.Function(this, "ClinicalTrialsSearchLambda", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "clinicaltrials_search_lambda.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/clinicaltrials_search"), {
+          bundling: this.getPythonBundlingOptions([]),
+        }),
+        timeout: cdk.Duration.seconds(60),
+        logGroup: new logs.LogGroup(this, "ClinicalTrialsLambdaLogGroup", {
+          logGroupName: `/aws/lambda/${config.stack_name_base}-clinicaltrials-search`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      })
+    }
+
+    // FRED Economic Data Lambda
+    const fredSecretName = `/${config.stack_name_base}/fred-api-key`
+    if (config.api_keys?.fred) {
+      new secretsmanager.Secret(this, "FredApiKeySecret", {
+        secretName: fredSecretName,
+        description: "FRED API key for economic data",
+        secretStringValue: cdk.SecretValue.unsafePlainText(config.api_keys.fred),
+      })
+    }
+
+    let fredLambda: lambda.Function | undefined
+    if (isToolEnabled("fred")) {
+      fredLambda = new lambda.Function(this, "FredSearchLambda", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "fred_search_lambda.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/fred_search"), {
+          bundling: this.getPythonBundlingOptions(["boto3"]),
+        }),
+        timeout: cdk.Duration.seconds(60),
+        environment: {
+          FRED_SECRET_NAME: fredSecretName,
+        },
+        logGroup: new logs.LogGroup(this, "FredLambdaLogGroup", {
+          logGroupName: `/aws/lambda/${config.stack_name_base}-fred-search`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      })
+
+      fredLambda.addToRolePolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["secretsmanager:GetSecretValue"],
+          resources: [
+            `arn:aws:secretsmanager:${this.region}:${this.account}:secret:/${config.stack_name_base}/fred-api-key*`,
+          ],
+        })
+      )
+    }
+
+    // SEC EDGAR Search Lambda
+    let edgarLambda: lambda.Function | undefined
+    if (isToolEnabled("edgar")) {
+      edgarLambda = new lambda.Function(this, "EdgarSearchLambda", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "edgar_search_lambda.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/edgar_search"), {
+          bundling: this.getPythonBundlingOptions([]),
+        }),
+        timeout: cdk.Duration.seconds(60),
+        logGroup: new logs.LogGroup(this, "EdgarLambdaLogGroup", {
+          logGroupName: `/aws/lambda/${config.stack_name_base}-edgar-search`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      })
+    }
+
     // ========== END ADR RESEARCH TOOLS ==========
 
     // Create comprehensive IAM role for gateway
@@ -832,6 +926,10 @@ export class BackendStack extends cdk.NestedStack {
     if (novaSearchLambda) novaSearchLambda.grantInvoke(gatewayRole)
     if (openfdaLambda) openfdaLambda.grantInvoke(gatewayRole)
     if (commoditiesLambda) commoditiesLambda.grantInvoke(gatewayRole)
+    if (pubmedLambda) pubmedLambda.grantInvoke(gatewayRole)
+    if (clinicaltrialsLambda) clinicaltrialsLambda.grantInvoke(gatewayRole)
+    if (fredLambda) fredLambda.grantInvoke(gatewayRole)
+    if (edgarLambda) edgarLambda.grantInvoke(gatewayRole)
 
     // Bedrock permissions (region-agnostic)
     gatewayRole.addToPolicy(
@@ -1031,6 +1129,46 @@ export class BackendStack extends cdk.NestedStack {
       )
     }
 
+    if (pubmedLambda) {
+      createGatewayTarget(
+        "PubMedSearchTarget",
+        "pubmed-search-target",
+        "PubMed biomedical literature search",
+        pubmedLambda,
+        "../../gateway/tools/pubmed_search/tool_spec.json"
+      )
+    }
+
+    if (clinicaltrialsLambda) {
+      createGatewayTarget(
+        "ClinicalTrialsSearchTarget",
+        "clinicaltrials-search-target",
+        "ClinicalTrials.gov clinical study search",
+        clinicaltrialsLambda,
+        "../../gateway/tools/clinicaltrials_search/tool_spec.json"
+      )
+    }
+
+    if (fredLambda) {
+      createGatewayTarget(
+        "FredSearchTarget",
+        "fred-search-target",
+        "FRED economic data search",
+        fredLambda,
+        "../../gateway/tools/fred_search/tool_spec.json"
+      )
+    }
+
+    if (edgarLambda) {
+      createGatewayTarget(
+        "EdgarSearchTarget",
+        "edgar-search-target",
+        "SEC EDGAR filings search",
+        edgarLambda,
+        "../../gateway/tools/edgar_search/tool_spec.json"
+      )
+    }
+
     // ========== END ADR RESEARCH TOOL TARGETS ==========
 
     // Ensure proper creation order
@@ -1043,6 +1181,10 @@ export class BackendStack extends cdk.NestedStack {
     if (novaSearchLambda) gateway.node.addDependency(novaSearchLambda)
     if (openfdaLambda) gateway.node.addDependency(openfdaLambda)
     if (commoditiesLambda) gateway.node.addDependency(commoditiesLambda)
+    if (pubmedLambda) gateway.node.addDependency(pubmedLambda)
+    if (clinicaltrialsLambda) gateway.node.addDependency(clinicaltrialsLambda)
+    if (fredLambda) gateway.node.addDependency(fredLambda)
+    if (edgarLambda) gateway.node.addDependency(edgarLambda)
     gateway.node.addDependency(this.machineClient)
     gateway.node.addDependency(gatewayRole)
 

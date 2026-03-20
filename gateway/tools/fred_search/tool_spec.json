@@ -1,0 +1,24 @@
+[
+  {
+    "name": "fred_economic_search",
+    "description": "Search FRED (Federal Reserve Economic Data) for 800,000+ economic time series. Search by keyword to find series, or provide a series_id to get actual data observations. Common series: GDP, UNRATE (unemployment), CPIAUCSL (CPI), FEDFUNDS (Fed rate), DGS10 (10-year Treasury). Best for macroeconomic research, financial analysis, and economic indicators.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search keywords to find economic data series (e.g., 'consumer price index', 'unemployment rate', 'housing starts'). Required unless series_id is provided."
+        },
+        "series_id": {
+          "type": "string",
+          "description": "Specific FRED series ID to retrieve observations (e.g., 'GDP', 'UNRATE', 'CPIAUCSL', 'FEDFUNDS'). When provided, returns actual data values."
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results/observations to return (default 10, max 50)"
+        }
+      },
+      "required": []
+    }
+  }
+]
