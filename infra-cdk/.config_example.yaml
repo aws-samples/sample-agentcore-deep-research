@@ -16,7 +16,7 @@ backend:
 # Research tools configuration
 # enabled: whether the tool is deployed and available (true/false)
 # default_on: whether the tool is toggled on by default in the UI (true/false)
-# required: fields that must be non-null for the tool to work (defaults to off if missing)
+# required: fields that must be non-null for the tool to work
 tools:
   alphavantage: # Commodity prices, economic indicators, and market news
     enabled: true
