@@ -17,6 +17,7 @@ build/
 __pycache__
 *.code-workspace
 .ruff_cache
+uv.lock
 .mypycache
 .claude
 .kiro

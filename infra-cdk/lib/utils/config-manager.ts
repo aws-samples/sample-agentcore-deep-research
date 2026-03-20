@@ -34,6 +34,7 @@ export class ConfigManager {
   }
 
   private _loadConfig(configFile: string): AppConfig {
+    // nosemgrep: path-join-resolve-traversal -- build-time config loading from known directory
     const configDir = path.join(__dirname, "..", "..")
     let configPath = path.join(configDir, configFile)
 
@@ -106,10 +107,14 @@ export class ConfigManager {
   }
 
   public get(key: string, defaultValue?: any): any {
+    const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
     const keys = key.split(".")
     let value: any = this.config
 
     for (const k of keys) {
+      if (UNSAFE_KEYS.has(k)) {
+        return defaultValue
+      }
       if (typeof value === "object" && value !== null && k in value) {
         value = value[k]
       } else {

@@ -22,12 +22,12 @@ def _get_api_key() -> str:
     client = boto3.client("secretsmanager")
     try:
         resp = client.get_secret_value(SecretId=secret_name)
-    except client.exceptions.ResourceNotFoundException:
+    except client.exceptions.ResourceNotFoundException as err:
         raise ValueError(
-            "FRED API key is not configured. "
-            "Please set the api_key field under tools.fred.required "
-            "in config.yaml and redeploy."
-        ) from None
+            "FRED API key not configured. Get a free key at "
+            "https://fredaccount.stlouisfed.org "
+            "and add it to config.yaml under api_keys.fred"
+        ) from err
     return resp["SecretString"]
 
 
@@ -52,9 +52,11 @@ def search_fred(
             }
         )
         url = f"{BASE_URL}/series/observations?{params}"
-        req = Request(url, method="GET")  # noqa: S310
+        if not url.startswith("https://"):
+            return "Error: invalid URL scheme for FRED request"
+        req = Request(url, method="GET")
         try:
-            with urlopen(req, timeout=30) as resp:  # noqa: S310
+            with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
                 data = json.loads(resp.read().decode("utf-8"))
         except Exception as e:
             return f"Error fetching FRED series {series_id}: {e}"
@@ -82,9 +84,11 @@ def search_fred(
         }
     )
     url = f"{BASE_URL}/series/search?{params}"
-    req = Request(url, method="GET")  # noqa: S310
+    if not url.startswith("https://"):
+        return "Error: invalid URL scheme for FRED request"
+    req = Request(url, method="GET")
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching FRED: {e}"

@@ -32,9 +32,11 @@ def search_clinicaltrials(
         params["query.term"] = f"AREA[Phase]{phase}"
 
     url = f"{BASE_URL}?{urlencode(params)}"
-    req = Request(url, method="GET")  # noqa: S310
+    if not url.startswith("https://"):
+        return "Error: invalid URL scheme for ClinicalTrials.gov request"
+    req = Request(url, method="GET")
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching ClinicalTrials.gov: {e}"
@@ -42,8 +44,8 @@ def search_clinicaltrials(
     studies = data.get("studies", [])
     if not studies:
         return (
-            f"No clinical trials found for "
-            f"condition='{condition}', intervention='{intervention}'"
+            f"No clinical trials found for condition='{condition}',"
+            f" intervention='{intervention}'"
         )
 
     total = data.get("totalCount", len(studies))
