@@ -35,3 +35,4 @@ public/
 .mkdocs/public/
 .ash/
 infra-cdk/cdk.context.json
+infra-cdk/config.yaml

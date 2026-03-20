@@ -1,0 +1,46 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+stack_name_base: deep-research
+
+# Optional: Set to automatically create an admin user and email credentials
+# If not provided, you'll need to manually create users via AWS Console
+admin_user_email: null
+
+auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy (when using npm run deploy)
+
+backend:
+  pattern: strands-deep-research
+  deployment_type: docker # Available deployment types: docker (default), zip
+  model_id: global.anthropic.claude-sonnet-4-6 # Model ID for the agent (with cross-region prefix)
+
+# Research tools configuration
+# enabled: whether the tool is deployed and available (true/false)
+# default_on: whether the tool is toggled on by default in the UI (true/false)
+tools:
+  tavily:
+    enabled: true
+    default_on: true
+  nova:
+    enabled: true
+    default_on: true
+  arxiv:
+    enabled: true
+    default_on: false
+  openfda:
+    enabled: true
+    default_on: false
+  alphavantage:
+    enabled: true
+    default_on: false
+  s3:
+    enabled: true
+    default_on: false
+  bedrock_kb:
+    enabled: false
+    default_on: false
+    knowledge_base_id: null # Replace with your Bedrock Knowledge Base ID
+
+# API Keys for research tools
+api_keys:
+  tavily: null # Replace with your Tavily API key from https://tavily.com/
+  alphavantage: null # Replace with your AlphaVantage API key from https://www.alphavantage.co/
