@@ -86,6 +86,7 @@ api_keys:
 ```
 
 The CDK deployment automatically stores these keys in AWS Secrets Manager. If you leave a key as `null`, the corresponding tool will deploy but fail at runtime when invoked.
+- If `config.yaml` is not found, the deployment will fall back to `.config_example.yaml` defaults
 
 ### Deployment Types
 
