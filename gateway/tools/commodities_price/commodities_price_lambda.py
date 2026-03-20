@@ -193,6 +193,10 @@ def fetch_cached(params: dict, ttl: int) -> dict:
     return data
 
 
+class ApiKeyNotConfiguredError(Exception):
+    """Raised when the API key secret is not found in Secrets Manager."""
+
+
 _sm_client = boto3.client(
     "secretsmanager",
     region_name=os.environ.get("AWS_REGION", "us-east-1"),
@@ -204,7 +208,15 @@ def get_api_key() -> str:
     global _cached_api_key
     if _cached_api_key is None:
         secret_name = os.environ.get("COMMODITIES_SECRET_NAME", "commodities-api-key")
-        response = _sm_client.get_secret_value(SecretId=secret_name)
+        try:
+            response = _sm_client.get_secret_value(SecretId=secret_name)
+        except _sm_client.exceptions.ResourceNotFoundException:
+            raise ApiKeyNotConfiguredError(
+                "AlphaVantage API key is not configured. "
+                "Please set the api_key field under "
+                "tools.alphavantage.required in config.yaml "
+                "and redeploy."
+            ) from None
         _cached_api_key = response["SecretString"]
     return _cached_api_key
 
@@ -549,6 +561,9 @@ def handler(event, context):
 
         return {"content": [{"type": "text", "text": output}]}
 
+    except ApiKeyNotConfiguredError as e:
+        logger.warning(str(e))
+        return {"error": str(e)}
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return {"error": f"Internal server error: {str(e)}"}

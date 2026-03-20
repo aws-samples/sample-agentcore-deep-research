@@ -124,8 +124,10 @@ def handler(event, context):
             )
             if not knowledge_base_id:
                 return {
-                    "error": "Missing knowledge_base_id. "
-                    "Configure it in config.yaml: tools.bedrock_kb.knowledge_base_id"
+                    "error": "Knowledge Base ID is not configured. "
+                    "Please set the knowledge_base_id field under "
+                    "tools.bedrock_kb.required in config.yaml "
+                    "and redeploy."
                 }
 
             max_results = event.get("max_results", 10)

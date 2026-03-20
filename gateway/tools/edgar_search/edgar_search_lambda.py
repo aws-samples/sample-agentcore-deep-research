@@ -17,9 +17,9 @@ MAX_CONTENT_CHARS = 25000
 
 def _fetch_text(url: str, max_chars: int = MAX_CONTENT_CHARS) -> str:
     """Fetch a filing document and extract readable text content."""
-    req = Request(url, headers=HEADERS, method="GET")
+    req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             raw = resp.read().decode("utf-8", errors="replace")
     except Exception as e:
         return f"[Error fetching filing: {e}]"
@@ -53,9 +53,9 @@ def _resolve_filing_doc_url(cik: str, accession: str) -> str | None:
     """Resolve the primary document URL from a filing index."""
     acc_clean = accession.replace("-", "")
     index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_clean}/{accession}-index.json"
-    req = Request(index_url, headers=HEADERS, method="GET")
+    req = Request(index_url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=15) as resp:
+        with urlopen(req, timeout=15) as resp:  # noqa: S310
             data = json.loads(resp.read().decode("utf-8"))
         for item in data.get("directory", {}).get("item", []):
             name = item.get("name", "")
@@ -64,7 +64,7 @@ def _resolve_filing_doc_url(cik: str, accession: str) -> str | None:
                     f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_clean}/{name}"
                 )
     except Exception:
-        pass
+        logger.debug("Failed to resolve filing doc URL for %s/%s", cik, accession)
     return None
 
 
@@ -86,9 +86,9 @@ def search_edgar(
     # Full-text search via EFTS
     params = {"q": query, "forms": form_type or "10-K,10-Q,8-K"}
     url = f"https://efts.sec.gov/LATEST/search-index?{urlencode(params)}&from=0&size={max_results}"
-    req = Request(url, headers=HEADERS, method="GET")
+    req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching EDGAR: {e}"
@@ -112,7 +112,10 @@ def search_edgar(
         output += f"**Filed:** {src.get('file_date', 'N/A')}\n"
         if adsh and cik:
             acc_clean = adsh.replace("-", "")
-            output += f"**URL:** https://www.sec.gov/Archives/edgar/data/{cik}/{acc_clean}/{adsh}-index.htm\n"
+            output += (
+                f"**URL:** https://www.sec.gov/Archives/edgar/data/"
+                f"{cik}/{acc_clean}/{adsh}-index.htm\n"
+            )
         output += "\n"
 
     return output
@@ -123,11 +126,11 @@ def _get_company_filings(
 ) -> str:
     """Get filings for a specific company by ticker, optionally with content."""
     # Resolve ticker to CIK
-    req = Request(
+    req = Request(  # noqa: S310
         "https://www.sec.gov/files/company_tickers.json", headers=HEADERS, method="GET"
     )
     try:
-        with urlopen(req, timeout=15) as resp:
+        with urlopen(req, timeout=15) as resp:  # noqa: S310
             tickers_data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error resolving ticker {ticker}: {e}"
@@ -145,9 +148,9 @@ def _get_company_filings(
 
     # Get recent filings
     url = f"{SUBMISSIONS_URL}/CIK{cik}.json"
-    req = Request(url, headers=HEADERS, method="GET")
+    req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=15) as resp:
+        with urlopen(req, timeout=15) as resp:  # noqa: S310
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error fetching filings for {ticker}: {e}"
@@ -179,7 +182,10 @@ def _get_company_filings(
             if doc_name
             else None
         )
-        index_url = f"https://www.sec.gov/Archives/edgar/data/{cik_stripped}/{acc_clean}/{accessions[j]}-index.htm"
+        index_url = (
+            f"https://www.sec.gov/Archives/edgar/data/"
+            f"{cik_stripped}/{acc_clean}/{accessions[j]}-index.htm"
+        )
 
         output += f"## {count}. {forms[j]} — {dates[j]}\n"
         if desc:

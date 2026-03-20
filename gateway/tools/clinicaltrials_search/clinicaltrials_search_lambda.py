@@ -32,16 +32,19 @@ def search_clinicaltrials(
         params["query.term"] = f"AREA[Phase]{phase}"
 
     url = f"{BASE_URL}?{urlencode(params)}"
-    req = Request(url, method="GET")
+    req = Request(url, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=30) as resp:  # noqa: S310
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching ClinicalTrials.gov: {e}"
 
     studies = data.get("studies", [])
     if not studies:
-        return f"No clinical trials found for condition='{condition}', intervention='{intervention}'"
+        return (
+            f"No clinical trials found for "
+            f"condition='{condition}', intervention='{intervention}'"
+        )
 
     total = data.get("totalCount", len(studies))
     output = f"Found {total} clinical trials (showing {len(studies)})\n\n"
