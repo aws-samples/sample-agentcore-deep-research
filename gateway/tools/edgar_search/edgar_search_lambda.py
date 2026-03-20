@@ -13,13 +13,24 @@ EFTS_URL = "https://efts.sec.gov/LATEST/search-index"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions"
 HEADERS = {"User-Agent": "AgentCoreDeepResearch/1.0 research@example.com"}
 MAX_CONTENT_CHARS = 25000
+ALLOWED_HOSTS = {"efts.sec.gov", "data.sec.gov", "www.sec.gov"}
+
+
+def _validate_sec_url(url: str) -> None:
+    """Validate URL scheme and host for SEC API requests."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS:
+        raise ValueError(f"Invalid SEC URL: {url}")
 
 
 def _fetch_text(url: str, max_chars: int = MAX_CONTENT_CHARS) -> str:
     """Fetch a filing document and extract readable text content."""
     req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        _validate_sec_url(url)
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             raw = resp.read().decode("utf-8", errors="replace")
     except Exception as e:
         return f"[Error fetching filing: {e}]"
@@ -55,7 +66,8 @@ def _resolve_filing_doc_url(cik: str, accession: str) -> str | None:
     index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_clean}/{accession}-index.json"
     req = Request(index_url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=15) as resp:  # noqa: S310
+        _validate_sec_url(index_url)
+        with urlopen(req, timeout=15) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             data = json.loads(resp.read().decode("utf-8"))
         for item in data.get("directory", {}).get("item", []):
             name = item.get("name", "")
@@ -64,7 +76,7 @@ def _resolve_filing_doc_url(cik: str, accession: str) -> str | None:
                     f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_clean}/{name}"
                 )
     except Exception:
-        logger.debug("Failed to resolve filing doc URL for %s/%s", cik, accession)
+        logger.debug("Could not resolve filing doc URL for %s", accession)
     return None
 
 
@@ -88,7 +100,8 @@ def search_edgar(
     url = f"https://efts.sec.gov/LATEST/search-index?{urlencode(params)}&from=0&size={max_results}"
     req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=30) as resp:  # noqa: S310
+        _validate_sec_url(url)
+        with urlopen(req, timeout=30) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error searching EDGAR: {e}"
@@ -130,7 +143,7 @@ def _get_company_filings(
         "https://www.sec.gov/files/company_tickers.json", headers=HEADERS, method="GET"
     )
     try:
-        with urlopen(req, timeout=15) as resp:  # noqa: S310
+        with urlopen(req, timeout=15) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             tickers_data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error resolving ticker {ticker}: {e}"
@@ -150,7 +163,8 @@ def _get_company_filings(
     url = f"{SUBMISSIONS_URL}/CIK{cik}.json"
     req = Request(url, headers=HEADERS, method="GET")  # noqa: S310
     try:
-        with urlopen(req, timeout=15) as resp:  # noqa: S310
+        _validate_sec_url(url)
+        with urlopen(req, timeout=15) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return f"Error fetching filings for {ticker}: {e}"

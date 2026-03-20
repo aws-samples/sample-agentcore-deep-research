@@ -89,17 +89,18 @@ ALL_DATA_SOURCES = {
         "name": "FRED Economic Data",
         "tool": "fred_economic_search",
         "description": (
-            "Search 800K+ economic time series from the Federal Reserve"
-            " (GDP, CPI, unemployment, interest rates)"
+            "Search 800K+ economic time series from the Federal"
+            " Reserve (GDP, CPI, unemployment, interest rates)"
         ),
     },
     "edgar": {
         "name": "SEC EDGAR Filings",
         "tool": "edgar_search",
         "description": (
-            "Search SEC EDGAR for company filings (10-K, 10-Q, 8-K)"
-            " by ticker or keyword. Use fetch_content=true with a ticker"
-            " and form_type to get actual filing text for analysis"
+            "Search SEC EDGAR for company filings (10-K, 10-Q,"
+            " 8-K) by ticker or keyword. Use fetch_content=true"
+            " with a ticker and form_type to get actual filing"
+            " text for analysis"
         ),
     },
 }

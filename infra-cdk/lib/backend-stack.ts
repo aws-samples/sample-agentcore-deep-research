@@ -126,6 +126,7 @@ export class BackendStack extends cdk.NestedStack {
     if (deploymentType === "zip") {
       // ZIP DEPLOYMENT: Use Lambda to package and upload to S3 (no Docker required)
       const repoRoot = path.resolve(__dirname, "..", "..")
+      // nosemgrep: path-join-resolve-traversal -- build-time paths from validated config, not user input
       const patternDir = path.join(repoRoot, "patterns", pattern)
 
       // Create S3 bucket for agent code
@@ -154,6 +155,7 @@ export class BackendStack extends cdk.NestedStack {
       // Read pattern .py files
       for (const file of fs.readdirSync(patternDir)) {
         if (file.endsWith(".py")) {
+          // nosemgrep: path-join-resolve-traversal
           const content = fs.readFileSync(path.join(patternDir, file))
           agentCode[file] = content.toString("base64")
         }
@@ -168,6 +170,7 @@ export class BackendStack extends cdk.NestedStack {
       }
 
       // Read requirements
+      // nosemgrep: path-join-resolve-traversal
       const requirementsPath = path.join(patternDir, "requirements.txt")
       const requirements = fs
         .readFileSync(requirementsPath, "utf-8")
@@ -1035,6 +1038,7 @@ export class BackendStack extends cdk.NestedStack {
     // ========== ADR RESEARCH TOOL TARGETS ==========
 
     // Helper to load tool spec and create gateway target
+    // nosemgrep: path-join-resolve-traversal -- build-time spec loading from known paths
     const loadToolSpec = (specPath: string) =>
       JSON.parse(fs.readFileSync(path.join(__dirname, specPath), "utf8"))
 
@@ -1306,6 +1310,7 @@ export class BackendStack extends cdk.NestedStack {
    */
   private readDirRecursive(dirPath: string, prefix: string, output: Record<string, string>): void {
     for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      // nosemgrep: path-join-resolve-traversal -- build-time directory traversal
       const fullPath = path.join(dirPath, entry.name)
       const relativePath = path.join(prefix, entry.name)
 

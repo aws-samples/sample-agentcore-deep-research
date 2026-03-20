@@ -67,7 +67,7 @@ def extract_user_id_from_context(context: RequestContext) -> str:
     )
 
     # Decode without verification — Runtime already validated the token
-    claims = jwt.decode(
+    claims = jwt.decode(  # nosemgrep: unverified-jwt-decode
         jwt=token,
         options={"verify_signature": False},
         algorithms=["RS256"],
@@ -155,7 +155,6 @@ def get_gateway_access_token() -> str:
     client_secret = get_secret(f"/{stack_name}/machine_client_secret")
 
     logger.info("Cognito domain: %s", cognito_domain)
-    logger.info("Client ID: %s...", client_id[:10])
 
     # Prepare OAuth2 token request
     token_url = f"https://{cognito_domain}/oauth2/token"
@@ -175,7 +174,6 @@ def get_gateway_access_token() -> str:
     }
 
     logger.info("Requesting token from: %s", token_url)
-    logger.info("Scopes: %s", data["scope"])
 
     # Request access token from Cognito
     response = requests.post(url=token_url, headers=headers, data=data, timeout=30)
@@ -194,5 +192,5 @@ def get_gateway_access_token() -> str:
         logger.error("No access_token in response: %s", token_data)
         raise Exception("No access_token in Cognito response")
 
-    logger.info("Successfully got access token: %s...", access_token[:20])
+    logger.info("Successfully obtained access token")
     return access_token
