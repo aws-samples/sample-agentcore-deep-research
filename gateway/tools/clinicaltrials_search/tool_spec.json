@@ -1,0 +1,34 @@
+[
+  {
+    "name": "clinicaltrials_search",
+    "description": "Search ClinicalTrials.gov for clinical studies worldwide. Returns trial titles, NCT IDs, status, phase, and summaries. Use to find what treatments are being tested, which trials are recruiting, and what phase of development a therapy is in. Pair with pubmed_search to get both ongoing trial data and published evidence.\n\nRecommended workflow: search RECRUITING trials to see what's active, then COMPLETED trials to find efficacy results. Combine condition + intervention for targeted results.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Disease or condition (e.g., 'breast cancer', 'Alzheimer disease', 'solid tumor')"
+        },
+        "intervention": {
+          "type": "string",
+          "description": "Drug, device, or therapy (e.g., 'pembrolizumab', 'CAR-T', 'CRISPR')"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["RECRUITING", "COMPLETED", "ACTIVE_NOT_RECRUITING", "NOT_YET_RECRUITING", "TERMINATED"],
+          "description": "Filter by trial status. Use RECRUITING for active trials, COMPLETED for results."
+        },
+        "phase": {
+          "type": "string",
+          "enum": ["EARLY_PHASE1", "PHASE1", "PHASE2", "PHASE3", "PHASE4"],
+          "description": "Filter by trial phase. Later phases (PHASE3, PHASE4) indicate more mature evidence."
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum results to return (default 10, max 50)"
+        }
+      },
+      "required": []
+    }
+  }
+]

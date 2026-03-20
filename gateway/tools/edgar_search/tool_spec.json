@@ -1,0 +1,32 @@
+[
+  {
+    "name": "edgar_search",
+    "description": "Search SEC EDGAR for company filings (10-K, 10-Q, 8-K, etc.). No API key required.\n\nRecommended two-step workflow:\n1. First call with ticker + form_type to browse available filings\n2. Second call with ticker + form_type + fetch_content=true to get actual filing text for analysis\n\nThe fetch_content option returns ~15K chars of the filing document, which includes business descriptions, revenue breakdowns, risk factors, and other substantive content. Use this to extract specific data points rather than just listing filings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Full-text search query across SEC filings (e.g., 'artificial intelligence revenue growth'). Required unless ticker is provided."
+        },
+        "ticker": {
+          "type": "string",
+          "description": "Company stock ticker (e.g., 'AAPL', 'MSFT', 'TSLA'). Preferred over query for targeted company research."
+        },
+        "form_type": {
+          "type": "string",
+          "description": "Filter by SEC form type: '10-K' (annual reports), '10-Q' (quarterly), '8-K' (current events)"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum results to return (default 5, max 10). When using fetch_content, keep low (1-2) for best content depth."
+        },
+        "fetch_content": {
+          "type": "boolean",
+          "description": "When true, fetches and returns the actual text content of each filing (~15K chars). Content includes business descriptions, financials, risk factors, etc. Best combined with ticker + form_type. Default false."
+        }
+      },
+      "required": []
+    }
+  }
+]
