@@ -451,6 +451,20 @@ def main() -> int:
     project_root = script_dir.parent
     frontend_dir = project_root / "frontend"
     config_path = project_root / "infra-cdk" / "config.yaml"
+    if not config_path.exists():
+        example_path = project_root / "infra-cdk" / ".config_example.yaml"
+        if example_path.exists():
+            log_warning(
+                "config.yaml not found, using .config_example.yaml defaults. "
+                "To customize, run: cp infra-cdk/.config_example.yaml infra-cdk/config.yaml"
+            )
+            config_path = example_path
+        else:
+            log_error(
+                "No configuration file found. Create config.yaml by copying the example:\n"
+                "  cp infra-cdk/.config_example.yaml infra-cdk/config.yaml"
+            )
+            return 1
 
     log_info("🚀 Starting frontend deployment process...")
     print()
