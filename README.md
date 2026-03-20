@@ -19,6 +19,7 @@ Deploying AgentCore Deep Research stack requires a few commands:
 
 ```bash
 cd infra-cdk
+cp .config_example.yaml config.yaml  # Create your config (edit as needed)
 npm install
 cdk bootstrap  # Once per account/region
 npm run deploy
@@ -104,7 +105,7 @@ docker-compose up --build
 ```
 
 **Finding the environment variable values:**
-- `STACK_NAME`: Use the `stack_name_base` value from `infra-cdk/config.yaml`
+- `STACK_NAME`: Use the `stack_name_base` value from your `infra-cdk/config.yaml`
 - `MEMORY_ID`: Extract from the `MemoryArn` CloudFormation output (the ID is the last segment after `/`)
   ```bash
   aws cloudformation describe-stacks --stack-name <your-stack-name> \
@@ -133,7 +134,8 @@ agentcore-deep-research/
 │   ├── lib/                # CDK stack definitions
 │   ├── bin/                # CDK app entry point
 │   ├── lambdas/            # Lambda function code
-│   └── config.yaml         # Deployment configuration
+│   ├── .config_example.yaml # Example deployment configuration (copy to config.yaml)
+│   └── config.yaml         # Your deployment configuration (gitignored)
 ├── patterns/               # Agent pattern implementations
 │   └── strands-deep-research/ # Deep Research agent
 │       ├── deep_research_agent.py  # Main agent with Gateway tools
