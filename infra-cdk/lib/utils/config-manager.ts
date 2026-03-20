@@ -38,12 +38,23 @@ export class ConfigManager {
   }
 
   private _loadConfig(configFile: string): AppConfig {
-    const configPath = path.join(__dirname, "..", "..", configFile)
+    const configDir = path.join(__dirname, "..", "..")
+    let configPath = path.join(configDir, configFile)
 
     if (!fs.existsSync(configPath)) {
-      throw new Error(
-        `Configuration file ${configPath} does not exist. Please create config.yaml file.`
-      )
+      const examplePath = path.join(configDir, ".config_example.yaml")
+      if (fs.existsSync(examplePath)) {
+        console.log(
+          `⚠ ${configFile} not found, using .config_example.yaml defaults. ` +
+            `To customize, run: cp infra-cdk/.config_example.yaml infra-cdk/config.yaml`
+        )
+        configPath = examplePath
+      } else {
+        throw new Error(
+          `Configuration file not found. Please create config.yaml by copying the example:\n` +
+            `  cp infra-cdk/.config_example.yaml infra-cdk/config.yaml`
+        )
+      }
     }
 
     try {
