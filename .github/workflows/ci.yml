@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      - run: pip install -U pip setuptools wheel
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files
