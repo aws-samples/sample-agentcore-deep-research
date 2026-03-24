@@ -4,12 +4,11 @@ AgentCore Deep Research is a sample AI solution for deep research built on Amazo
 
 ![Workflow](docs/figures/workflow.png)
 
-**Key Features**
-
-- **Multi-Source Retrieval**: Search across enterprise data (S3, Knowledge Base) and public sources (Internet, arXiv, PubMed, AlphaVantage, SEC filings and more)
-- **Iterative Research Workflow**: AI agent scaffolds report, researches across sources, writes all sections with citations, and verifies completeness
-- **Real-Time Report Display**: Split-pane UI shows the research report being built in real-time and allows follow-up questions
-- **Fact-Checking and Citations**: Every factual claim includes inline source citations with the references section
+**✨ Key features:**
+- **Multi-source analysis**: Search across enterprise data, Internet, and specialized APIs (10+ built-in sources)
+- **Iterative workflow**: AI agent scaffolds report, researches the data, and creates a detailed report
+- **Real-time report display**: Split-pane UI shows the report being built in real-time and allows follow-ups
+- **Fact-checking and citations**: Every factual claim includes inline source citations with the references section
 
 
 
