@@ -35,6 +35,11 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.2.0"
   },
+  "overrides": {
+    "fast-xml-parser": ">=5.3.5",
+    "rollup": ">=4.59.0",
+    "flatted": ">=3.4.2"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@shadcn/ui": "^0.0.4",
