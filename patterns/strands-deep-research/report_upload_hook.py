@@ -5,6 +5,7 @@ import threading
 from pathlib import Path
 
 import boto3
+from botocore.config import Config
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 
 REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108  # nosec B108
@@ -24,7 +25,11 @@ class ReportS3UploadHook(HookProvider):
         region = os.environ.get(
             "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         )
-        self.s3_client = boto3.client("s3", region_name=region)
+        self.s3_client = boto3.client(
+            "s3",
+            region_name=region,
+            config=Config(s3={"addressing_style": "virtual"}),
+        )
         self._last_url: str | None = None
         self._lock = threading.Lock()
 
