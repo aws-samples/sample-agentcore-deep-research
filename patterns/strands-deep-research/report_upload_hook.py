@@ -21,7 +21,10 @@ class ReportS3UploadHook(HookProvider):
     """
 
     def __init__(self):
-        self.s3_client = boto3.client("s3")
+        region = os.environ.get(
+            "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+        )
+        self.s3_client = boto3.client("s3", region_name=region)
         self._last_url: str | None = None
         self._lock = threading.Lock()
 
