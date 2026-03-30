@@ -222,7 +222,9 @@ def get_file_size_human(filepath: str) -> str:
 # --- AWS CLI wrappers ---
 
 
-def get_stack_outputs(stack_name: str, region: str | None = None) -> tuple[dict[str, str], str]:
+def get_stack_outputs(
+    stack_name: str, region: str | None = None
+) -> tuple[dict[str, str], str]:
     """
     Fetch CloudFormation stack outputs via AWS CLI.
 
@@ -263,7 +265,9 @@ def get_stack_outputs(stack_name: str, region: str | None = None) -> tuple[dict[
     return {o["OutputKey"]: o["OutputValue"] for o in outputs}, region
 
 
-def upload_to_s3(local_path: str, bucket: str, key: str, region: str | None = None) -> None:
+def upload_to_s3(
+    local_path: str, bucket: str, key: str, region: str | None = None
+) -> None:
     """
     Upload a file to S3 via AWS CLI.
 
@@ -279,7 +283,9 @@ def upload_to_s3(local_path: str, bucket: str, key: str, region: str | None = No
     run_command(cmd)
 
 
-def start_amplify_deployment(app_id: str, branch: str, source_url: str, region: str | None = None) -> dict:
+def start_amplify_deployment(
+    app_id: str, branch: str, source_url: str, region: str | None = None
+) -> dict:
     """
     Start an Amplify deployment via AWS CLI.
 
@@ -293,11 +299,17 @@ def start_amplify_deployment(app_id: str, branch: str, source_url: str, region: 
         Deployment response as dictionary
     """
     cmd = [
-        "aws", "amplify", "start-deployment",
-        "--app-id", app_id,
-        "--branch-name", branch,
-        "--source-url", source_url,
-        "--output", "json",
+        "aws",
+        "amplify",
+        "start-deployment",
+        "--app-id",
+        app_id,
+        "--branch-name",
+        branch,
+        "--source-url",
+        source_url,
+        "--output",
+        "json",
     ]
     if region:
         cmd.extend(["--region", region])
@@ -306,7 +318,9 @@ def start_amplify_deployment(app_id: str, branch: str, source_url: str, region: 
     return dict(json.loads(result.stdout))
 
 
-def get_amplify_job_status(app_id: str, branch: str, job_id: str, region: str | None = None) -> str:
+def get_amplify_job_status(
+    app_id: str, branch: str, job_id: str, region: str | None = None
+) -> str:
     """
     Get the status of an Amplify deployment job.
 
@@ -320,11 +334,17 @@ def get_amplify_job_status(app_id: str, branch: str, job_id: str, region: str | 
         Job status string
     """
     cmd = [
-        "aws", "amplify", "get-job",
-        "--app-id", app_id,
-        "--branch-name", branch,
-        "--job-id", job_id,
-        "--output", "json",
+        "aws",
+        "amplify",
+        "get-job",
+        "--app-id",
+        app_id,
+        "--branch-name",
+        branch,
+        "--job-id",
+        job_id,
+        "--output",
+        "json",
     ]
     if region:
         cmd.extend(["--region", region])
@@ -345,10 +365,15 @@ def get_amplify_app_domain(app_id: str, region: str | None = None) -> str:
         Default domain string
     """
     cmd = [
-        "aws", "amplify", "get-app",
-        "--app-id", app_id,
-        "--query", "app.defaultDomain",
-        "--output", "text",
+        "aws",
+        "amplify",
+        "get-app",
+        "--app-id",
+        app_id,
+        "--query",
+        "app.defaultDomain",
+        "--output",
+        "text",
     ]
     if region:
         cmd.extend(["--region", region])
