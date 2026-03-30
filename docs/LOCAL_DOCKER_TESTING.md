@@ -221,4 +221,4 @@ docker run --rm -p 8080:8080 \
 ## Related Documentation
 
 - [Deployment Guide](DEPLOYMENT.md) - Full stack deployment instructions
-- [Agent Configuration](AGENT_CONFIGURATION.md) - Configuring agent patterns
+- [Local Development](LOCAL_DEVELOPMENT.md) - Local development with Docker Compose
