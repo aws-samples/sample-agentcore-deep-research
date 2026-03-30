@@ -125,6 +125,7 @@ def parse_config_yaml(config_path: Path) -> dict:
     """
     config: dict = {
         "stack_name_base": "",
+        "region": None,
         "pattern": "strands-deep-research",
         "auto_deploy_frontend": False,
         "tools": {},
@@ -139,6 +140,12 @@ def parse_config_yaml(config_path: Path) -> dict:
     match = re.search(r"^stack_name_base:\s*(\S+)", content, re.MULTILINE)
     if match:
         config["stack_name_base"] = match.group(1).strip("\"'")
+
+    # Extract region
+    match = re.search(r"^region:\s*(\S+)", content, re.MULTILINE)
+    if match:
+        val = match.group(1).split("#")[0].strip().strip("\"'")
+        config["region"] = val if val != "null" else None
 
     # Extract pattern from backend section
     match = re.search(r"pattern:\s*(\S+)", content)
@@ -215,27 +222,29 @@ def get_file_size_human(filepath: str) -> str:
 # --- AWS CLI wrappers ---
 
 
-def get_stack_outputs(stack_name: str) -> dict[str, str]:
+def get_stack_outputs(stack_name: str, region: str | None = None) -> tuple[dict[str, str], str]:
     """
     Fetch CloudFormation stack outputs via AWS CLI.
 
     Args:
         stack_name: Name of the CloudFormation stack
+        region: AWS region (optional, uses CLI default if None)
 
     Returns:
-        Dictionary mapping output keys to values
+        Tuple of (outputs dict, region string)
     """
-    result = run_command(
-        [
-            "aws",
-            "cloudformation",
-            "describe-stacks",
-            "--stack-name",
-            stack_name,
-            "--output",
-            "json",
-        ]
-    )
+    cmd = [
+        "aws",
+        "cloudformation",
+        "describe-stacks",
+        "--stack-name",
+        stack_name,
+        "--output",
+        "json",
+    ]
+    if region:
+        cmd.extend(["--region", region])
+    result = run_command(cmd)
 
     stack_data = json.loads(result.stdout)
     stacks = stack_data.get("Stacks", [])
@@ -243,41 +252,15 @@ def get_stack_outputs(stack_name: str) -> dict[str, str]:
         raise ValueError(f"Stack '{stack_name}' not found or has no data")
     outputs = stacks[0].get("Outputs", [])
 
-    return {o["OutputKey"]: o["OutputValue"] for o in outputs}
+    # Extract region from stack ARN if not provided
+    if not region:
+        stack_arn = stacks[0]["StackId"]
+        arn_parts = stack_arn.split(":")
+        if len(arn_parts) < 4:
+            raise ValueError(f"Invalid stack ARN format: {stack_arn}")
+        region = arn_parts[3]
 
-
-def get_stack_region(stack_name: str) -> str:
-    """
-    Get the AWS region from stack ARN.
-
-    Args:
-        stack_name: Name of the CloudFormation stack
-
-    Returns:
-        AWS region string
-    """
-    result = run_command(
-        [
-            "aws",
-            "cloudformation",
-            "describe-stacks",
-            "--stack-name",
-            stack_name,
-            "--output",
-            "json",
-        ]
-    )
-
-    stack_data = json.loads(result.stdout)
-    stacks = stack_data.get("Stacks", [])
-    if not stacks:
-        raise ValueError(f"Stack '{stack_name}' not found or has no data")
-    stack_arn = stacks[0]["StackId"]
-    # ARN format: arn:aws:cloudformation:region:account:stack/name/id
-    arn_parts = stack_arn.split(":")
-    if len(arn_parts) < 4:
-        raise ValueError(f"Invalid stack ARN format: {stack_arn}")
-    return str(arn_parts[3])
+    return {o["OutputKey"]: o["OutputValue"] for o in outputs}, region
 
 
 def upload_to_s3(local_path: str, bucket: str, key: str) -> None:
@@ -525,9 +508,10 @@ def main() -> int:
 
     # Fetch CDK outputs
     log_info(f"Fetching configuration from CDK stack: {stack_name}")
+    config = parse_config_yaml(config_path)
+    config_region = config.get("region")
     try:
-        outputs = get_stack_outputs(stack_name)
-        region = get_stack_region(stack_name)
+        outputs, region = get_stack_outputs(stack_name, config_region)
     except subprocess.CalledProcessError as e:
         log_error(f"Failed to fetch stack outputs: {e.stderr}")
         return 1
@@ -551,7 +535,6 @@ def main() -> int:
     log_success(f"Region: {region}")
 
     # Get agent pattern and tools config
-    config = parse_config_yaml(config_path)
     pattern = config.get("pattern", "strands-deep-research")
     tools = config.get("tools", {})
     log_info(f"Agent pattern: {pattern}")
