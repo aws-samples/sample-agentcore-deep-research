@@ -4,7 +4,6 @@
 
 from typing import Any
 
-import boto3
 import botocore
 
 BEDROCK_READ_TIMEOUT = 600
@@ -75,24 +74,4 @@ def get_bedrock_config() -> botocore.config.Config:
             "mode": "adaptive",
         },
         max_pool_connections=BEDROCK_MAX_CONNECTIONS,
-    )
-
-
-def get_bedrock_client(region_name: str) -> boto3.client:
-    """
-    Get Bedrock client with custom configuration.
-
-    Parameters
-    ----------
-    region_name : str
-        AWS region name
-
-    Returns
-    -------
-    boto3.client
-        Bedrock client with custom configuration
-    """
-    config = get_bedrock_config()
-    return boto3.client(
-        service_name="bedrock-runtime", region_name=region_name, config=config
     )
