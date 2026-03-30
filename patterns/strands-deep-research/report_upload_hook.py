@@ -37,33 +37,9 @@ class ReportS3UploadHook(HookProvider):
         registry.add_callback(AfterToolCallEvent, self.upload_report_to_s3)
 
     def _do_upload(self, session_id: str, content: str) -> str | None:
-        """Upload report and any chart images to S3, return pre-signed URL for report."""
+        """Upload report to S3, return pre-signed URL."""
         try:
             s3_key = f"reports/{session_id}/report.md"
-
-            # Upload chart images and rewrite /tmp/ paths to presigned URLs
-            import glob
-
-            for img_path in glob.glob("/tmp/*.png"):  # noqa: S108  # nosec B108
-                img_name = os.path.basename(img_path)
-                img_s3_key = f"reports/{session_id}/{img_name}"
-                try:
-                    with open(img_path, "rb") as f:
-                        self.s3_client.put_object(
-                            Bucket=REPORTS_BUCKET,
-                            Key=img_s3_key,
-                            Body=f.read(),
-                            ContentType="image/png",
-                        )
-                    img_url = self.s3_client.generate_presigned_url(
-                        "get_object",
-                        Params={"Bucket": REPORTS_BUCKET, "Key": img_s3_key},
-                        ExpiresIn=URL_EXPIRATION,
-                    )
-                    content = content.replace(f"/tmp/{img_name}", img_url)
-                    print(f"[HOOK] Uploaded chart {img_name} to S3")
-                except Exception as e:
-                    print(f"[HOOK WARNING] Failed to upload {img_name}: {e}")
 
             self.s3_client.put_object(
                 Bucket=REPORTS_BUCKET,

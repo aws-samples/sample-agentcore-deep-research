@@ -53,48 +53,47 @@ export function ResearchReportPanel({
   }, [content]);
 
   const handleDownload = async () => {
-    // Collect images and rewrite markdown to use local paths
     const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
     let localContent = content;
+    const images: { filename: string; url: string }[] = [];
     let match;
     let i = 1;
-    const downloads: { filename: string; url: string }[] = [];
 
     while ((match = imgRegex.exec(content)) !== null) {
-      const filename = `chart_${i}.png`;
+      const pathMatch = match[2].match(/\/([^/?]+\.png)/);
+      const filename = pathMatch ? pathMatch[1] : `chart_${i}.png`;
+      images.push({ filename, url: match[2] });
       localContent = localContent.replace(match[2], filename);
-      downloads.push({ filename, url: match[2] });
       i++;
     }
 
-    // Download markdown with local paths
-    const mdBlob = new Blob([localContent], { type: "text/markdown" });
-    const mdUrl = URL.createObjectURL(mdBlob);
-    const mdA = document.createElement("a");
-    mdA.href = mdUrl;
-    mdA.download = "research_report.md";
-    document.body.appendChild(mdA);
-    mdA.click();
-    document.body.removeChild(mdA);
-    URL.revokeObjectURL(mdUrl);
+    // Download markdown (with local paths if images exist)
+    const blob = new Blob([images.length ? localContent : content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "research_report.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-    // Download each image
-    for (const dl of downloads) {
+    // Download each image with a small delay to avoid browser blocking
+    for (const img of images) {
       try {
-        const resp = await fetch(dl.url);
+        const resp = await fetch(img.url);
         if (!resp.ok) continue;
         const imgBlob = await resp.blob();
         const imgUrl = URL.createObjectURL(imgBlob);
         const imgA = document.createElement("a");
         imgA.href = imgUrl;
-        imgA.download = dl.filename;
+        imgA.download = img.filename;
         document.body.appendChild(imgA);
         imgA.click();
         document.body.removeChild(imgA);
         URL.revokeObjectURL(imgUrl);
-      } catch {
-        /* skip failed images */
-      }
+        await new Promise((r) => setTimeout(r, 300));
+      } catch { /* skip */ }
     }
   };
 

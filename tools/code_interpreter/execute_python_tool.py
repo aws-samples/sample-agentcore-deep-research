@@ -70,6 +70,10 @@ def execute_python(code: str, chart_name: str = "") -> str:
         import io, base64
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', transparent=True)
+
+    Always set text/axis colors for visibility on both light and dark backgrounds:
+        plt.rcParams.update({'text.color': '#333333', 'axes.labelcolor': '#333333',
+                             'xtick.color': '#333333', 'ytick.color': '#333333'})
         plt.close()
         buf.seek(0)
         print(f"CHART_BASE64:{base64.b64encode(buf.read()).decode()}")
@@ -80,7 +84,7 @@ def execute_python(code: str, chart_name: str = "") -> str:
     Args:
         code: Python code for data analysis or visualization. Include all imports.
         chart_name: Short filename for the chart (e.g., "gold_forecasts").
-    """
+    """  # noqa: E501
     result = _get_interpreter().execute_python_securely(code)
 
     if STAGING_BUCKET and chart_name:
