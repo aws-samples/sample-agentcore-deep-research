@@ -18,10 +18,6 @@ export function useDefaultTool(render: ToolRenderFn) {
   renderers.set("*", render);
 }
 
-export function useToolRenderer(name: string, render: ToolRenderFn) {
-  renderers.set(name, render);
-}
-
 export function getToolRenderer(name: string): ToolRenderFn | null {
   return renderers.get(name) ?? renderers.get("*") ?? null;
 }

@@ -27,14 +27,14 @@ async function loadApiUrl(): Promise<string> {
   }
 }
 
-export interface FeedbackPayload {
+interface FeedbackPayload {
   sessionId: string;
   message: string;
   feedbackType: "positive" | "negative";
   comment?: string;
 }
 
-export interface FeedbackResponse {
+interface FeedbackResponse {
   success: boolean;
   feedbackId: string;
 }

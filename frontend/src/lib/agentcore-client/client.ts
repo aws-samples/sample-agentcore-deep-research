@@ -25,10 +25,6 @@ export class AgentCoreClient {
     this.parser = PARSERS[config.pattern];
   }
 
-  generateSessionId(): string {
-    return crypto.randomUUID();
-  }
-
   // Abort any in-flight stream
   abort(): void {
     this._abortController?.abort();
