@@ -18,7 +18,7 @@ const amplifyStack = new ADRMainStack(app, props.stack_name_base, {
   config: props,
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION,
+    region: props.region || process.env.CDK_DEFAULT_REGION,
   },
 })
 
