@@ -41,6 +41,30 @@ class ReportS3UploadHook(HookProvider):
         try:
             s3_key = f"reports/{session_id}/report.md"
 
+            # Upload chart images and rewrite /tmp/ paths to presigned URLs
+            import glob
+
+            for img_path in glob.glob("/tmp/*.png"):  # noqa: S108  # nosec B108
+                img_name = os.path.basename(img_path)
+                img_s3_key = f"reports/{session_id}/{img_name}"
+                try:
+                    with open(img_path, "rb") as f:
+                        self.s3_client.put_object(
+                            Bucket=REPORTS_BUCKET,
+                            Key=img_s3_key,
+                            Body=f.read(),
+                            ContentType="image/png",
+                        )
+                    img_url = self.s3_client.generate_presigned_url(
+                        "get_object",
+                        Params={"Bucket": REPORTS_BUCKET, "Key": img_s3_key},
+                        ExpiresIn=URL_EXPIRATION,
+                    )
+                    content = content.replace(f"/tmp/{img_name}", img_url)
+                    print(f"[HOOK] Uploaded chart {img_name} to S3")
+                except Exception as e:
+                    print(f"[HOOK WARNING] Failed to upload {img_name}: {e}")
+
             self.s3_client.put_object(
                 Bucket=REPORTS_BUCKET,
                 Key=s3_key,
