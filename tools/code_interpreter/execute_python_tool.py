@@ -69,11 +69,7 @@ def execute_python(code: str, chart_name: str = "") -> str:
 
         import io, base64
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', transparent=True)
-
-    Always set text/axis colors for visibility on both light and dark backgrounds:
-        plt.rcParams.update({'text.color': '#333333', 'axes.labelcolor': '#333333',
-                             'xtick.color': '#333333', 'ytick.color': '#333333'})
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
         plt.close()
         buf.seek(0)
         print(f"CHART_BASE64:{base64.b64encode(buf.read()).decode()}")
