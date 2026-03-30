@@ -16,6 +16,7 @@ export interface ToolConfig {
 
 export interface AppConfig {
   stack_name_base: string
+  region?: string | null
   admin_user_email?: string | null
   auto_deploy_frontend?: boolean
   backend: {
@@ -88,6 +89,7 @@ export class ConfigManager {
 
       return {
         stack_name_base: stackNameBase,
+        region: parsedConfig.region || null,
         admin_user_email: parsedConfig.admin_user_email || null,
         auto_deploy_frontend: parsedConfig.auto_deploy_frontend ?? false,
         backend: {

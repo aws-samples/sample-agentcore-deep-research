@@ -47,7 +47,15 @@ change anything:
   "post_logout_redirect_uri": "https://your-amplify-url",
   "response_type": "code",
   "scope": "email openid profile",
-  "automaticSilentRenew": true
+  "automaticSilentRenew": true,
+  "agentRuntimeArn": "arn:aws:bedrock-agentcore:region:account:runtime/runtime-id",
+  "awsRegion": "us-east-1",
+  "feedbackApiUrl": "https://your-api-gateway-url",
+  "agentPattern": "strands-deep-research",
+  "tools": {
+    "tavily": { "enabled": true, "default_on": true },
+    "nova": { "enabled": true, "default_on": true }
+  }
 }
 ```
 
@@ -62,7 +70,7 @@ change anything:
 ## Requirements
 
 - AWS CLI configured with appropriate permissions
-- Python 3.11+ (standard library only, no pip install needed for deployment)
+- Python 3.10+ (standard library only, no pip install needed for deployment)
 - Node.js and npm (for frontend build)
 - CDK stack deployed with the required outputs:
   - `CognitoClientId`

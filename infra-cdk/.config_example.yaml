@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 stack_name_base: deep-research
+region: null # AWS region to deploy the stack (e.g., us-west-2). If null, uses your AWS CLI default region.
 
 # Optional: Set to automatically create an admin user and email credentials
 # If not provided, you'll need to manually create users via AWS Console
