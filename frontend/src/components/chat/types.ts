@@ -1,8 +1,5 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-// Define message types
-export type MessageRole = "user" | "assistant";
-
 export type ToolCallStatus = "streaming" | "executing" | "complete";
 
 export interface ToolCall {
@@ -18,17 +15,8 @@ export type MessageSegment =
   | { type: "tool"; toolCall: ToolCall };
 
 export interface Message {
-  role: MessageRole;
+  role: "user" | "assistant";
   content: string;
   timestamp: string;
   segments?: MessageSegment[];
-}
-
-// Define chat session types
-export interface ChatSession {
-  id: string;
-  name: string;
-  history: Message[];
-  startDate: string;
-  endDate: string;
 }
