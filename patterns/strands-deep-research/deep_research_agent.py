@@ -25,7 +25,7 @@ from utils.inference import get_bedrock_config, get_inference_configs
 from utils.ssm import get_ssm_parameter
 
 # load inference configurations
-INFERENCE_CONFIG, REASONING_CONFIG = get_inference_configs()
+INFERENCE_CONFIG, _ = get_inference_configs()
 BEDROCK_CONFIG = get_bedrock_config()
 
 app = BedrockAgentCoreApp()
