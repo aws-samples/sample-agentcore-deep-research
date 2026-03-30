@@ -10,11 +10,9 @@ AgentCore Deep Research is a sample AI solution for deep research built on Amazo
 - **Real-time report display**: Split-pane UI shows the report being built in real-time and allows follow-ups
 - **Fact-checking and citations**: Every factual claim includes inline source citations with the references section
 
-
-
 ## 🚀 Deployment
 
-**Prerequisites**: Node.js 20+, AWS CLI, [AWS CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html), Python 3.10+, [uv](https://docs.astral.sh/uv/), and Docker. See the [deployment guide](docs/DEPLOYMENT.md) for details.
+**Prerequisites**: [Node.js 20+](https://nodejs.org/), [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [AWS CDK CLI](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html), [Python 3.10+](https://www.python.org/downloads/), [uv](https://docs.astral.sh/uv/), and [Docker](https://docs.docker.com/engine/install/). See the [deployment guide](docs/DEPLOYMENT.md) for details.
 
 Deploying AgentCore Deep Research stack requires a few commands:
 
@@ -108,7 +106,7 @@ export AWS_DEFAULT_REGION=us-east-1
 
 # Start the full stack locally
 cd docker
-docker-compose up --build
+docker compose up --build
 ```
 
 **Finding the environment variable values:**
@@ -152,13 +150,12 @@ agentcore-deep-research/
 │       └── Dockerfile              # Container configuration
 ├── gateway/                # Gateway utilities and tools
 │   └── tools/              # Gateway tool implementations
+├── docker/                 # Local development Docker setup
+│   └── docker-compose.yml  # Docker Compose for local stack
 ├── scripts/                # Deployment and test scripts
-│   ├── deploy-frontend.py  # Cross-platform frontend deployment
-│   └── test-*.py           # Various test utilities
+│   └── deploy-frontend.py  # Cross-platform frontend deployment
 ├── docs/                   # Documentation source files
-│   └── architecture-diagram/ # Architecture diagrams
 ├── tests/                  # Test suite
-├── docker-compose.yml      # Local development stack
 └── README.md
 ```
 
