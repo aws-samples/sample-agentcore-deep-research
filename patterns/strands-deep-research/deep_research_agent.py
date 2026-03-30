@@ -27,7 +27,7 @@ from utils.ssm import get_ssm_parameter
 from tools.code_interpreter.execute_python_tool import execute_python
 
 # load inference configurations
-INFERENCE_CONFIG, REASONING_CONFIG = get_inference_configs()
+INFERENCE_CONFIG, _ = get_inference_configs()
 BEDROCK_CONFIG = get_bedrock_config()
 
 app = BedrockAgentCoreApp()
@@ -364,7 +364,8 @@ def _truncate_text(text: str, max_len: int) -> str:
         return text
     match = _REPORT_URL_RE.search(text)
     suffix = f"\n\n{match.group()}" if match else ""
-    return text[:max_len] + "... (truncated)" + suffix
+    clean = _REPORT_URL_RE.sub("", text)
+    return clean[:max_len] + "... (truncated)" + suffix
 
 
 def _truncate_large_fields(d: dict, max_len: int = 3000) -> None:

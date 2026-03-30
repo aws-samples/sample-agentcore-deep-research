@@ -125,6 +125,7 @@ def parse_config_yaml(config_path: Path) -> dict:
     """
     config: dict = {
         "stack_name_base": "",
+        "region": None,
         "pattern": "strands-deep-research",
         "auto_deploy_frontend": False,
         "tools": {},
@@ -139,6 +140,12 @@ def parse_config_yaml(config_path: Path) -> dict:
     match = re.search(r"^stack_name_base:\s*(\S+)", content, re.MULTILINE)
     if match:
         config["stack_name_base"] = match.group(1).strip("\"'")
+
+    # Extract region
+    match = re.search(r"^region:\s*(\S+)", content, re.MULTILINE)
+    if match:
+        val = match.group(1).split("#")[0].strip().strip("\"'")
+        config["region"] = val if val != "null" else None
 
     # Extract pattern from backend section
     match = re.search(r"pattern:\s*(\S+)", content)
@@ -215,27 +222,31 @@ def get_file_size_human(filepath: str) -> str:
 # --- AWS CLI wrappers ---
 
 
-def get_stack_outputs(stack_name: str) -> dict[str, str]:
+def get_stack_outputs(
+    stack_name: str, region: str | None = None
+) -> tuple[dict[str, str], str]:
     """
     Fetch CloudFormation stack outputs via AWS CLI.
 
     Args:
         stack_name: Name of the CloudFormation stack
+        region: AWS region (optional, uses CLI default if None)
 
     Returns:
-        Dictionary mapping output keys to values
+        Tuple of (outputs dict, region string)
     """
-    result = run_command(
-        [
-            "aws",
-            "cloudformation",
-            "describe-stacks",
-            "--stack-name",
-            stack_name,
-            "--output",
-            "json",
-        ]
-    )
+    cmd = [
+        "aws",
+        "cloudformation",
+        "describe-stacks",
+        "--stack-name",
+        stack_name,
+        "--output",
+        "json",
+    ]
+    if region:
+        cmd.extend(["--region", region])
+    result = run_command(cmd)
 
     stack_data = json.loads(result.stdout)
     stacks = stack_data.get("Stacks", [])
@@ -243,44 +254,20 @@ def get_stack_outputs(stack_name: str) -> dict[str, str]:
         raise ValueError(f"Stack '{stack_name}' not found or has no data")
     outputs = stacks[0].get("Outputs", [])
 
-    return {o["OutputKey"]: o["OutputValue"] for o in outputs}
+    # Extract region from stack ARN if not provided
+    if not region:
+        stack_arn = stacks[0]["StackId"]
+        arn_parts = stack_arn.split(":")
+        if len(arn_parts) < 4:
+            raise ValueError(f"Invalid stack ARN format: {stack_arn}")
+        region = arn_parts[3]
+
+    return {o["OutputKey"]: o["OutputValue"] for o in outputs}, region
 
 
-def get_stack_region(stack_name: str) -> str:
-    """
-    Get the AWS region from stack ARN.
-
-    Args:
-        stack_name: Name of the CloudFormation stack
-
-    Returns:
-        AWS region string
-    """
-    result = run_command(
-        [
-            "aws",
-            "cloudformation",
-            "describe-stacks",
-            "--stack-name",
-            stack_name,
-            "--output",
-            "json",
-        ]
-    )
-
-    stack_data = json.loads(result.stdout)
-    stacks = stack_data.get("Stacks", [])
-    if not stacks:
-        raise ValueError(f"Stack '{stack_name}' not found or has no data")
-    stack_arn = stacks[0]["StackId"]
-    # ARN format: arn:aws:cloudformation:region:account:stack/name/id
-    arn_parts = stack_arn.split(":")
-    if len(arn_parts) < 4:
-        raise ValueError(f"Invalid stack ARN format: {stack_arn}")
-    return str(arn_parts[3])
-
-
-def upload_to_s3(local_path: str, bucket: str, key: str) -> None:
+def upload_to_s3(
+    local_path: str, bucket: str, key: str, region: str | None = None
+) -> None:
     """
     Upload a file to S3 via AWS CLI.
 
@@ -288,13 +275,17 @@ def upload_to_s3(local_path: str, bucket: str, key: str) -> None:
         local_path: Path to local file
         bucket: S3 bucket name
         key: S3 object key
+        region: AWS region (optional)
     """
-    run_command(
-        ["aws", "s3", "cp", local_path, f"s3://{bucket}/{key}", "--no-progress"]
-    )
+    cmd = ["aws", "s3", "cp", local_path, f"s3://{bucket}/{key}", "--no-progress"]
+    if region:
+        cmd.extend(["--region", region])
+    run_command(cmd)
 
 
-def start_amplify_deployment(app_id: str, branch: str, source_url: str) -> dict:
+def start_amplify_deployment(
+    app_id: str, branch: str, source_url: str, region: str | None = None
+) -> dict:
     """
     Start an Amplify deployment via AWS CLI.
 
@@ -302,30 +293,34 @@ def start_amplify_deployment(app_id: str, branch: str, source_url: str) -> dict:
         app_id: Amplify application ID
         branch: Branch name to deploy
         source_url: S3 URL of deployment package
+        region: AWS region (optional)
 
     Returns:
         Deployment response as dictionary
     """
-    result = run_command(
-        [
-            "aws",
-            "amplify",
-            "start-deployment",
-            "--app-id",
-            app_id,
-            "--branch-name",
-            branch,
-            "--source-url",
-            source_url,
-            "--output",
-            "json",
-        ]
-    )
+    cmd = [
+        "aws",
+        "amplify",
+        "start-deployment",
+        "--app-id",
+        app_id,
+        "--branch-name",
+        branch,
+        "--source-url",
+        source_url,
+        "--output",
+        "json",
+    ]
+    if region:
+        cmd.extend(["--region", region])
+    result = run_command(cmd)
 
     return dict(json.loads(result.stdout))
 
 
-def get_amplify_job_status(app_id: str, branch: str, job_id: str) -> str:
+def get_amplify_job_status(
+    app_id: str, branch: str, job_id: str, region: str | None = None
+) -> str:
     """
     Get the status of an Amplify deployment job.
 
@@ -333,52 +328,56 @@ def get_amplify_job_status(app_id: str, branch: str, job_id: str) -> str:
         app_id: Amplify application ID
         branch: Branch name
         job_id: Deployment job ID
+        region: AWS region (optional)
 
     Returns:
         Job status string
     """
-    result = run_command(
-        [
-            "aws",
-            "amplify",
-            "get-job",
-            "--app-id",
-            app_id,
-            "--branch-name",
-            branch,
-            "--job-id",
-            job_id,
-            "--output",
-            "json",
-        ]
-    )
+    cmd = [
+        "aws",
+        "amplify",
+        "get-job",
+        "--app-id",
+        app_id,
+        "--branch-name",
+        branch,
+        "--job-id",
+        job_id,
+        "--output",
+        "json",
+    ]
+    if region:
+        cmd.extend(["--region", region])
+    result = run_command(cmd)
 
     return str(json.loads(result.stdout)["job"]["summary"]["status"])
 
 
-def get_amplify_app_domain(app_id: str) -> str:
+def get_amplify_app_domain(app_id: str, region: str | None = None) -> str:
     """
     Get the default domain for an Amplify app.
 
     Args:
         app_id: Amplify application ID
+        region: AWS region (optional)
 
     Returns:
         Default domain string
     """
-    result = run_command(
-        [
-            "aws",
-            "amplify",
-            "get-app",
-            "--app-id",
-            app_id,
-            "--query",
-            "app.defaultDomain",
-            "--output",
-            "text",
-        ]
-    )
+    cmd = [
+        "aws",
+        "amplify",
+        "get-app",
+        "--app-id",
+        app_id,
+        "--query",
+        "app.defaultDomain",
+        "--output",
+        "text",
+    ]
+    if region:
+        cmd.extend(["--region", region])
+    result = run_command(cmd)
 
     return str(result.stdout.strip())
 
@@ -525,9 +524,10 @@ def main() -> int:
 
     # Fetch CDK outputs
     log_info(f"Fetching configuration from CDK stack: {stack_name}")
+    config = parse_config_yaml(config_path)
+    config_region = config.get("region")
     try:
-        outputs = get_stack_outputs(stack_name)
-        region = get_stack_region(stack_name)
+        outputs, region = get_stack_outputs(stack_name, config_region)
     except subprocess.CalledProcessError as e:
         log_error(f"Failed to fetch stack outputs: {e.stderr}")
         return 1
@@ -551,7 +551,6 @@ def main() -> int:
     log_success(f"Region: {region}")
 
     # Get agent pattern and tools config
-    config = parse_config_yaml(config_path)
     pattern = config.get("pattern", "strands-deep-research")
     tools = config.get("tools", {})
     log_info(f"Agent pattern: {pattern}")
@@ -620,7 +619,7 @@ def main() -> int:
     s3_key = f"amplify-deploy-{int(time.time())}.zip"
     log_info(f"Uploading to S3 (s3://{deployment_bucket}/{s3_key})...")
     try:
-        upload_to_s3(str(zip_path), deployment_bucket, s3_key)
+        upload_to_s3(str(zip_path), deployment_bucket, s3_key, region)
         log_success("Upload completed")
     except subprocess.CalledProcessError as e:
         log_error(f"S3 upload failed: {e.stderr}")
@@ -631,7 +630,7 @@ def main() -> int:
     source_url = f"s3://{deployment_bucket}/{s3_key}"
 
     try:
-        deployment = start_amplify_deployment(app_id, BRANCH_NAME, source_url)
+        deployment = start_amplify_deployment(app_id, BRANCH_NAME, source_url, region)
         job_id = deployment["jobSummary"]["jobId"]
         log_success(f"Deployment initiated (Job ID: {job_id})")
     except subprocess.CalledProcessError as e:
@@ -642,7 +641,7 @@ def main() -> int:
     log_info("Monitoring deployment status...")
     while True:
         try:
-            status = get_amplify_job_status(app_id, BRANCH_NAME, job_id)
+            status = get_amplify_job_status(app_id, BRANCH_NAME, job_id, region)
         except subprocess.CalledProcessError as e:
             log_error(f"Failed to get deployment status: {e.stderr}")
             return 1
@@ -663,7 +662,7 @@ def main() -> int:
     log_info(f"S3 Package: s3://{deployment_bucket}/{s3_key}")
     log_info("Console: https://console.aws.amazon.com/amplify/apps")
     try:
-        app_domain = get_amplify_app_domain(app_id)
+        app_domain = get_amplify_app_domain(app_id, region)
         log_info(f"App URL: https://{BRANCH_NAME}.{app_domain}")
     except subprocess.CalledProcessError:
         log_warning("Could not retrieve app URL - check Amplify console")

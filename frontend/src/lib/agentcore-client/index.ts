@@ -2,10 +2,4 @@
 // SPDX-License-Identifier: MIT-0
 
 export { AgentCoreClient } from "./client";
-export type {
-  AgentCoreConfig,
-  AgentPattern,
-  StreamCallback,
-  StreamEvent,
-  ChunkParser,
-} from "./types";
+export type { AgentCoreConfig, AgentPattern } from "./types";
