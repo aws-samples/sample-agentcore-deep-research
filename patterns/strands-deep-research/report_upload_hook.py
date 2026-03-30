@@ -37,9 +37,10 @@ class ReportS3UploadHook(HookProvider):
         registry.add_callback(AfterToolCallEvent, self.upload_report_to_s3)
 
     def _do_upload(self, session_id: str, content: str) -> str | None:
-        """Upload to S3 and return pre-signed URL."""
+        """Upload report and any chart images to S3, return pre-signed URL for report."""
         try:
             s3_key = f"reports/{session_id}/report.md"
+
             self.s3_client.put_object(
                 Bucket=REPORTS_BUCKET,
                 Key=s3_key,

@@ -24,6 +24,8 @@ from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.inference import get_bedrock_config, get_inference_configs
 from utils.ssm import get_ssm_parameter
 
+from tools.code_interpreter.execute_python_tool import execute_python
+
 # load inference configurations
 INFERENCE_CONFIG, REASONING_CONFIG = get_inference_configs()
 BEDROCK_CONFIG = get_bedrock_config()
@@ -303,6 +305,7 @@ def create_deep_research_agent(
         file_read,
         file_write,
         editor,
+        execute_python,
     ]
 
     try:
