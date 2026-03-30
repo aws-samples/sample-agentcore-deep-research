@@ -361,7 +361,8 @@ def _truncate_text(text: str, max_len: int) -> str:
         return text
     match = _REPORT_URL_RE.search(text)
     suffix = f"\n\n{match.group()}" if match else ""
-    return text[:max_len] + "... (truncated)" + suffix
+    clean = _REPORT_URL_RE.sub("", text)
+    return clean[:max_len] + "... (truncated)" + suffix
 
 
 def _truncate_large_fields(d: dict, max_len: int = 3000) -> None:
