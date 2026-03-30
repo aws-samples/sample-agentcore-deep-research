@@ -154,10 +154,6 @@ def authenticate_cognito(
         access_token = response["AuthenticationResult"]["AccessToken"]
         id_token = response["AuthenticationResult"]["IdToken"]
 
-        # Decode ID token to get user ID
-        import base64
-        import json
-
         payload = id_token.split(".")[1]
         payload += "=" * (4 - len(payload) % 4)
         decoded = base64.b64decode(payload)
