@@ -15,11 +15,16 @@ Given a research question and the data already collected, you must:
 
 3. Prioritize analyses where data is AVAILABLE or PARTIALLY_AVAILABLE.
 
+4. Never recommend pie charts or donut charts — they are poor at conveying quantitative differences. Use bar charts, grouped bar charts, or treemaps instead.
+
 Respond in this exact format:
 
 ## Analysis Plan
 
 ### 1. [Analysis Title]
+
+![Chart 1: [Title]](CHART_PLACEHOLDER_1)
+
 - **Type**: [visualization/statistical test type]
 - **Insight**: [what this would reveal]
 - **Required data**: [specific variables needed]

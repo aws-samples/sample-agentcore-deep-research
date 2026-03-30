@@ -3,7 +3,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { Download, FileText, Loader2, BookOpen, Link } from "lucide-react";
+import {
+  Download,
+  FileText,
+  Loader2,
+  BookOpen,
+  Link,
+  BarChart3,
+} from "lucide-react";
 import {
   ReportMarkdownRenderer,
   extractReportTitle,
@@ -13,12 +20,14 @@ interface ResearchReportPanelProps {
   content: string;
   isLoading: boolean;
   currentRound: number;
+  onAnalyze?: () => void;
 }
 
 export function ResearchReportPanel({
   content,
   isLoading,
   currentRound,
+  onAnalyze,
 }: ResearchReportPanelProps) {
   // Extract H1 title from markdown content
   const reportTitle = useMemo(
@@ -43,16 +52,50 @@ export function ResearchReportPanel({
     return refs;
   }, [content]);
 
-  const handleDownload = () => {
-    const blob = new Blob([content], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "research_report.md";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleDownload = async () => {
+    // Collect images and rewrite markdown to use local paths
+    const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+    let localContent = content;
+    let match;
+    let i = 1;
+    const downloads: { filename: string; url: string }[] = [];
+
+    while ((match = imgRegex.exec(content)) !== null) {
+      const filename = `chart_${i}.png`;
+      localContent = localContent.replace(match[2], filename);
+      downloads.push({ filename, url: match[2] });
+      i++;
+    }
+
+    // Download markdown with local paths
+    const mdBlob = new Blob([localContent], { type: "text/markdown" });
+    const mdUrl = URL.createObjectURL(mdBlob);
+    const mdA = document.createElement("a");
+    mdA.href = mdUrl;
+    mdA.download = "research_report.md";
+    document.body.appendChild(mdA);
+    mdA.click();
+    document.body.removeChild(mdA);
+    URL.revokeObjectURL(mdUrl);
+
+    // Download each image
+    for (const dl of downloads) {
+      try {
+        const resp = await fetch(dl.url);
+        if (!resp.ok) continue;
+        const imgBlob = await resp.blob();
+        const imgUrl = URL.createObjectURL(imgBlob);
+        const imgA = document.createElement("a");
+        imgA.href = imgUrl;
+        imgA.download = dl.filename;
+        document.body.appendChild(imgA);
+        imgA.click();
+        document.body.removeChild(imgA);
+        URL.revokeObjectURL(imgUrl);
+      } catch {
+        /* skip failed images */
+      }
+    }
   };
 
   return (
@@ -79,13 +122,24 @@ export function ResearchReportPanel({
           )}
         </div>
         {content && (
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm shrink-0 ml-2"
-          >
-            <Download className="w-4 h-4" />
-            Download
-          </button>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            {onAnalyze && !isLoading && (
+              <button
+                onClick={onAnalyze}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-blue-700 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Analyze
+              </button>
+            )}
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
+          </div>
         )}
       </div>
 

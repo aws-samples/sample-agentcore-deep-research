@@ -539,6 +539,11 @@ export default function ChatInterface() {
                 content={reportContent}
                 isLoading={isLoading}
                 currentRound={researchRound}
+                onAnalyze={() =>
+                  sendMessage(
+                    "Read the Data Analysis Recommendations section from the report. For each analysis marked AVAILABLE or PARTIALLY_AVAILABLE, fetch any missing data needed, then generate the visualization using execute_python with a chart_name. The tool returns a chart_url. Use editor to replace each CHART_PLACEHOLDER in the report with: ![Chart Title](chart_url)",
+                  )
+                }
               />
             }
           />
