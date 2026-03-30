@@ -206,6 +206,42 @@ uv run test-scripts/test-deep-research-agent.py "What are the latest advances in
 
 ---
 
+### test_nova_local.py
+
+Tests Nova web search locally using the Bedrock Converse API with the web grounding tool.
+
+**Usage:**
+
+```bash
+uv run test-scripts/test_nova_local.py
+```
+
+---
+
+### test_openfda_local.py
+
+Tests the OpenFDA drug search tool locally without AWS dependencies by calling the Lambda handler directly.
+
+**Usage:**
+
+```bash
+uv run test-scripts/test_openfda_local.py
+```
+
+---
+
+### test_tavily_local.py
+
+Tests the Tavily web search SDK locally using an API key from AWS Secrets Manager.
+
+**Usage:**
+
+```bash
+uv run test-scripts/test_tavily_local.py
+```
+
+---
+
 ## Shared Utilities
 
 The test scripts use shared utilities from `../scripts/utils.py`:
