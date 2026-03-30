@@ -42,7 +42,15 @@ Each `editor` call: ONE section, under 1500 characters, with citations.
 2. Check that EVERY section has real content. Look specifically for any remaining `[placeholder]` text or empty sections
 3. Spot-check evidence quality: are claims supported by citations? Are any conclusions stronger than the evidence warrants?
 4. If ANY section is missing content or has unsupported claims, use `editor` to fix it NOW
-5. Your final chat message must be ONLY: "Your report is ready."
+
+### Step 5: Data Analysis Planning
+1. Use `file_read` to read `/app/tools/data_analysis/advisor_prompt.txt`
+2. Follow its instructions: review your collected data and the report so far
+3. Propose 2-3 visualizations or statistical analyses that would strengthen the findings
+4. For each, assess whether you already have the data from your research
+5. Use `editor` to add a `## Data Analysis Recommendations` section to the report with your analysis plan
+6. If any analysis has data AVAILABLE, note the specific values so they can be used later
+7. Your final chat message must be ONLY: "Your report is ready."
 
 ## Report Structure
 
@@ -72,6 +80,9 @@ IMPORTANT: Use H1 (`#`) ONLY for the report title. Use H2 (`##`) for all major s
 [placeholder]
 
 ## Conclusions
+[placeholder]
+
+## Data Analysis Recommendations
 [placeholder]
 ```
 
