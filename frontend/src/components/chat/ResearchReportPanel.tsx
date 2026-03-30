@@ -68,7 +68,9 @@ export function ResearchReportPanel({
     }
 
     // Download markdown (with local paths if images exist)
-    const blob = new Blob([images.length ? localContent : content], { type: "text/markdown" });
+    const blob = new Blob([images.length ? localContent : content], {
+      type: "text/markdown",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -93,7 +95,9 @@ export function ResearchReportPanel({
         document.body.removeChild(imgA);
         URL.revokeObjectURL(imgUrl);
         await new Promise((r) => setTimeout(r, 300));
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
   };
 
