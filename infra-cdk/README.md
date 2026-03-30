@@ -59,6 +59,7 @@ Edit `config.yaml` to customize your deployment:
 
 ```yaml
 stack_name_base: "adr-stack"
+region: null  # AWS region (e.g., us-west-2). If null, uses AWS CLI default region.
 
 admin_user_email: admin@example.com  # Required: Email for the admin user
 
