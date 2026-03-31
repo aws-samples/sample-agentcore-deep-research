@@ -51,8 +51,12 @@ Each `editor` call: ONE section, under 1500 characters, with citations.
 4. If **yes**:
    a. Use `file_read` to read `/app/tools/data_analysis/advisor_prompt.txt` and follow its instructions to plan 2-3 visualizations
    b. Write the analysis plan to `/tmp/data_analysis_plan.md` using `file_write` — do NOT output it in chat
-   c. For each planned chart, check its **Data status** in the plan. If it is PARTIALLY_AVAILABLE or NOT_AVAILABLE, you MUST run targeted searches to obtain the missing data before generating the chart. Never fabricate or estimate data values — use only real data from tool results. Any new data obtained must be cited in the report using the standard `[Source: URL]` format.
-   d. Use `execute_python` to generate each chart (save as PNG via base64 — see the tool docstring)
+   c. **CRITICAL — DATA INTEGRITY RULE**: Before generating ANY chart, check its **Data status** in the plan:
+      - **AVAILABLE**: Proceed — use the exact values quoted in the plan.
+      - **PARTIALLY_AVAILABLE**: You MUST search for the missing data points BEFORE generating the chart. Do NOT fill gaps with invented, estimated, or placeholder values.
+      - **NOT_AVAILABLE**: You MUST search for the required data BEFORE generating the chart. If searches return no results, SKIP this chart entirely.
+      After obtaining new data from searches, use `editor` to add `[Source: URL]` citations to the relevant report section.
+   d. Use `execute_python` to generate each chart (save as PNG via base64 — see the tool docstring). Every data point in the chart MUST come from a tool result — never invent numbers.
    e. Use `editor` to insert each chart image (`![Chart Title](returned_url)`) directly into the report section where it fits best (e.g., a price trend chart in the relevant Finding, a comparison chart in Analysis)
 5. Your final chat message must be ONLY: "Your report is ready."
 
