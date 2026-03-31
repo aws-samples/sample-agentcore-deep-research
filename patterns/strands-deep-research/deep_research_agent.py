@@ -344,7 +344,7 @@ def create_deep_research_agent(
         print(
             "[AGENT] Agent created successfully with Gateway tools and S3 upload hook"
         )
-        return agent
+        return agent, report_upload_hook
 
     except Exception as e:
         print(f"[AGENT ERROR] Error creating Gateway client: {e}")
@@ -355,17 +355,11 @@ def create_deep_research_agent(
         raise
 
 
-_REPORT_URL_RE = re.compile(r"\[REPORT_(?:PDF_)?URL:[^\]]+\]")
-
-
 def _truncate_text(text: str, max_len: int) -> str:
-    """Truncate text but preserve [REPORT_URL:...] and [REPORT_PDF_URL:...] tags."""
+    """Truncate text to max_len."""
     if len(text) <= max_len:
         return text
-    matches = _REPORT_URL_RE.findall(text)
-    suffix = "\n\n" + "\n".join(matches) if matches else ""
-    clean = _REPORT_URL_RE.sub("", text)
-    return clean[:max_len] + "... (truncated)" + suffix
+    return text[:max_len] + "... (truncated)"
 
 
 def _truncate_large_fields(d: dict, max_len: int = 3000) -> None:
@@ -381,6 +375,27 @@ def _truncate_large_fields(d: dict, max_len: int = 3000) -> None:
                 for item in tr["content"]:
                     if isinstance(item, dict) and isinstance(item.get("text"), str):
                         item["text"] = _truncate_text(item["text"], max_len)
+
+
+def _inject_report_urls(d: dict, urls: dict[str, str]) -> None:
+    """Append [REPORT_URL:...] / [REPORT_PDF_URL:...] to streamed tool result."""
+    msg = d.get("message")
+    if not isinstance(msg, dict) or not isinstance(msg.get("content"), list):
+        return
+    for block in msg["content"]:
+        if not isinstance(block, dict):
+            continue
+        tr = block.get("toolResult")
+        if isinstance(tr, dict) and isinstance(tr.get("content"), list):
+            for item in tr["content"]:
+                if isinstance(item, dict) and isinstance(item.get("text"), str):
+                    tags = ""
+                    if "report" in urls:
+                        tags += f"\n\n[REPORT_URL:{urls['report']}]"
+                    if "pdf" in urls:
+                        tags += f"\n[REPORT_PDF_URL:{urls['pdf']}]"
+                    item["text"] += tags
+                    return
 
 
 @app.entrypoint
@@ -422,7 +437,7 @@ async def agent_stream(payload, context: RequestContext):
         if s3_file_uris:
             print(f"[STREAM] S3 files: {s3_file_uris}")
 
-        agent = create_deep_research_agent(
+        agent, report_hook = create_deep_research_agent(
             user_id, session_id, enabled_sources, s3_file_uris
         )
 
@@ -453,8 +468,13 @@ async def agent_stream(payload, context: RequestContext):
                     "toolUseId": ctu.get("toolUseId"),
                     "name": ctu.get("name"),
                 }
-            # truncate tool result text but preserve REPORT_URL
             _truncate_large_fields(d, max_len=3000)
+
+            # inject report URLs into the streamed copy only (LLM never sees them)
+            pending = report_hook.take_pending_urls()
+            if pending:
+                _inject_report_urls(d, pending)
+
             yield json.loads(json.dumps(d, default=str))
 
     except Exception as e:
