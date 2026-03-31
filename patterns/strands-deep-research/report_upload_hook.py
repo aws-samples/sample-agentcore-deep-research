@@ -113,7 +113,7 @@ class ReportS3UploadHook(HookProvider):
             print("[HOOK] STAGING_BUCKET_NAME not set, skipping S3 upload")
             return
 
-        content = local.read_text()
+        content = local.read_text(errors="replace")
         presigned_url = self._do_upload(session_id, s3_suffix, content)
 
         # inject URL tags for the report (frontend uses them for display/download)

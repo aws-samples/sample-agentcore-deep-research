@@ -4,10 +4,10 @@ This code is being licensed under the terms of the Amazon Software License avail
 """
 
 import re
+from html import escape
 
 import markdown
 import weasyprint
-
 
 _CSS = """
 @page {
@@ -130,23 +130,18 @@ def _process_citations(html_body: str) -> str:
             source_index[raw] = len(sources) + 1
             sources.append(raw)
         idx = source_index[raw]
-        return (
-            f'<sup class="citation">'
-            f'<a href="#ref-{idx}">[{idx}]</a></sup>'
-        )
+        return f'<sup class="citation"><a href="#ref-{idx}">[{idx}]</a></sup>'
 
     html_body = _SOURCE_RE.sub(_replace, html_body)
 
     if sources:
         refs_html = '<div class="references"><h2>References</h2><ol>'
         for i, src in enumerate(sources, 1):
+            safe = escape(src, quote=True)
             if _URL_RE.match(src):
-                refs_html += (
-                    f'<li id="ref-{i}">'
-                    f'<a href="{src}">{src}</a></li>'
-                )
+                refs_html += f'<li id="ref-{i}"><a href="{safe}">{safe}</a></li>'
             else:
-                refs_html += f'<li id="ref-{i}">{src}</li>'
+                refs_html += f'<li id="ref-{i}">{safe}</li>'
         refs_html += "</ol></div>"
         html_body += refs_html
 
@@ -167,9 +162,7 @@ def generate_pdf(markdown_content: str) -> bytes:
     bytes
         PDF file content.
     """
-    html_body = markdown.markdown(
-        markdown_content, extensions=_MD_EXTENSIONS
-    )
+    html_body = markdown.markdown(markdown_content, extensions=_MD_EXTENSIONS)
     html_body = _process_citations(html_body)
     html_doc = (
         "<!DOCTYPE html>"
