@@ -25,6 +25,12 @@ function extractReportUrl(result: string): string | null {
   return match ? match[1] : null;
 }
 
+// Extract report PDF URL from tool result
+function extractReportPdfUrl(result: string): string | null {
+  const match = result.match(/\[REPORT_PDF_URL:(https?:\/\/[^\]]+)\]/);
+  return match ? match[1] : null;
+}
+
 // Fetch report content from pre-signed S3 URL
 async function fetchReportContent(url: string): Promise<string | null> {
   try {
@@ -82,6 +88,7 @@ export default function ChatInterface() {
   const [showReportPanel, setShowReportPanel] = useState<boolean>(false);
   const fileWriteCountRef = useRef<number>(0);
   const lastReportUrlRef = useRef<string | null>(null);
+  const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
 
   // Get array of enabled source IDs for API
   const getEnabledSourceIds = () =>
@@ -322,6 +329,10 @@ export default function ChatInterface() {
                   if (newUrl) {
                     lastReportUrlRef.current = newUrl;
                   }
+                  const pdfUrl = extractReportPdfUrl(tc.result || "");
+                  if (pdfUrl) {
+                    setReportPdfUrl(pdfUrl);
+                  }
                   const url = lastReportUrlRef.current;
                   if (url) {
                     fetchReportContent(url).then((content) => {
@@ -420,6 +431,7 @@ export default function ChatInterface() {
     setError(null);
     setIsLoading(false);
     setReportContent("");
+    setReportPdfUrl(null);
     setResearchRound(0);
     setShowReportPanel(false);
     fileWriteCountRef.current = 0;
@@ -539,6 +551,7 @@ export default function ChatInterface() {
                 content={reportContent}
                 isLoading={isLoading}
                 currentRound={researchRound}
+                pdfUrl={reportPdfUrl}
               />
             }
           />
