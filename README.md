@@ -66,17 +66,19 @@ The architecture uses Amazon Cognito in four places:
 
 The application includes multiple Lambda-based tools behind AgentCore Gateway with OAuth authentication:
 
-1. **AlphaVantage Research** - Commodity prices, US economic indicators, and market news with sentiment analysis
-2. **ArXiv Search** - Search academic papers on arXiv by topic, author, or keywords with category filtering
-3. **ClinicalTrials.gov Search** - Search clinical studies worldwide by condition, intervention, phase, and recruitment status
-4. **FRED Economic Search** - Search 800,000+ economic time series from the Federal Reserve (GDP, CPI, unemployment, and more)
-5. **Knowledge Base Search** - Query Amazon Bedrock Knowledge Bases (requires configuration)
-6. **Nova Web Grounding** - AWS-powered web search via Amazon Nova with citations
-7. **OpenFDA Drug Search** - Search FDA drug label database for pharmaceutical information
-8. **PubMed Search** - Search peer-reviewed biomedical literature for abstracts, journal articles, and meta-analyses
-9. **S3 File Reader** - Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm)
-10. **SEC EDGAR Search** - Search SEC company filings (10-K, 10-Q, 8-K) with optional full-text content retrieval
-11. **Tavily Web Search** - Search the web for current information with relevance scoring and domain filtering
+| Tool | Domain | Description | API Key Required |
+|------|--------|-------------|:---:|
+| AlphaVantage Research | Finance | Commodity prices, US economic indicators, and market news with sentiment analysis | Yes |
+| ArXiv Search | Science | Search academic papers on arXiv by topic, author, or keywords with category filtering | No |
+| ClinicalTrials.gov Search | Life Science | Search clinical studies worldwide by condition, intervention, phase, and recruitment status | No |
+| FRED Economic Search | Finance | Search 800,000+ economic time series from the Federal Reserve (GDP, CPI, unemployment, and more) | No |
+| Knowledge Base Search | Generic | Query Amazon Bedrock Knowledge Bases (requires configuration) | No |
+| Nova Web Grounding | Generic | AWS-powered web search via Amazon Nova with citations | No |
+| OpenFDA Drug Search | Life Science | Search FDA drug label database for pharmaceutical information | No |
+| PubMed Search | Life Science | Search peer-reviewed biomedical literature for abstracts, journal articles, and meta-analyses | No |
+| S3 File Reader | Generic | Read text files and PDFs from S3 (PDFs auto-converted to markdown via pymupdf4llm) | No |
+| SEC EDGAR Search | Finance | Search SEC company filings (10-K, 10-Q, 8-K) with optional full-text content retrieval | No |
+| Tavily Web Search | Generic | Search the web for current information with relevance scoring and domain filtering | Yes |
 
 The modular architecture makes it easy to integrate additional data sources for developers.
 
