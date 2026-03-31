@@ -7,6 +7,7 @@ AgentCore Deep Research is a sample AI solution for deep research built on Amazo
 **✨ Key features:**
 - **Multi-source analysis**: Search across enterprise data, Internet, and specialized APIs (10+ built-in sources)
 - **Iterative workflow**: AI agent scaffolds report, researches the data, and creates a detailed report
+- **Data visualization**: Agent generates charts and diagrams to enrich reports with quantitative insights
 - **Real-time report display**: Split-pane UI shows the report being built in real-time and allows follow-ups
 - **Fact-checking and citations**: Every factual claim includes inline source citations with the references section
 
@@ -47,7 +48,8 @@ See the [deployment guide](docs/DEPLOYMENT.md) for detailed instructions.
    - Researches across enabled data sources
    - Writes all sections with citations
    - Verifies completeness and fills gaps
-6. Ask follow-up questions and download the report
+   - Generates charts and diagrams when the report has quantitative data
+6. Ask follow-up questions and download the report (including any generated charts)
 
 
 ## ℹ️ Architecture
@@ -145,9 +147,12 @@ agentcore-deep-research/
 │   └── strands-deep-research/ # Deep Research agent
 │       ├── deep_research_agent.py  # Main agent with Gateway tools
 │       ├── report_upload_hook.py   # S3 upload for real-time display
-│       ├── system_prompt.txt       # 4-round research workflow
+│       ├── system_prompt.txt       # 5-step research workflow
 │       ├── requirements.txt        # Agent dependencies
 │       └── Dockerfile              # Container configuration
+├── tools/                  # Agent tool implementations
+│   ├── code_interpreter/   # Code interpreter for chart generation
+│   └── data_analysis/      # Data analysis advisor prompt
 ├── gateway/                # Gateway utilities and tools
 │   └── tools/              # Gateway tool implementations
 ├── docker/                 # Local development Docker setup

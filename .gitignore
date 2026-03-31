@@ -37,3 +37,5 @@ public/
 .ash/
 infra-cdk/cdk.context.json
 infra-cdk/config.yaml
+.mypy_cache/
+infra-cdk/cdk.out
