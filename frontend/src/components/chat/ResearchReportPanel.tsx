@@ -13,12 +13,14 @@ interface ResearchReportPanelProps {
   content: string;
   isLoading: boolean;
   currentRound: number;
+  pdfUrl?: string | null;
 }
 
 export function ResearchReportPanel({
   content,
   isLoading,
   currentRound,
+  pdfUrl,
 }: ResearchReportPanelProps) {
   // Extract H1 title from markdown content
   const reportTitle = useMemo(
@@ -26,24 +28,54 @@ export function ResearchReportPanel({
     [content],
   );
 
-  // Extract unique [Source: XXX] references from report
-  const references = useMemo(() => {
-    if (!content) return [];
-    const matches = content.matchAll(/\[Source:\s*([^\]]+)\]/g);
-    const seen = new Set<string>();
+  // Extract unique references and replace inline citations with superscripts
+  const { processedContent, references } = useMemo(() => {
+    if (!content) return { processedContent: "", references: [] };
     const refs: { label: string; url: string | null }[] = [];
-    for (const m of matches) {
-      const raw = m[1].trim();
-      if (seen.has(raw)) continue;
-      seen.add(raw);
-      // detect if the source is a URL
-      const isUrl = /^https?:\/\//.test(raw);
-      refs.push({ label: raw, url: isUrl ? raw : null });
-    }
-    return refs;
+    const sourceIndex = new Map<string, number>();
+
+    const processed = content.replace(
+      /\[Source:\s*([^\]]+)\]/g,
+      (_, raw: string) => {
+        const trimmed = raw.trim();
+        if (!sourceIndex.has(trimmed)) {
+          sourceIndex.set(trimmed, refs.length + 1);
+          const isUrl = /^https?:\/\//.test(trimmed);
+          refs.push({ label: trimmed, url: isUrl ? trimmed : null });
+        }
+        const idx = sourceIndex.get(trimmed)!;
+        const isUrl = /^https?:\/\//.test(trimmed);
+        const href = isUrl ? trimmed : `#ref-${idx}`;
+        return `<sup><a href="${href}">[${idx}]</a></sup>`;
+      },
+    );
+
+    return { processedContent: processed, references: refs };
   }, [content]);
 
   const handleDownload = async () => {
+    // Prefer PDF download when available
+    if (pdfUrl) {
+      try {
+        const resp = await fetch(pdfUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "research_report.pdf";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          return;
+        }
+      } catch {
+        /* fall through to markdown download */
+      }
+    }
+
+    // Fallback: download markdown with chart images
     const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
     let localContent = content;
     const images: { filename: string; url: string }[] = [];
@@ -58,7 +90,6 @@ export function ResearchReportPanel({
       i++;
     }
 
-    // Download markdown (with local paths if images exist)
     const blob = new Blob([images.length ? localContent : content], {
       type: "text/markdown",
     });
@@ -71,7 +102,6 @@ export function ResearchReportPanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    // Download each image with a small delay to avoid browser blocking
     for (const img of images) {
       try {
         const resp = await fetch(img.url);
@@ -122,7 +152,7 @@ export function ResearchReportPanel({
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm"
             >
               <Download className="w-4 h-4" />
-              Download
+              {pdfUrl ? "Download PDF" : "Download"}
             </button>
           </div>
         )}
@@ -134,7 +164,7 @@ export function ResearchReportPanel({
           <div className="p-6">
             <div className="bg-background rounded-2xl shadow-sm border border-border p-6">
               <ReportMarkdownRenderer
-                content={content}
+                content={processedContent}
                 collapsibleSections={true}
                 isLoading={isLoading}
               />
@@ -149,7 +179,11 @@ export function ResearchReportPanel({
                 </div>
                 <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
                   {references.map((ref, i) => (
-                    <li key={i} className="break-all">
+                    <li
+                      key={i}
+                      id={`ref-${i + 1}`}
+                      className="break-all scroll-mt-4"
+                    >
                       {ref.url ? (
                         <a
                           href={ref.url}

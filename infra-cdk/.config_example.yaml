@@ -20,24 +20,24 @@ backend:
 # required: fields that must be non-null for the tool to work
 tools:
   alphavantage: # Commodity prices, economic indicators, and market news
-    enabled: true
+    enabled: false
     default_on: false
     required:
       api_key: null # Get your key from https://www.alphavantage.co/
   arxiv: # Search academic papers on arXiv by topic, author, or keywords
     enabled: true
-    default_on: false
+    default_on: true
   bedrock_kb: # Query Amazon Bedrock Knowledge Bases for enterprise data
-    enabled: true
+    enabled: false
     default_on: false
     required:
       knowledge_base_id: null # Replace with your Bedrock Knowledge Base ID
   clinicaltrials: # Search clinical studies by condition, intervention, or phase
-    enabled: false
-    default_on: false
+    enabled: true
+    default_on: true
   edgar: # Search SEC company filings (10-K, 10-Q, 8-K)
     enabled: true
-    default_on: false
+    default_on: true
   fred: # 800K+ economic time series from the Federal Reserve
     enabled: false
     default_on: false
@@ -48,15 +48,15 @@ tools:
     default_on: true
   openfda: # Search FDA drug label database for pharmaceutical information
     enabled: true
-    default_on: false
+    default_on: true
   pubmed: # Search peer-reviewed biomedical and life sciences literature
     enabled: true
-    default_on: false
+    default_on: true
   s3: # Read text files and PDFs from S3 buckets
     enabled: true
     default_on: false
   tavily: # Search the web with relevance scoring and domain filtering
-    enabled: true
+    enabled: false
     default_on: true
     required:
       api_key: null # Get your key from https://tavily.com/

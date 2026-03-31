@@ -6,6 +6,7 @@ from pathlib import Path
 
 import boto3
 from botocore.config import Config
+from pdf_generator import generate_pdf
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 
 REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108  # nosec B108
@@ -38,21 +39,41 @@ class ReportS3UploadHook(HookProvider):
             config=Config(s3={"addressing_style": "virtual"}),
         )
         self._last_url: str | None = None
+        self._last_report_url: str | None = None
+        self._last_pdf_url: str | None = None
         self._lock = threading.Lock()
 
     def register_hooks(self, registry: HookRegistry) -> None:
         registry.add_callback(AfterToolCallEvent, self.upload_report_to_s3)
 
+    def take_pending_urls(self) -> dict[str, str]:
+        """Return and clear any pending report/PDF URLs (for streaming layer)."""
+        with self._lock:
+            urls = {}
+            if self._last_report_url:
+                urls["report"] = self._last_report_url
+                self._last_report_url = None
+            if self._last_pdf_url:
+                urls["pdf"] = self._last_pdf_url
+            return urls
+
     def _do_upload(self, session_id: str, s3_suffix: str, content: str) -> str | None:
         """Upload file to S3, return pre-signed URL."""
+        return self._do_upload_binary(
+            session_id, s3_suffix, content.encode("utf-8"), "text/markdown"
+        )
+
+    def _do_upload_binary(
+        self, session_id: str, s3_suffix: str, data: bytes, content_type: str
+    ) -> str | None:
+        """Upload raw bytes to S3, return pre-signed URL."""
         try:
             s3_key = f"reports/{session_id}/{s3_suffix}"
-
             self.s3_client.put_object(
                 Bucket=REPORTS_BUCKET,
                 Key=s3_key,
-                Body=content.encode("utf-8"),
-                ContentType="text/markdown",
+                Body=data,
+                ContentType=content_type,
             )
             print(f"[HOOK] Uploaded to s3://{REPORTS_BUCKET}/{s3_key}")
 
@@ -105,18 +126,26 @@ class ReportS3UploadHook(HookProvider):
             print("[HOOK] STAGING_BUCKET_NAME not set, skipping S3 upload")
             return
 
-        content = local.read_text()
+        content = local.read_text(errors="replace")
         presigned_url = self._do_upload(session_id, s3_suffix, content)
 
-        # Only inject URL tag for the report (frontend uses it for real-time display)
-        if (
-            file_key == "research_report"
-            and presigned_url
-            and "content" in event.result
-            and event.result["content"]
-        ):
-            original_text = event.result["content"][0].get("text", "")
-            event.result["content"][0]["text"] = (
-                f"{original_text}\n\n[REPORT_URL:{presigned_url}]"
-            )
-            print("[HOOK] Added REPORT_URL pre-signed URL to tool result")
+        # store URLs for the streaming layer (not injected into LLM context)
+        if file_key == "research_report" and presigned_url:
+            with self._lock:
+                self._last_report_url = presigned_url
+
+            try:
+                pdf_bytes = generate_pdf(content)
+                pdf_url = self._do_upload_binary(
+                    session_id,
+                    "report.pdf",
+                    pdf_bytes,
+                    "application/pdf",
+                )
+                if pdf_url:
+                    with self._lock:
+                        self._last_pdf_url = pdf_url
+            except Exception as e:
+                print(f"[HOOK] PDF generation failed: {e}")
+
+            print("[HOOK] Stored report URLs for frontend streaming")
