@@ -1,7 +1,5 @@
-"""
-Copyright Amazon.com and Affiliates
-This code is being licensed under the terms of the Amazon Software License available at https://aws.amazon.com/asl/
-"""
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 
 import re
 from html import escape
