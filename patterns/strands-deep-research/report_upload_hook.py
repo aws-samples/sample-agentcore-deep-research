@@ -109,7 +109,12 @@ class ReportS3UploadHook(HookProvider):
         presigned_url = self._do_upload(session_id, s3_suffix, content)
 
         # Only inject URL tag for the report (frontend uses it for real-time display)
-        if file_key == "research_report" and presigned_url and "content" in event.result and event.result["content"]:
+        if (
+            file_key == "research_report"
+            and presigned_url
+            and "content" in event.result
+            and event.result["content"]
+        ):
             original_text = event.result["content"][0].get("text", "")
             event.result["content"][0]["text"] = (
                 f"{original_text}\n\n[REPORT_URL:{presigned_url}]"
