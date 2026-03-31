@@ -3,13 +3,7 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  Download,
-  FileText,
-  Loader2,
-  BookOpen,
-  Link,
-} from "lucide-react";
+import { Download, FileText, Loader2, BookOpen, Link } from "lucide-react";
 import {
   ReportMarkdownRenderer,
   extractReportTitle,
