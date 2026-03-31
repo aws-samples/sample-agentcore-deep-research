@@ -43,8 +43,25 @@ export function ResearchReportPanel({
     return refs;
   }, [content]);
 
-  const handleDownload = () => {
-    const blob = new Blob([content], { type: "text/markdown" });
+  const handleDownload = async () => {
+    const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+    let localContent = content;
+    const images: { filename: string; url: string }[] = [];
+    let match;
+    let i = 1;
+
+    while ((match = imgRegex.exec(content)) !== null) {
+      const pathMatch = match[2].match(/\/([^/?]+\.png)/);
+      const filename = pathMatch ? pathMatch[1] : `chart_${i}.png`;
+      images.push({ filename, url: match[2] });
+      localContent = localContent.replace(match[2], filename);
+      i++;
+    }
+
+    // Download markdown (with local paths if images exist)
+    const blob = new Blob([images.length ? localContent : content], {
+      type: "text/markdown",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -53,6 +70,26 @@ export function ResearchReportPanel({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Download each image with a small delay to avoid browser blocking
+    for (const img of images) {
+      try {
+        const resp = await fetch(img.url);
+        if (!resp.ok) continue;
+        const imgBlob = await resp.blob();
+        const imgUrl = URL.createObjectURL(imgBlob);
+        const imgA = document.createElement("a");
+        imgA.href = imgUrl;
+        imgA.download = img.filename;
+        document.body.appendChild(imgA);
+        imgA.click();
+        document.body.removeChild(imgA);
+        URL.revokeObjectURL(imgUrl);
+        await new Promise((r) => setTimeout(r, 300));
+      } catch {
+        /* skip */
+      }
+    }
   };
 
   return (
@@ -79,13 +116,15 @@ export function ResearchReportPanel({
           )}
         </div>
         {content && (
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm shrink-0 ml-2"
-          >
-            <Download className="w-4 h-4" />
-            Download
-          </button>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
+          </div>
         )}
       </div>
 

@@ -24,6 +24,8 @@ from utils.auth import extract_user_id_from_context, get_gateway_access_token
 from utils.inference import get_bedrock_config, get_inference_configs
 from utils.ssm import get_ssm_parameter
 
+from tools.code_interpreter.execute_python_tool import execute_python
+
 # load inference configurations
 INFERENCE_CONFIG, _ = get_inference_configs()
 BEDROCK_CONFIG = get_bedrock_config()
@@ -303,6 +305,7 @@ def create_deep_research_agent(
         file_read,
         file_write,
         editor,
+        execute_python,
     ]
 
     try:
@@ -394,7 +397,7 @@ async def agent_stream(payload, context: RequestContext):
     - prompt: User's research query (required)
     - runtimeSessionId: Session ID for continuity (required)
     - enabledSources: List of enabled data sources (optional, default: all)
-      Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "alphavantage"
+        Valid values: "tavily", "nova", "arxiv", "openfda", "s3", "alphavantage"
     - s3FileUris: List of S3 file URIs (optional, used when "s3" is enabled)
     """
     user_query = payload.get("prompt")

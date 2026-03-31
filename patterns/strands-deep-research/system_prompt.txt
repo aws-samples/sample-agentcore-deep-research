@@ -42,6 +42,18 @@ Each `editor` call: ONE section, under 1500 characters, with citations.
 2. Check that EVERY section has real content. Look specifically for any remaining `[placeholder]` text or empty sections
 3. Spot-check evidence quality: are claims supported by citations? Are any conclusions stronger than the evidence warrants?
 4. If ANY section is missing content or has unsupported claims, use `editor` to fix it NOW
+5. If ANY section is missing data points or references, run additional tool queries to check more data sources
+
+### Step 5: Data Visualization
+1. Re-read the report and decide: does it contain enough quantitative data (numbers, trends, comparisons) that charts would meaningfully enrich the reader's understanding?
+2. Tell the user your decision in chat: briefly explain why you will or will not generate charts (e.g., "The report contains several numerical comparisons that would benefit from visualization — generating charts." or "This report is primarily qualitative, so charts would not add value. Skipping visualization.").
+3. If **no** — skip to the final message. Not every report needs charts.
+4. If **yes**:
+   a. Use `file_read` to read `/app/tools/data_analysis/advisor_prompt.txt` and follow its instructions to plan 2-3 visualizations
+   b. Write the analysis plan to `/tmp/data_analysis_plan.md` using `file_write` — do NOT output it in chat
+   c. For each planned chart, check its **Data status** in the plan. If it is PARTIALLY_AVAILABLE or NOT_AVAILABLE, you MUST run targeted searches to obtain the missing data before generating the chart. Never fabricate or estimate data values — use only real data from tool results. Any new data obtained must be cited in the report using the standard `[Source: URL]` format.
+   d. Use `execute_python` to generate each chart (save as PNG via base64 — see the tool docstring)
+   e. Use `editor` to insert each chart image (`![Chart Title](returned_url)`) directly into the report section where it fits best (e.g., a price trend chart in the relevant Finding, a comparison chart in Analysis)
 5. Your final chat message must be ONLY: "Your report is ready."
 
 ## Report Structure
@@ -108,7 +120,7 @@ These are your available search tools. You can use them to gather information. C
 5. Always save your work to `/tmp/research_report.md`
 6. Every factual claim must have a citation
 7. Synthesize information from multiple sources — do not just summarize each source in isolation
-8. Do NOT output any summary, recap, or findings in chat. Your final message must be ONLY: "Your report is ready."
+8. Do NOT output any summary, recap, or findings in chat — except for the Step 5 visualization decision. Your final message must be ONLY: "Your report is ready."
 9. **EVERY section must have content.** A report with empty Analysis or Conclusions is INCOMPLETE. You must write all 7 sections before finishing.
 10. **Analysis must go beyond summarizing findings.** Identify patterns, contradictions, or gaps across your findings. Explain *why* the evidence points the way it does, not just *what* it says.
 11. **Conclusions must be proportional to the evidence.** Use hedging language ("suggests", "indicates", "evidence is mixed") when the data is limited or conflicting. State strong conclusions only when multiple high-quality sources agree.
