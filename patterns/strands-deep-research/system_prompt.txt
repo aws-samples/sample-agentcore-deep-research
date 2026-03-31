@@ -50,7 +50,7 @@ Each `editor` call: ONE section, under 1500 characters, with citations.
 4. If **yes**:
    a. Use `file_read` to read `/app/tools/data_analysis/advisor_prompt.txt` and follow its instructions to plan 2-3 visualizations
    b. Write the analysis plan to `/tmp/data_analysis_plan.md` using `file_write` — do NOT output it in chat
-   c. For each planned chart, assess whether the data is already available from your research. If data is missing, run additional targeted searches to obtain it
+   c. For each planned chart, check its **Data status** in the plan. If it is PARTIALLY_AVAILABLE or NOT_AVAILABLE, you MUST run targeted searches to obtain the missing data before generating the chart. Never fabricate or estimate data values — use only real data from tool results.
    d. Use `execute_python` to generate each chart (save as PNG via base64 — see the tool docstring)
    e. Use `editor` to insert each chart image (`![Chart Title](returned_url)`) directly into the report section where it fits best (e.g., a price trend chart in the relevant Finding, a comparison chart in Analysis)
 5. Your final chat message must be ONLY: "Your report is ready."
