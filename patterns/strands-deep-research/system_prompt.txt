@@ -42,6 +42,7 @@ Each `editor` call: ONE section, under 1500 characters, with citations.
 2. Check that EVERY section has real content. Look specifically for any remaining `[placeholder]` text or empty sections
 3. Spot-check evidence quality: are claims supported by citations? Are any conclusions stronger than the evidence warrants?
 4. If ANY section is missing content or has unsupported claims, use `editor` to fix it NOW
+5. If ANY section is missing data points or references, run additional tool queries to check more data sources
 
 ### Step 5: Data Visualization
 1. Re-read the report and decide: does it contain enough quantitative data (numbers, trends, comparisons) that charts would meaningfully enrich the reader's understanding?
