@@ -6,6 +6,7 @@ from pathlib import Path
 
 import boto3
 from botocore.config import Config
+from pdf_generator import generate_pdf
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 
 REPORT_FILE_PATH = "/tmp/research_report.md"  # noqa: S108  # nosec B108
@@ -45,14 +46,21 @@ class ReportS3UploadHook(HookProvider):
 
     def _do_upload(self, session_id: str, s3_suffix: str, content: str) -> str | None:
         """Upload file to S3, return pre-signed URL."""
+        return self._do_upload_binary(
+            session_id, s3_suffix, content.encode("utf-8"), "text/markdown"
+        )
+
+    def _do_upload_binary(
+        self, session_id: str, s3_suffix: str, data: bytes, content_type: str
+    ) -> str | None:
+        """Upload raw bytes to S3, return pre-signed URL."""
         try:
             s3_key = f"reports/{session_id}/{s3_suffix}"
-
             self.s3_client.put_object(
                 Bucket=REPORTS_BUCKET,
                 Key=s3_key,
-                Body=content.encode("utf-8"),
-                ContentType="text/markdown",
+                Body=data,
+                ContentType=content_type,
             )
             print(f"[HOOK] Uploaded to s3://{REPORTS_BUCKET}/{s3_key}")
 
@@ -108,15 +116,26 @@ class ReportS3UploadHook(HookProvider):
         content = local.read_text()
         presigned_url = self._do_upload(session_id, s3_suffix, content)
 
-        # Only inject URL tag for the report (frontend uses it for real-time display)
+        # inject URL tags for the report (frontend uses them for display/download)
         if (
             file_key == "research_report"
             and presigned_url
             and "content" in event.result
             and event.result["content"]
         ):
+            # Generate PDF alongside the markdown
+            pdf_url = None
+            try:
+                pdf_bytes = generate_pdf(content)
+                pdf_url = self._do_upload_binary(
+                    session_id, "report.pdf", pdf_bytes, "application/pdf"
+                )
+            except Exception as e:
+                print(f"[HOOK] PDF generation failed: {e}")
+
             original_text = event.result["content"][0].get("text", "")
-            event.result["content"][0]["text"] = (
-                f"{original_text}\n\n[REPORT_URL:{presigned_url}]"
-            )
-            print("[HOOK] Added REPORT_URL pre-signed URL to tool result")
+            url_tags = f"\n\n[REPORT_URL:{presigned_url}]"
+            if pdf_url:
+                url_tags += f"\n[REPORT_PDF_URL:{pdf_url}]"
+            event.result["content"][0]["text"] = f"{original_text}{url_tags}"
+            print("[HOOK] Added pre-signed URL tags to tool result")

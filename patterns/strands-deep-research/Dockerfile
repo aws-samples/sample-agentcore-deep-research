@@ -18,6 +18,12 @@ COPY pyproject.toml .
 COPY gateway/ gateway/
 COPY tools/ tools/
 
+# Install system dependencies for weasyprint (PDF generation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 \
+    libcairo2 libffi-dev libglib2.0-0 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy and install agent-specific requirements first
 COPY patterns/strands-deep-research/requirements.txt requirements.txt
 RUN uv pip install --no-cache -r requirements.txt && \
@@ -37,6 +43,7 @@ EXPOSE 8080
 COPY patterns/strands-deep-research/deep_research_agent.py .
 COPY patterns/strands-deep-research/system_prompt.txt .
 COPY patterns/strands-deep-research/report_upload_hook.py .
+COPY patterns/strands-deep-research/pdf_generator.py .
 COPY patterns/utils/ utils/
 
 # Healthcheck using Python (no extra dependencies needed)
