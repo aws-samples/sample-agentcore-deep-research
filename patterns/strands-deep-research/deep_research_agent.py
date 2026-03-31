@@ -355,15 +355,15 @@ def create_deep_research_agent(
         raise
 
 
-_REPORT_URL_RE = re.compile(r"\[REPORT_URL:[^\]]+\]")
+_REPORT_URL_RE = re.compile(r"\[REPORT_(?:PDF_)?URL:[^\]]+\]")
 
 
 def _truncate_text(text: str, max_len: int) -> str:
-    """Truncate text but preserve [REPORT_URL:...] tag if present."""
+    """Truncate text but preserve [REPORT_URL:...] and [REPORT_PDF_URL:...] tags."""
     if len(text) <= max_len:
         return text
-    match = _REPORT_URL_RE.search(text)
-    suffix = f"\n\n{match.group()}" if match else ""
+    matches = _REPORT_URL_RE.findall(text)
+    suffix = "\n\n" + "\n".join(matches) if matches else ""
     clean = _REPORT_URL_RE.sub("", text)
     return clean[:max_len] + "... (truncated)" + suffix
 
