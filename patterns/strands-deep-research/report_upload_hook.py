@@ -39,10 +39,23 @@ class ReportS3UploadHook(HookProvider):
             config=Config(s3={"addressing_style": "virtual"}),
         )
         self._last_url: str | None = None
+        self._last_report_url: str | None = None
+        self._last_pdf_url: str | None = None
         self._lock = threading.Lock()
 
     def register_hooks(self, registry: HookRegistry) -> None:
         registry.add_callback(AfterToolCallEvent, self.upload_report_to_s3)
+
+    def take_pending_urls(self) -> dict[str, str]:
+        """Return and clear any pending report/PDF URLs (for streaming layer)."""
+        with self._lock:
+            urls = {}
+            if self._last_report_url:
+                urls["report"] = self._last_report_url
+                self._last_report_url = None
+            if self._last_pdf_url:
+                urls["pdf"] = self._last_pdf_url
+            return urls
 
     def _do_upload(self, session_id: str, s3_suffix: str, content: str) -> str | None:
         """Upload file to S3, return pre-signed URL."""
@@ -116,26 +129,23 @@ class ReportS3UploadHook(HookProvider):
         content = local.read_text(errors="replace")
         presigned_url = self._do_upload(session_id, s3_suffix, content)
 
-        # inject URL tags for the report (frontend uses them for display/download)
-        if (
-            file_key == "research_report"
-            and presigned_url
-            and "content" in event.result
-            and event.result["content"]
-        ):
-            # Generate PDF alongside the markdown
-            pdf_url = None
+        # store URLs for the streaming layer (not injected into LLM context)
+        if file_key == "research_report" and presigned_url:
+            with self._lock:
+                self._last_report_url = presigned_url
+
             try:
                 pdf_bytes = generate_pdf(content)
                 pdf_url = self._do_upload_binary(
-                    session_id, "report.pdf", pdf_bytes, "application/pdf"
+                    session_id,
+                    "report.pdf",
+                    pdf_bytes,
+                    "application/pdf",
                 )
+                if pdf_url:
+                    with self._lock:
+                        self._last_pdf_url = pdf_url
             except Exception as e:
                 print(f"[HOOK] PDF generation failed: {e}")
 
-            original_text = event.result["content"][0].get("text", "")
-            url_tags = f"\n\n[REPORT_URL:{presigned_url}]"
-            if pdf_url:
-                url_tags += f"\n[REPORT_PDF_URL:{pdf_url}]"
-            event.result["content"][0]["text"] = f"{original_text}{url_tags}"
-            print("[HOOK] Added pre-signed URL tags to tool result")
+            print("[HOOK] Stored report URLs for frontend streaming")

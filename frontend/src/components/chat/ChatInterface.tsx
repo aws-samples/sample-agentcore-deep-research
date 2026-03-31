@@ -333,6 +333,12 @@ export default function ChatInterface() {
                   if (pdfUrl) {
                     setReportPdfUrl(pdfUrl);
                   }
+                  // strip URL tags from display
+                  if (tc.result) {
+                    tc.result = tc.result
+                      .replace(/\n*\[REPORT_(?:PDF_)?URL:[^\]]+\]/g, "")
+                      .trim();
+                  }
                   const url = lastReportUrlRef.current;
                   if (url) {
                     fetchReportContent(url).then((content) => {
