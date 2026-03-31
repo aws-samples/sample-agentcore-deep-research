@@ -9,7 +9,6 @@ import {
   Loader2,
   BookOpen,
   Link,
-  BarChart3,
 } from "lucide-react";
 import {
   ReportMarkdownRenderer,
@@ -20,14 +19,12 @@ interface ResearchReportPanelProps {
   content: string;
   isLoading: boolean;
   currentRound: number;
-  onAnalyze?: () => void;
 }
 
 export function ResearchReportPanel({
   content,
   isLoading,
   currentRound,
-  onAnalyze,
 }: ResearchReportPanelProps) {
   // Extract H1 title from markdown content
   const reportTitle = useMemo(
@@ -126,15 +123,6 @@ export function ResearchReportPanel({
         </div>
         {content && (
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            {onAnalyze && !isLoading && (
-              <button
-                onClick={onAnalyze}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-blue-700 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Analyze
-              </button>
-            )}
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted hover:border-muted-foreground/30 transition-all shadow-sm"

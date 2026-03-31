@@ -57,11 +57,10 @@ def _upload_chart(b64_data: str, chart_name: str) -> str:
 
 @tool
 def execute_python(code: str, chart_name: str = "") -> str:
-    """Execute Python code for data visualization and statistical analysis ONLY.
+    """Execute Python code for data visualization and statistical analysis.
 
-    Use this tool exclusively when the user clicks "Analyze" to generate charts
-    and run statistical tests based on the Data Analysis Recommendations section.
-    Do NOT use this tool during the research or report writing phases.
+    Use this tool in Step 5 when you decide the report would benefit from charts.
+    Do NOT use this tool during the research or report writing phases (Steps 1-4).
 
     The sandbox has numpy, pandas, matplotlib, seaborn, scipy, and scikit-learn.
 
@@ -75,7 +74,7 @@ def execute_python(code: str, chart_name: str = "") -> str:
         print(f"CHART_BASE64:{base64.b64encode(buf.read()).decode()}")
 
     The tool uploads the image to S3 and returns a presigned URL.
-    Use editor to replace the CHART_PLACEHOLDER in the report with: ![Chart Title](returned_url)
+    Use editor to insert ![Chart Title](returned_url) into the relevant report section.
 
     Args:
         code: Python code for data analysis or visualization. Include all imports.
