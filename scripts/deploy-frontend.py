@@ -165,7 +165,7 @@ def parse_config_yaml(config_path: Path) -> dict:
         in_required = False
         for line in tools_text.split("\n"):
             # Match tool name (2-space indented)
-            tool_match = re.match(r"^  (\w+):\s*$", line)
+            tool_match = re.match(r"^  (\w+):\s*(?:#.*)?$", line)
             if tool_match:
                 current_tool = tool_match.group(1)
                 in_required = False
@@ -177,7 +177,7 @@ def parse_config_yaml(config_path: Path) -> dict:
             if not current_tool:
                 continue
             # Match "required:" block start (4-space indented)
-            if re.match(r"^    required:\s*$", line):
+            if re.match(r"^    required:\s*(?:#.*)?$", line):
                 in_required = True
                 config["tools"][current_tool]["required"] = {}
                 continue

@@ -4,6 +4,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -115,7 +116,23 @@ const markdownComponents: Record<string, any> = {
   },
   a({ href, children }: { href?: string; children?: React.ReactNode }) {
     const text = String(children);
+    const isAnchor = href?.startsWith("#");
     const isSource = text.startsWith("http") || text.includes("Source");
+    // Citation superscript links like [1], [2] — open source URL or scroll to ref
+    const isCitation = /^\[\d+\]$/.test(text);
+    if (isCitation) {
+      return (
+        <a
+          href={href}
+          {...(isAnchor
+            ? {}
+            : { target: "_blank", rel: "noopener noreferrer" })}
+          className="text-blue-600 hover:text-blue-800 no-underline text-[0.75em]"
+        >
+          {children}
+        </a>
+      );
+    }
     return (
       <a
         href={href}
@@ -293,6 +310,7 @@ function CollapsibleSection({
         <div className="pl-6 pt-2">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={markdownComponents}
           >
             {completePartialMarkdown(section.content)}
@@ -438,6 +456,7 @@ export function ReportMarkdownRenderer({
               <div key={section.id} className="mb-4">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
                   components={markdownComponents}
                 >
                   {completePartialMarkdown(section.content)}
@@ -468,6 +487,7 @@ export function ReportMarkdownRenderer({
               {section.content && (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
                   components={markdownComponents}
                 >
                   {completePartialMarkdown(section.content)}

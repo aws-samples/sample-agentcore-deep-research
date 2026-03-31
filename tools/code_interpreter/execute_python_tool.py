@@ -68,7 +68,7 @@ def execute_python(code: str, chart_name: str = "") -> str:
 
         import io, base64
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
+        plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         buf.seek(0)
         print(f"CHART_BASE64:{base64.b64encode(buf.read()).decode()}")
