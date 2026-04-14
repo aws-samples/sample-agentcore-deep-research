@@ -1,6 +1,6 @@
 # AgentCore Deep Research
 
-AgentCore Deep Research is a sample AI solution for deep research built on Amazon Bedrock AgentCore. It conducts thorough research across multiple data sources and creates comprehensive reports with proper citations. The app features a modern React frontend showing real-time report generation alongside the chat. This sample is built using the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
+AgentCore Deep Research is an open-source sample application that automates multi-source research on [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/). Given a research question, an AI agent iteratively queries diverse data sources, cross-references findings, and generates a structured PDF report with inline citations and data visualizations. The application includes a React frontend with real-time report streaming, over 10 configurable data connectors spanning enterprise data on AWS and third-party APIs, and a modular architecture built on the [Fullstack Solution Template for AgentCore](https://github.com/awslabs/fullstack-solution-template-for-agentcore).
 
 ![Workflow](docs/figures/workflow.png)
 
