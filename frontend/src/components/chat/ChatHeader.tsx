@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Moon, Sun } from "lucide-react";
+import { Plus, Moon, Sun, PanelLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
@@ -36,19 +36,31 @@ type ChatHeaderProps = {
   title?: string | undefined;
   onNewChat: () => void;
   canStartNewChat: boolean;
+  onToggleSidebar?: () => void;
 };
 
 export function ChatHeader({
   title,
   onNewChat,
   canStartNewChat,
+  onToggleSidebar,
 }: ChatHeaderProps) {
   const { isAuthenticated, signOut } = useAuth();
   const [dark, toggleDark] = useDarkMode();
 
   return (
     <header className="flex items-center justify-between p-4 border-b w-full">
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        {onToggleSidebar && (
+          <Button
+            onClick={onToggleSidebar}
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle sidebar"
+          >
+            <PanelLeft className="h-5 w-5" />
+          </Button>
+        )}
         <h1 className="text-xl font-bold">
           {title || "AgentCore Deep Research"}
         </h1>
