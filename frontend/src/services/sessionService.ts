@@ -60,9 +60,10 @@ async function apiRequest<T>(
 ): Promise<T> {
   const baseUrl = await loadApiUrl();
   // cache-bust GET requests to bypass API Gateway response cache
-  const cacheBuster = !options.method || options.method === "GET"
-    ? `${path.includes("?") ? "&" : "?"}_t=${Date.now()}`
-    : "";
+  const cacheBuster =
+    !options.method || options.method === "GET"
+      ? `${path.includes("?") ? "&" : "?"}_t=${Date.now()}`
+      : "";
   const url = `${baseUrl}${path}${cacheBuster}`;
 
   const response = await fetch(url, {
@@ -84,9 +85,7 @@ async function apiRequest<T>(
   return response.json();
 }
 
-export async function listSessions(
-  idToken: string,
-): Promise<SessionSummary[]> {
+export async function listSessions(idToken: string): Promise<SessionSummary[]> {
   const data = await apiRequest<{ sessions: SessionSummary[] }>(
     "sessions",
     idToken,
@@ -105,7 +104,13 @@ export async function saveSession(
   sessionId: string,
   payload: SaveSessionPayload,
   idToken: string,
-): Promise<{ success: boolean; sessionId: string; title: string; createdAt: number; updatedAt: number }> {
+): Promise<{
+  success: boolean;
+  sessionId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}> {
   return apiRequest(`sessions/${sessionId}`, idToken, {
     method: "PUT",
     body: JSON.stringify(payload),
