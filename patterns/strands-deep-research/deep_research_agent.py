@@ -4,6 +4,7 @@ import json
 import os
 import re
 import traceback
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Bypass tool confirmation prompts for headless operation in AgentCore Runtime
@@ -187,6 +188,10 @@ def load_system_prompt(
     # Replace the data retrieval section in the prompt
     pattern = r"### Data Retrieval \(via Gateway\)\n(?:- .*\n)*"
     base_prompt = re.sub(pattern, tools_section, base_prompt)
+
+    # Prepend today's date so the agent has temporal context
+    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    base_prompt = f"Today is {today}.\n\n{base_prompt}"
 
     return base_prompt
 

@@ -43,6 +43,9 @@ export class BackendStack extends cdk.NestedStack {
   private machineClient: cognito.UserPoolClient
   private agentRuntime: agentcore.Runtime
   private stagingBucketName: string
+  private api: apigateway.RestApi
+  private apiAuthorizer: apigateway.CognitoUserPoolsAuthorizer
+  private apiRequestValidator: apigateway.RequestValidator
 
   constructor(scope: Construct, id: string, props: BackendStackProps) {
     super(scope, id, props)
@@ -91,12 +94,16 @@ export class BackendStack extends cdk.NestedStack {
     // Store Cognito configuration in SSM for testing and frontend
     this.createCognitoSSMParameters(props.config)
 
-    // Create Feedback DynamoDB table (example of application data storage)
-    const feedbackTable = this.createFeedbackTable(props.config)
+    // Create API Gateway (shared by all endpoints)
+    this.createApi(props.config, props.frontendUrl)
 
-    // Create API Gateway Feedback API resources (example of best-practice API Gateway + Lambda
-    // pattern)
-    this.createFeedbackApi(props.config, props.frontendUrl, feedbackTable)
+    // Create Feedback DynamoDB table and API endpoint
+    const feedbackTable = this.createFeedbackTable(props.config)
+    this.createFeedbackEndpoint(props.config, props.frontendUrl, feedbackTable)
+
+    // Create Sessions DynamoDB table and API endpoints (session history)
+    const sessionsTable = this.createSessionsTable(props.config)
+    this.createSessionsEndpoint(props.config, props.frontendUrl, sessionsTable, props.stagingBucket)
   }
 
   private createAgentCoreRuntime(config: AppConfig): void {
@@ -451,35 +458,73 @@ export class BackendStack extends cdk.NestedStack {
     return feedbackTable
   }
 
-  /**
-   * Creates an API Gateway with Lambda integration for the feedback endpoint.
-   * This is an EXAMPLE implementation demonstrating best practices for API Gateway + Lambda.
-   *
-   * API Contract - POST /feedback
-   * Authorization: Bearer <cognito-access-token> (required)
-   *
-   * Request Body:
-   *   sessionId: string (required, max 100 chars, alphanumeric with -_) - Conversation session ID
-   *   message: string (required, max 5000 chars) - Agent's response being rated
-   *   feedbackType: "positive" | "negative" (required) - User's rating
-   *   comment: string (optional, max 5000 chars) - User's explanation for rating
-   *
-   * Success Response (200):
-   *   { success: true, feedbackId: string }
-   *
-   * Error Responses:
-   *   400: { error: string } - Validation failure (missing fields, invalid format)
-   *   401: { error: "Unauthorized" } - Invalid/missing JWT token
-   *   500: { error: "Internal server error" } - DynamoDB or processing error
-   *
-   * Implementation: infra-cdk/lambdas/feedback/index.py
-   */
-  private createFeedbackApi(
+  // Creates the shared API Gateway, Cognito authorizer, and request validator
+  private createApi(config: AppConfig, frontendUrl: string): void {
+    this.api = new apigateway.RestApi(this, "FeedbackApi", {
+      restApiName: `${config.stack_name_base}-api`,
+      description: "API for user feedback, sessions, and future endpoints",
+      defaultCorsPreflightOptions: {
+        allowOrigins: [frontendUrl, "http://localhost:3000"],
+        allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowHeaders: ["Content-Type", "Authorization"],
+      },
+      deployOptions: {
+        stageName: "prod",
+        throttlingRateLimit: 100,
+        throttlingBurstLimit: 200,
+        cachingEnabled: true,
+        cacheClusterEnabled: true,
+        cacheClusterSize: "0.5",
+        cacheTtl: cdk.Duration.minutes(5),
+        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        dataTraceEnabled: true,
+        metricsEnabled: true,
+        accessLogDestination: new apigateway.LogGroupLogDestination(
+          new logs.LogGroup(this, "FeedbackApiAccessLogGroup", {
+            logGroupName: `/aws/apigateway/${config.stack_name_base}-api-access`,
+            retention: logs.RetentionDays.ONE_WEEK,
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+          })
+        ),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields(),
+        tracingEnabled: true,
+      },
+    })
+
+    this.apiRequestValidator = new apigateway.RequestValidator(
+      this,
+      "FeedbackApiRequestValidator",
+      {
+        restApi: this.api,
+        requestValidatorName: `${config.stack_name_base}-request-validator`,
+        validateRequestBody: true,
+        validateRequestParameters: true,
+      }
+    )
+
+    this.apiAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "FeedbackApiAuthorizer", {
+      cognitoUserPools: [this.userPool],
+      identitySource: "method.request.header.Authorization",
+      authorizerName: `${config.stack_name_base}-authorizer`,
+    })
+
+    // Store the API URL for access from main stack
+    this.feedbackApiUrl = this.api.url
+
+    // Store API URL in SSM for frontend
+    new ssm.StringParameter(this, "FeedbackApiUrlParam", {
+      parameterName: `/${config.stack_name_base}/feedback-api-url`,
+      stringValue: this.api.url,
+      description: "API Gateway URL",
+    })
+  }
+
+  // Creates the feedback Lambda and POST /feedback endpoint
+  private createFeedbackEndpoint(
     config: AppConfig,
     frontendUrl: string,
     feedbackTable: dynamodb.Table
   ): void {
-    // Create Lambda function for feedback using Python
     const feedbackLambda = new PythonFunction(this, "FeedbackLambda", {
       functionName: `${config.stack_name_base}-feedback`,
       runtime: lambda.Runtime.PYTHON_3_13,
@@ -506,78 +551,151 @@ export class BackendStack extends cdk.NestedStack {
       }),
     })
 
-    // Grant Lambda permissions to write to DynamoDB
     feedbackTable.grantWriteData(feedbackLambda)
 
-    /*
-     * CORS TODO: Wildcard (*) used because Backend deploys before Frontend in nested stack order.
-     * For Lambda proxy integrations, the Lambda's ALLOWED_ORIGINS env var is the primary CORS control.
-     * API Gateway defaultCorsPreflightOptions below only handles OPTIONS preflight requests.
-     * See detailed explanation and fix options in: infra-cdk/lambdas/feedback/index.py
-     */
-    const api = new apigateway.RestApi(this, "FeedbackApi", {
-      restApiName: `${config.stack_name_base}-api`,
-      description: "API for user feedback and future endpoints",
-      defaultCorsPreflightOptions: {
-        allowOrigins: [frontendUrl, "http://localhost:3000"],
-        allowMethods: ["POST", "OPTIONS"],
-        allowHeaders: ["Content-Type", "Authorization"],
-      },
-      deployOptions: {
-        stageName: "prod",
-        throttlingRateLimit: 100,
-        throttlingBurstLimit: 200,
-        cachingEnabled: true,
-        cacheClusterEnabled: true,
-        cacheClusterSize: "0.5",
-        cacheTtl: cdk.Duration.minutes(5),
-        loggingLevel: apigateway.MethodLoggingLevel.INFO,
-        dataTraceEnabled: true,
-        metricsEnabled: true,
-        accessLogDestination: new apigateway.LogGroupLogDestination(
-          new logs.LogGroup(this, "FeedbackApiAccessLogGroup", {
-            logGroupName: `/aws/apigateway/${config.stack_name_base}-api-access`,
-            retention: logs.RetentionDays.ONE_WEEK,
-            removalPolicy: cdk.RemovalPolicy.DESTROY,
-          })
-        ),
-        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields(),
-        tracingEnabled: true,
-      },
-    })
-
-    // Add request validator for API security
-    const requestValidator = new apigateway.RequestValidator(this, "FeedbackApiRequestValidator", {
-      restApi: api,
-      requestValidatorName: `${config.stack_name_base}-request-validator`,
-      validateRequestBody: true,
-      validateRequestParameters: true,
-    })
-
-    // Create Cognito authorizer
-    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "FeedbackApiAuthorizer", {
-      cognitoUserPools: [this.userPool],
-      identitySource: "method.request.header.Authorization",
-      authorizerName: `${config.stack_name_base}-authorizer`,
-    })
-
-    // Create /feedback resource and POST method
-    const feedbackResource = api.root.addResource("feedback")
+    const feedbackResource = this.api.root.addResource("feedback")
     feedbackResource.addMethod("POST", new apigateway.LambdaIntegration(feedbackLambda), {
-      authorizer,
+      authorizer: this.apiAuthorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO,
-      requestValidator: requestValidator,
+      requestValidator: this.apiRequestValidator,
+    })
+  }
+
+  // Creates a DynamoDB table for session history
+  private createSessionsTable(config: AppConfig): dynamodb.Table {
+    const sessionsTable = new dynamodb.Table(this, "SessionsTable", {
+      tableName: `${config.stack_name_base}-sessions`,
+      partitionKey: {
+        name: "userId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "sessionId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
     })
 
-    // Store the API URL for access from main stack
-    this.feedbackApiUrl = api.url
-
-    // Store API URL in SSM for frontend
-    new ssm.StringParameter(this, "FeedbackApiUrlParam", {
-      parameterName: `/${config.stack_name_base}/feedback-api-url`,
-      stringValue: api.url,
-      description: "Feedback API Gateway URL",
+    sessionsTable.addGlobalSecondaryIndex({
+      indexName: "userId-updatedAt-index",
+      partitionKey: {
+        name: "userId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "updatedAt",
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
     })
+
+    return sessionsTable
+  }
+
+  // Creates the sessions Lambda and API endpoints for session history
+  private createSessionsEndpoint(
+    config: AppConfig,
+    frontendUrl: string,
+    sessionsTable: dynamodb.Table,
+    stagingBucket: s3.Bucket
+  ): void {
+    const sessionsLambda = new PythonFunction(this, "SessionsLambda", {
+      functionName: `${config.stack_name_base}-sessions`,
+      runtime: lambda.Runtime.PYTHON_3_13,
+      entry: path.join(__dirname, "..", "lambdas", "sessions"),
+      handler: "handler",
+      environment: {
+        TABLE_NAME: sessionsTable.tableName,
+        REPORT_BUCKET: stagingBucket.bucketName,
+        CORS_ALLOWED_ORIGINS: `${frontendUrl},http://localhost:3000`,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      layers: [
+        lambda.LayerVersion.fromLayerVersionArn(
+          this,
+          "SessionsPowertoolsLayer",
+          `arn:aws:lambda:${
+            cdk.Stack.of(this).region
+          }:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18`
+        ),
+      ],
+      logGroup: new logs.LogGroup(this, "SessionsLambdaLogGroup", {
+        logGroupName: `/aws/lambda/${config.stack_name_base}-sessions`,
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    })
+
+    sessionsTable.grantReadWriteData(sessionsLambda)
+    stagingBucket.grantRead(sessionsLambda, "reports/*")
+
+    // GET /sessions - list sessions
+    // PUT /sessions/{sessionId} - create/update session
+    // GET /sessions/{sessionId} - load full session
+    // DELETE /sessions/{sessionId} - delete session
+    const sessionsResource = this.api.root.addResource("sessions")
+    const sessionIdResource = sessionsResource.addResource("{sessionId}")
+
+    const authOptions: apigateway.MethodOptions = {
+      authorizer: this.apiAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    }
+
+    const listMethod = sessionsResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(sessionsLambda),
+      authOptions
+    )
+    const getMethod = sessionIdResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(sessionsLambda),
+      {
+        ...authOptions,
+        requestParameters: { "method.request.path.sessionId": true },
+      }
+    )
+    sessionIdResource.addMethod(
+      "PUT",
+      new apigateway.LambdaIntegration(sessionsLambda),
+      authOptions
+    )
+    sessionIdResource.addMethod(
+      "DELETE",
+      new apigateway.LambdaIntegration(sessionsLambda),
+      authOptions
+    )
+
+    // disable stage-level caching for session GET endpoints to prevent stale
+    // responses. We use CfnMethodSettings-like overrides on the stage.
+    const stage = this.api.deploymentStage.node.defaultChild as apigateway.CfnStage
+    stage.addPropertyOverride("MethodSettings", [
+      {
+        HttpMethod: "*",
+        ResourcePath: "/*",
+        CachingEnabled: true,
+        CacheTtlInSeconds: 300,
+      },
+      {
+        HttpMethod: "GET",
+        ResourcePath: "/sessions",
+        CachingEnabled: false,
+      },
+      {
+        HttpMethod: "GET",
+        ResourcePath: "/sessions/{sessionId}",
+        CachingEnabled: false,
+      },
+    ])
+
+    // Suppress unused warnings
+    void listMethod
+    void getMethod
   }
 
   private createAgentCoreGateway(config: AppConfig): void {

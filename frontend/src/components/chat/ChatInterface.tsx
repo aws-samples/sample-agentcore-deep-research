@@ -15,6 +15,8 @@ import { useGlobal } from "@/app/context/GlobalContext";
 import { AgentCoreClient } from "@/lib/agentcore-client";
 import type { AgentPattern } from "@/lib/agentcore-client";
 import { submitFeedback } from "@/services/feedbackService";
+import { saveSession } from "@/services/sessionService";
+import type { SessionData, SessionSummary } from "@/services/sessionService";
 import { useAuth } from "react-oidc-context";
 import { useDefaultTool } from "@/hooks/useToolRenderer";
 import { ToolCallDisplay } from "./ToolCallDisplay";
@@ -63,12 +65,28 @@ const FALLBACK_TOOLS: Record<string, ToolConfig> = {
   tavily: { enabled: false, default_on: false },
 };
 
-export default function ChatInterface() {
+interface ChatInterfaceProps {
+  onToggleSidebar?: () => void;
+  sessionToLoad?: SessionData | null;
+  loadTrigger?: number;
+  onSessionSaved?: (summary: SessionSummary) => void;
+  onResearchStart?: () => void;
+  onNewChat?: () => void;
+}
+
+export default function ChatInterface({
+  onToggleSidebar,
+  sessionToLoad,
+  loadTrigger,
+  onSessionSaved,
+  onResearchStart,
+  onNewChat,
+}: ChatInterfaceProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<AgentCoreClient | null>(null);
-  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
 
   // Tools config loaded from aws-exports.json
   const [toolsConfig, setToolsConfig] =
@@ -196,8 +214,78 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
+  // Load a session when sessionToLoad changes (user clicked a session in sidebar)
+  useEffect(() => {
+    if (!sessionToLoad) return;
+
+    client?.abort();
+    setIsLoading(false);
+
+    setSessionId(sessionToLoad.sessionId);
+    setMessages(sessionToLoad.messages);
+    setReportContent(sessionToLoad.reportContent || "");
+    setReportPdfUrl(sessionToLoad.reportPdfUrl || null);
+    setShowReportPanel(!!sessionToLoad.reportContent);
+    setResearchRound(0);
+    fileWriteCountRef.current = 0;
+    setError(null);
+    setInput("");
+
+    if (
+      sessionToLoad.enabledSources &&
+      Object.keys(sessionToLoad.enabledSources).length > 0
+    ) {
+      setEnabledSources(sessionToLoad.enabledSources);
+    }
+    setS3FileInput(sessionToLoad.s3FileInput || "");
+  }, [sessionToLoad, loadTrigger]);
+
+  // Persist session to backend
+  const persistSession = async (
+    forSessionId: string,
+    currentMessages?: Message[],
+  ) => {
+    const idToken = auth.user?.id_token;
+    if (!idToken) return;
+
+    const msgs = currentMessages ?? messages;
+    if (msgs.length === 0) return;
+
+    // check if any file_write/editor tool calls occurred (report was generated)
+    const hasReport = fileWriteCountRef.current > 0;
+
+    try {
+      const result = await saveSession(
+        forSessionId,
+        {
+          title: "",
+          messages: msgs,
+          enabledSources,
+          s3FileInput,
+          hasReport,
+        },
+        idToken,
+      );
+
+      onSessionSaved?.({
+        sessionId: forSessionId,
+        title: result.title,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+        hasReport,
+      });
+    } catch (err) {
+      console.error("Failed to save session:", err);
+    }
+  };
+
   const sendMessage = async (userMessage: string) => {
     if (!userMessage.trim() || !client) return;
+
+    // capture session ID at send time so auto-save uses the correct ID
+    const currentSessionId = sessionId;
+
+    onResearchStart?.();
 
     // Clear any previous errors
     setError(null);
@@ -386,6 +474,14 @@ export default function ChatInterface() {
       });
     } finally {
       setIsLoading(false);
+
+      // auto-save session after each response completes
+      setMessages((currentMessages) => {
+        if (currentMessages.length > 0) {
+          persistSession(currentSessionId, currentMessages);
+        }
+        return currentMessages;
+      });
     }
   };
 
@@ -430,6 +526,14 @@ export default function ChatInterface() {
 
   // Start a new chat (generates new session ID)
   const startNewChat = () => {
+    // save current session before clearing (fire-and-forget)
+    if (messages.length > 0) {
+      persistSession(sessionId);
+    }
+
+    // notify parent to clear active session in sidebar
+    onNewChat?.();
+
     client?.abort();
     setSessionId(crypto.randomUUID());
     setMessages([]);
@@ -481,6 +585,7 @@ export default function ChatInterface() {
         <ChatHeader
           onNewChat={startNewChat}
           canStartNewChat={hasAssistantMessages}
+          onToggleSidebar={onToggleSidebar}
         />
         {error && (
           <div className="bg-red-50 dark:bg-red-950/50 border-l-4 border-red-500 p-4 mx-4 mt-2">
