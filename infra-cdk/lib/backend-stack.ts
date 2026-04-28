@@ -315,6 +315,7 @@ export class BackendStack extends cdk.NestedStack {
       MEMORY_ID: memoryId,
       STACK_NAME: config.stack_name_base, // Required for agent to find SSM parameters
       MODEL_ID: config.backend?.model_id || "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      SERVICE_TIER: config.backend?.service_tier || "default", // Bedrock service tier: default, priority, or flex
       STAGING_BUCKET_NAME: this.stagingBucketName, // For S3 report upload
       TOOLS_CONFIG: JSON.stringify(config.tools || {}), // Tool enabled/default_on config
     }

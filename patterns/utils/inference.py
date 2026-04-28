@@ -2,6 +2,7 @@
 # AWS Content under the AWS Enterprise Agreement or
 # AWS Customer Agreement (as applicable).
 
+import os
 from typing import Any
 
 import botocore
@@ -14,6 +15,8 @@ BEDROCK_MAX_CONNECTIONS = 10
 MAX_TOKENS = 64_000
 THINKING_TOKENS = 2_000
 TEMPERATURE = 0.0
+
+VALID_SERVICE_TIERS = {"default", "priority", "flex"}
 
 INFERENCE_CONFIG = {
     "stopSequences": [],  # words after which the generation is stopped
@@ -55,6 +58,24 @@ def get_inference_configs() -> tuple[dict[str, Any], dict[str, Any]]:
         }
 
     return inference_config, reasoning_config
+
+
+def get_service_tier() -> str:
+    """
+    Get the Bedrock service tier from the SERVICE_TIER environment variable.
+
+    Returns
+    -------
+    str
+        Service tier value (default, priority, or flex). Falls back to "default"
+        when the env var is unset or contains an unrecognised value.
+    """
+
+    tier = os.environ.get("SERVICE_TIER", "default").lower()
+    if tier not in VALID_SERVICE_TIERS:
+        print(f"[INFERENCE] Unknown SERVICE_TIER '{tier}', falling back to 'default'")
+        tier = "default"
+    return tier
 
 
 def get_bedrock_config() -> botocore.config.Config:

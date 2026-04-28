@@ -7,6 +7,9 @@ import * as yaml from "yaml"
 const MAX_STACK_NAME_BASE_LENGTH = 35
 
 export type DeploymentType = "docker" | "zip"
+export type ServiceTier = "default" | "priority" | "flex"
+
+const VALID_SERVICE_TIERS: ServiceTier[] = ["default", "priority", "flex"]
 
 export interface ToolConfig {
   enabled: boolean
@@ -23,6 +26,7 @@ export interface AppConfig {
     pattern: string
     deployment_type: DeploymentType
     model_id?: string
+    service_tier: ServiceTier
   }
   tools?: Record<string, ToolConfig>
 }
@@ -64,6 +68,15 @@ export class ConfigManager {
         throw new Error(`Invalid deployment_type '${deploymentType}'. Must be 'docker' or 'zip'.`)
       }
 
+      const serviceTier = (parsedConfig.backend?.service_tier || "default") as ServiceTier
+      if (!VALID_SERVICE_TIERS.includes(serviceTier)) {
+        throw new Error(
+          `Invalid service_tier '${serviceTier}'. Must be one of: ${VALID_SERVICE_TIERS.join(
+            ", "
+          )}.`
+        )
+      }
+
       const stackNameBase = parsedConfig.stack_name_base
       if (!stackNameBase) {
         throw new Error("stack_name_base is required in config.yaml")
@@ -96,6 +109,7 @@ export class ConfigManager {
           pattern: parsedConfig.backend?.pattern || "strands-deep-research",
           deployment_type: deploymentType,
           model_id: parsedConfig.backend?.model_id,
+          service_tier: serviceTier,
         },
         tools,
       }

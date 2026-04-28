@@ -13,6 +13,7 @@ backend:
   pattern: strands-deep-research
   deployment_type: docker # Available deployment types: docker (default), zip
   model_id: global.anthropic.claude-sonnet-4-6 # Model ID for the agent (with cross-region prefix)
+  service_tier: default # Bedrock service tier: default, priority (faster), or flex (cheaper)
 
 # Research tools configuration
 # enabled: whether the tool is deployed and available (true/false)
