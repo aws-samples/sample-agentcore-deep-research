@@ -22,7 +22,7 @@ from strands.models import BedrockModel, CacheConfig
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
-from utils.inference import get_bedrock_config, get_inference_configs
+from utils.inference import get_bedrock_config, get_inference_configs, get_service_tier
 from utils.ssm import get_ssm_parameter
 
 from tools.code_interpreter.execute_python_tool import execute_python
@@ -282,6 +282,8 @@ def create_deep_research_agent(
     model_id = os.environ.get(
         "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
     )
+    service_tier = get_service_tier()
+    print(f"[AGENT] Using Bedrock service tier: {service_tier}")
     bedrock_model = BedrockModel(
         model_id=model_id,
         temperature=INFERENCE_CONFIG["temperature"],
@@ -289,6 +291,7 @@ def create_deep_research_agent(
         streaming=True,
         boto_client_config=BEDROCK_CONFIG,
         cache_config=CacheConfig(strategy="auto"),
+        additional_args={"serviceTier": {"type": service_tier}},
     )
 
     memory_id = os.environ.get("MEMORY_ID")
