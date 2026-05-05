@@ -1,6 +1,6 @@
 # AgentCore Deep Research
 
-Sample open-source app that automates multi-source research on [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/). Given a research question, an AI agent iteratively queries data sources, cross-references findings, and generates a structured PDF report with citations and visualizations. The app includes a React frontend with real-time report streaming, over 10 configurable data connectors spanning enterprise data on AWS and external APIs, and a modular architecture based on the [FAST template stack](https://github.com/awslabs/fullstack-solution-template-for-agentcore). Read more details in [our blog](https://builder.aws.com/content/2sLJJhyoVZLIco77zHkvN2IBB6P/accelerate-deep-research-workflows-with-amazon-bedrock-agentcore-application).
+Sample open-source app that automates deep research on [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/). Given a user question, the AI agent iteratively queries data sources, cross-references findings, and generates a structured report with citations and visualizations. The app features a frontend with real-time streaming, over 10 configurable data connectors spanning enterprise data on AWS and external APIs, and a modular architecture based on the [FAST template](https://github.com/awslabs/fullstack-solution-template-for-agentcore). Read more in [our blog](https://builder.aws.com/content/2sLJJhyoVZLIco77zHkvN2IBB6P/accelerate-deep-research-workflows-with-amazon-bedrock-agentcore-application).
 
 ![Workflow](docs/figures/workflow.png)
 
