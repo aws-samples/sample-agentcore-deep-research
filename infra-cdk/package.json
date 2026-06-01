@@ -30,5 +30,8 @@
     "aws-cdk-lib": "^2.233.0",
     "constructs": "^10.0.0",
     "yaml": "^2.3.4"
+  },
+  "overrides": {
+    "fast-xml-parser": ">=5.8.0"
   }
 }
