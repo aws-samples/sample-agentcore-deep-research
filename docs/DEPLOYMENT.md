@@ -36,9 +36,11 @@ Then edit `infra-cdk/config.yaml` to customize your deployment:
 stack_name_base: your-project-name  # Change this to your preferred stack name (max 35 chars)
 region: null  # AWS region to deploy the stack (e.g., us-west-2). If null, uses your AWS CLI default region.
 
-# Optional: Set to automatically create an admin user and email credentials
-# If not provided, you'll need to manually create users via AWS Console
-admin_user_email: null
+# Optional: List of Cognito user emails to create automatically. Each user
+# receives a temporary password by email on first deployment.
+# If empty, you'll need to manually create users via AWS Console.
+user_emails:
+  # - user@example.com
 
 auto_deploy_frontend: true # Automatically deploy frontend after CDK deploy (when using npm run deploy)
 
@@ -181,12 +183,12 @@ npm run deploy:frontend       # Frontend only
 
 ### 4. Create a Cognito User (if necessary)
 
-**If you provided `admin_user_email` in config:**
+**If you provided `user_emails` in config:**
 
-- Check your email for temporary password
+- Each listed user receives an email with a temporary password
 - Sign in and change password on first login
 
-**If you didn't provide email:**
+**If you didn't provide any emails:**
 
 1. Go to the [AWS Cognito Console](https://console.aws.amazon.com/cognito/)
 2. Find your User Pool (named `{stack_name_base}-user-pool`)

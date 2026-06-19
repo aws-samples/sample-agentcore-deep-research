@@ -61,7 +61,8 @@ Edit `config.yaml` to customize your deployment:
 stack_name_base: "adr-stack"
 region: null  # AWS region (e.g., us-west-2). If null, uses AWS CLI default region.
 
-admin_user_email: admin@example.com  # Required: Email for the admin user
+user_emails:                  # Optional: Cognito users to create (emailed a temporary password)
+  - user@example.com
 
 backend:
   pattern: "strands-deep-research"
