@@ -29,7 +29,7 @@
     "react-dropzone": "^14.3.8",
     "react-markdown": "^10.1.0",
     "react-oidc-context": "^3.3.0",
-    "react-router-dom": "^6.21.0",
+    "react-router-dom": "^6.30.4",
     "react-spinners": "^0.17.0",
     "react-syntax-highlighter": "^16.1.0",
     "rehype-raw": "^7.0.0",
@@ -57,7 +57,7 @@
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",
-    "@vitejs/plugin-react": "^4.2.0",
+    "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9.39.2",
     "fast-check": "^4.5.3",
     "jsdom": "^23.0.1",
@@ -65,7 +65,7 @@
     "tailwindcss": "^4",
     "tw-animate-css": "^1.2.9",
     "typescript": "^5",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.0"
   }
 }
