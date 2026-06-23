@@ -107,24 +107,29 @@ export class CognitoStack extends cdk.NestedStack {
     this.userPoolId = userPool.userPoolId
     this.userPoolClientId = userPoolClient.userPoolClientId
 
-    // Create admin user if email is provided in config
-    if (config.admin_user_email) {
-      new cognito.CfnUserPoolUser(this, "AdminUser", {
+    // Create a Cognito user for each email provided in config
+    const userEmails = config.user_emails ?? []
+    userEmails.forEach(email => {
+      // Stable, email-derived construct ID so reordering the list does not recreate users
+      const userId = `User${email.replace(/[^a-zA-Z0-9]/g, "")}`
+      new cognito.CfnUserPoolUser(this, userId, {
         userPoolId: userPool.userPoolId,
-        username: config.admin_user_email,
+        username: email,
         userAttributes: [
           {
             name: "email",
-            value: config.admin_user_email,
+            value: email,
           },
         ],
         desiredDeliveryMediums: ["EMAIL"],
       })
+    })
 
-      // Output admin user creation status
-      new cdk.CfnOutput(this, "AdminUserCreated", {
-        description: "Admin user created and credentials emailed",
-        value: `Admin user created: ${config.admin_user_email}`,
+    // Output created user status
+    if (userEmails.length > 0) {
+      new cdk.CfnOutput(this, "UsersCreated", {
+        description: "Cognito users created and credentials emailed",
+        value: userEmails.join(", "),
       })
     }
   }
