@@ -651,7 +651,6 @@ def _run_parallel(
                     correct_count += 1
 
                 status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if result["correct"] else f"{Fore.RED}✗{Style.RESET_ALL}"
-                q_display = question["question"][:80] + "..." if len(question["question"]) > 80 else question["question"]
                 print(
                     f"  {status} [{completed_count}/{total_to_run}] [{result['elapsed_seconds']:.1f}s] "
                     f"{result['extracted_answer'][:50]} | GT: {question['answer'][:50]}"
@@ -932,7 +931,7 @@ def main():
             print(f"  Accuracy (excl.): {metrics['accuracy_excl_errors']*100:.1f}%")
 
         if "per_level" in metrics:
-            print(f"  Per level:")
+            print("  Per level:")
             for level, level_metrics in metrics["per_level"].items():
                 print(
                     f"    Level {level}: {level_metrics['correct']}/{level_metrics['total']} "
