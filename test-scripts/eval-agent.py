@@ -138,7 +138,9 @@ def load_gaia_dataset() -> list[dict]:
             }
         )
 
-    print_msg(f"Loaded {len(questions)} GAIA questions (excluding file-based)", "success")
+    print_msg(
+        f"Loaded {len(questions)} GAIA questions (excluding file-based)", "success"
+    )
     return questions
 
 
@@ -243,7 +245,9 @@ def invoke_agent_sync(
     headers = {**headers, "Content-Type": "application/json"}
 
     try:
-        response = requests.post(url, headers=headers, json=payload, stream=True, timeout=timeout)
+        response = requests.post(
+            url, headers=headers, json=payload, stream=True, timeout=timeout
+        )
 
         if response.status_code != 200:
             return f"ERROR: HTTP {response.status_code}: {response.text[:500]}"
@@ -313,7 +317,9 @@ def judge_correctness(
     import boto3
 
     # First extract the answer from the full response
-    extraction_prompt = ANSWER_EXTRACTION_PROMPT.format(question=question, response=predicted)
+    extraction_prompt = ANSWER_EXTRACTION_PROMPT.format(
+        question=question, response=predicted
+    )
 
     bedrock = boto3.client("bedrock-runtime")
 
@@ -335,7 +341,11 @@ def judge_correctness(
     extracted_answer = extract_body["content"][0]["text"].strip()
 
     if extracted_answer == "NO_ANSWER":
-        return {"correct": False, "extracted_answer": "NO_ANSWER", "raw_judgment": "NO_ANSWER"}
+        return {
+            "correct": False,
+            "extracted_answer": "NO_ANSWER",
+            "raw_judgment": "NO_ANSWER",
+        }
 
     # Judge correctness
     judge_prompt = CORRECTNESS_JUDGE_PROMPT.format(
@@ -414,7 +424,9 @@ def compute_metrics(filepath: Path) -> dict:
         "correct": correct,
         "errors": errors,
         "accuracy": correct / total if total > 0 else 0.0,
-        "accuracy_excl_errors": correct / (total - errors) if (total - errors) > 0 else 0.0,
+        "accuracy_excl_errors": correct / (total - errors)
+        if (total - errors) > 0
+        else 0.0,
     }
 
     # Per-level breakdown for GAIA
@@ -496,7 +508,13 @@ def run_evaluation(
         print_msg("All questions already completed!", "success")
         if results_file.exists():
             return compute_metrics(results_file)
-        return {"total": 0, "correct": 0, "errors": 0, "accuracy": 0.0, "accuracy_excl_errors": 0.0}
+        return {
+            "total": 0,
+            "correct": 0,
+            "errors": 0,
+            "accuracy": 0.0,
+            "accuracy_excl_errors": 0.0,
+        }
 
     print_section(f"Running {benchmark_name} Evaluation")
     print(f"Questions to evaluate: {total_to_run}")
@@ -507,12 +525,27 @@ def run_evaluation(
 
     if parallel <= 1:
         # Sequential execution (original behavior)
-        _run_sequential(remaining, total_to_run, url, headers, enabled_sources,
-                        results_file, judge_model)
+        _run_sequential(
+            remaining,
+            total_to_run,
+            url,
+            headers,
+            enabled_sources,
+            results_file,
+            judge_model,
+        )
     else:
         # Parallel execution with ThreadPoolExecutor
-        _run_parallel(remaining, total_to_run, url, headers, enabled_sources,
-                      results_file, judge_model, parallel)
+        _run_parallel(
+            remaining,
+            total_to_run,
+            url,
+            headers,
+            enabled_sources,
+            results_file,
+            judge_model,
+            parallel,
+        )
 
     # Final metrics
     metrics = compute_metrics(results_file)
@@ -581,13 +614,19 @@ def _run_sequential(
         q_display = q_text[:100] + "..." if len(q_text) > 100 else q_text
         print(f"[{i}/{total_to_run}] {q_display}")
 
-        result = _evaluate_single_question(question, url, headers, enabled_sources, judge_model)
+        result = _evaluate_single_question(
+            question, url, headers, enabled_sources, judge_model
+        )
         save_result(results_file, result)
 
         if result["correct"]:
             correct_count += 1
 
-        status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if result["correct"] else f"{Fore.RED}✗{Style.RESET_ALL}"
+        status = (
+            f"{Fore.GREEN}✓{Style.RESET_ALL}"
+            if result["correct"]
+            else f"{Fore.RED}✗{Style.RESET_ALL}"
+        )
         print(
             f"  {status} [{result['elapsed_seconds']:.1f}s] "
             f"Extracted: {result['extracted_answer'][:60]} | "
@@ -595,7 +634,7 @@ def _run_sequential(
         )
         print(
             f"  Running accuracy (this session): {correct_count}/{i} "
-            f"({correct_count/i*100:.1f}%)\n"
+            f"({correct_count / i * 100:.1f}%)\n"
         )
 
 
@@ -621,7 +660,12 @@ def _run_parallel(
     with ThreadPoolExecutor(max_workers=parallel) as executor:
         future_to_question = {
             executor.submit(
-                _evaluate_single_question, question, url, headers, enabled_sources, judge_model
+                _evaluate_single_question,
+                question,
+                url,
+                headers,
+                enabled_sources,
+                judge_model,
             ): question
             for question in remaining
         }
@@ -650,7 +694,11 @@ def _run_parallel(
                 if result["correct"]:
                     correct_count += 1
 
-                status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if result["correct"] else f"{Fore.RED}✗{Style.RESET_ALL}"
+                status = (
+                    f"{Fore.GREEN}✓{Style.RESET_ALL}"
+                    if result["correct"]
+                    else f"{Fore.RED}✗{Style.RESET_ALL}"
+                )
                 print(
                     f"  {status} [{completed_count}/{total_to_run}] [{result['elapsed_seconds']:.1f}s] "
                     f"{result['extracted_answer'][:50]} | GT: {question['answer'][:50]}"
@@ -658,7 +706,7 @@ def _run_parallel(
                 if completed_count % 5 == 0 or completed_count == total_to_run:
                     print(
                         f"  >>> Running accuracy: {correct_count}/{completed_count} "
-                        f"({correct_count/completed_count*100:.1f}%)\n"
+                        f"({correct_count / completed_count * 100:.1f}%)\n"
                     )
 
 
@@ -783,7 +831,9 @@ def setup_remote_connection(stack_cfg: dict) -> tuple[str, dict[str, str]]:
     if not username:
         print_msg("Username is required", "error")
         sys.exit(1)
-    password = os.environ.get("EVAL_PASSWORD") or getpass.getpass(f"Enter password for {username}: ")
+    password = os.environ.get("EVAL_PASSWORD") or getpass.getpass(
+        f"Enter password for {username}: "
+    )
 
     access_token, _, _ = authenticate_cognito(
         outputs["CognitoUserPoolId"], outputs["CognitoClientId"], username, password
@@ -926,16 +976,16 @@ def main():
         print(f"  Total questions:  {metrics['total']}")
         print(f"  Correct:          {metrics['correct']}")
         print(f"  Errors:           {metrics['errors']}")
-        print(f"  Accuracy:         {metrics['accuracy']*100:.1f}%")
+        print(f"  Accuracy:         {metrics['accuracy'] * 100:.1f}%")
         if metrics["errors"] > 0:
-            print(f"  Accuracy (excl.): {metrics['accuracy_excl_errors']*100:.1f}%")
+            print(f"  Accuracy (excl.): {metrics['accuracy_excl_errors'] * 100:.1f}%")
 
         if "per_level" in metrics:
             print("  Per level:")
             for level, level_metrics in metrics["per_level"].items():
                 print(
                     f"    Level {level}: {level_metrics['correct']}/{level_metrics['total']} "
-                    f"({level_metrics['accuracy']*100:.1f}%)"
+                    f"({level_metrics['accuracy'] * 100:.1f}%)"
                 )
         print()
 
