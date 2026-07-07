@@ -1,6 +1,74 @@
-# Local Development with Docker Compose
+# Local Development
 
-This guide explains how to run the full AgentCore Deep Research stack locally using Docker Compose for development purposes.
+This guide explains how to run the AgentCore Deep Research agent locally for development and testing.
+
+## Native (without Docker)
+
+You can run the agent directly on macOS without Docker. This is faster for iterating on agent code.
+
+### Prerequisites
+
+1. **Deployed ADR Stack**: Deploy the stack first (the agent depends on AWS services):
+   ```bash
+   cd infra-cdk && npm run deploy
+   ```
+
+2. **Python 3.10+** and **[uv](https://docs.astral.sh/uv/)** installed
+
+3. **System libraries** (required by weasyprint for PDF generation):
+   ```bash
+   arch -arm64 brew install pango glib
+   ```
+
+4. **Python dependencies**:
+   ```bash
+   cd /path/to/correlate-deep-research
+   uv pip install -r patterns/strands-deep-research/requirements.txt
+   ```
+
+### Running the Agent
+
+```bash
+cd patterns/strands-deep-research
+
+PYTHONPATH="$(cd ../.. && pwd)/patterns:$(cd ../.. && pwd)" \
+DYLD_LIBRARY_PATH=/opt/homebrew/lib \
+MEMORY_ID=<your-memory-id> \
+AWS_DEFAULT_REGION=us-east-1 \
+STACK_NAME=<your-stack-name> \
+OTEL_TRACES_EXPORTER=none \
+OTEL_METRICS_EXPORTER=none \
+OTEL_LOGS_EXPORTER=none \
+uv run python deep_research_agent.py
+```
+
+The agent starts on `http://localhost:8080`. Verify with:
+```bash
+curl http://localhost:8080/ping
+```
+
+### Finding Environment Variable Values
+
+```bash
+# STACK_NAME: from infra-cdk/config.yaml → stack_name_base
+grep stack_name_base infra-cdk/config.yaml
+
+# MEMORY_ID: last segment of the MemoryArn output
+aws cloudformation describe-stacks --stack-name <your-stack-name> \
+  --query 'Stacks[0].Outputs[?OutputKey==`MemoryArn`].OutputValue' --output text
+# Returns: arn:aws:bedrock-agentcore:region:account:memory/MEMORY_ID
+```
+
+### Running the Test Script
+
+With the agent running locally:
+```bash
+uv run test-scripts/test-agent.py --local
+```
+
+## Docker Compose
+
+This section explains how to run the full stack locally using Docker Compose.
 
 ## Prerequisites
 

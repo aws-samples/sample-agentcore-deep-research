@@ -15,6 +15,26 @@ Sample open-source app that automates deep research on [Amazon Bedrock AgentCore
   <img src="docs/figures/demo.gif" alt="AgentCore Deep Research demo" width="800">
 </p>
 
+## 📊 Benchmarks
+
+Evaluation results on standard deep research benchmarks from [TTD-DR](https://arxiv.org/abs/2507.16075) (correctness %):
+
+| System | HLE-Search | GAIA |
+|--------|:----------:|:----:|
+| TTD-DR | 33.9 | 69.1 |
+| OpenAI Deep Research | 29.1 | 67.4 |
+| Perplexity Deep Research | 14.5 | 54.5 |
+| Grok DeeperSearch | 19.3 | 47.9 |
+| AgentCore Deep Research** | 24.0 | 47.2* |
+| GPT-Researcher | 2.0 | 37.7 |
+| Open Deep Search | 3.0 | 20.9 |
+
+*\*GAIA evaluated on 127/165 validation questions (file-based questions excluded since the agent only has search tools).*
+
+**Our results use Claude Sonnet 4 with Nova Web Grounding + Tavily Web Search (default web search tools), following our scaffold→research→write→verify workflow designed for comprehensive reports.
+
+Run the evaluation yourself with `uv run test-scripts/eval-agent.py` (see [eval script](test-scripts/eval-agent.py) for details).
+
 ## 🚀 Deployment
 
 **Prerequisites**: [Node.js 20+](https://nodejs.org/), [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html), [Python 3.10+](https://www.python.org/downloads/), [uv](https://docs.astral.sh/uv/), and [Docker](https://docs.docker.com/engine/install/). See [deployment guide](docs/DEPLOYMENT.md) for details.
