@@ -91,12 +91,12 @@ Question: {question}
 Ground truth answer: {ground_truth}
 Predicted answer: {predicted}
 
-Determine if the predicted answer is correct. The predicted answer does not need to match
-the ground truth exactly, but must be semantically equivalent or contain the correct answer.
-For numerical answers, minor formatting differences are acceptable.
-For multiple choice, the letter must match.
+Determine if the predicted answer is correct. The predicted answer does not need to match the ground truth exactly, but must be semantically equivalent or contain the correct answer. For numerical answers, minor formatting differences are acceptable. For multiple choice, the letter must match.
 
-Respond with your judgement in XML tags: <judgement>correct</judgement> or <judgement>incorrect</judgement>
+You MUST respond with ONLY the following XML tag and nothing else:
+<judgement>correct</judgement>
+or
+<judgement>incorrect</judgement>
 """
 
 # ---------------------------------------------------------------------------
@@ -349,18 +349,31 @@ def judge_correctness(
         body=json.dumps(
             {
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 50,
+                "max_tokens": 100,
                 "temperature": 0.0,
-                "messages": [{"role": "user", "content": judge_prompt}],
+                "messages": [
+                    {"role": "user", "content": judge_prompt},
+                    {"role": "assistant", "content": "<judgement>"},
+                ],
             }
         ),
     )
     judge_body = json.loads(judge_response["body"].read())
-    judgment = judge_body["content"][0]["text"].strip()
+    judgment = "<judgement>" + judge_body["content"][0]["text"].strip()
 
     # Extract verdict from <judgement> tags
     match = re.search(r"<judgement>(.*?)</judgement>", judgment, re.IGNORECASE)
-    verdict = match.group(1).strip().lower() if match else judgment.lower()
+    if match:
+        verdict = match.group(1).strip().lower()
+    else:
+        # Fallback: check if response contains "incorrect" or "correct" as keywords
+        text_lower = judgment.lower()
+        if "incorrect" in text_lower:
+            verdict = "incorrect"
+        elif "correct" in text_lower:
+            verdict = "correct"
+        else:
+            verdict = "unknown"
 
     return {
         "correct": verdict == "correct",
