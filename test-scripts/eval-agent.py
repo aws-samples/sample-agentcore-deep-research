@@ -40,6 +40,7 @@ import argparse
 import getpass
 import json
 import os
+import re
 import sys
 import time
 import uuid
@@ -95,19 +96,8 @@ the ground truth exactly, but must be semantically equivalent or contain the cor
 For numerical answers, minor formatting differences are acceptable.
 For multiple choice, the letter must match.
 
-Respond with ONLY one word: "CORRECT" or "INCORRECT"
+Respond with your judgement in XML tags: <judgement>correct</judgement> or <judgement>incorrect</judgement>
 """
-
-# HLE-search categorization prompt (from TTD-DR paper appendix A.4)
-HLE_SEARCH_CATEGORIZATION_PROMPT = """Categorize this question into one of two categories:
-[a] Pure reasoning: Can be answered using only logical reasoning, mathematical computation, or general knowledge without needing to search for specific facts.
-[b] Requiring search: Requires looking up specific facts, data, recent events, or domain-specific information that would need external search tools.
-
-Question: {question}
-
-Respond with ONLY the letter: a or b
-"""
-
 
 # ---------------------------------------------------------------------------
 # Dataset loading
@@ -366,10 +356,14 @@ def judge_correctness(
         ),
     )
     judge_body = json.loads(judge_response["body"].read())
-    judgment = judge_body["content"][0]["text"].strip().upper()
+    judgment = judge_body["content"][0]["text"].strip()
+
+    # Extract verdict from <judgement> tags
+    match = re.search(r"<judgement>(.*?)</judgement>", judgment, re.IGNORECASE)
+    verdict = match.group(1).strip().lower() if match else judgment.lower()
 
     return {
-        "correct": "CORRECT" in judgment and "INCORRECT" not in judgment,
+        "correct": verdict == "correct",
         "extracted_answer": extracted_answer,
         "raw_judgment": judgment,
     }
@@ -501,7 +495,7 @@ def run_evaluation(
     # Filter to remaining questions
     remaining = [q for q in questions if q["id"] not in completed_ids]
     if max_questions is not None:
-        remaining = remaining[: max_questions - len(completed_ids)]
+        remaining = remaining[: max(0, max_questions - len(completed_ids))]
 
     total_to_run = len(remaining)
     if total_to_run == 0:
@@ -932,7 +926,7 @@ def main():
         else:
             results_file = output_dir / f"eval_hle_search_{run_timestamp}.jsonl"
 
-        questions = load_hle_dataset(max_search_questions=200)
+        questions = load_hle_dataset(max_search_questions=args.max_questions or 200)
 
         metrics = run_evaluation(
             questions=questions,
