@@ -25,7 +25,7 @@ Evaluation results on standard deep research benchmarks from [TTD-DR](https://ar
 | OpenAI Deep Research | 29.1 | 67.4 |
 | Perplexity Deep Research | 14.5 | 54.5 |
 | Grok DeeperSearch | 19.3 | 47.9 |
-| AgentCore Deep Research** | 24.0 | 47.2* |
+| AgentCore Deep Research** | 24.0 | 49.6* |
 | GPT-Researcher | 2.0 | 37.7 |
 | Open Deep Search | 3.0 | 20.9 |
 
