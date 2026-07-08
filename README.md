@@ -19,15 +19,16 @@ Sample open-source app that automates deep research on [Amazon Bedrock AgentCore
 
 Evaluation results on standard deep research benchmarks from [TTD-DR](https://arxiv.org/abs/2507.16075) (correctness %):
 
-| System | HLE-Search | GAIA |
-|--------|:----------:|:----:|
-| TTD-DR | 33.9 | 69.1 |
-| OpenAI Deep Research | 29.1 | 67.4 |
-| Perplexity Deep Research | 14.5 | 54.5 |
-| Grok DeeperSearch | 19.3 | 47.9 |
-| AgentCore Deep Research** | 24.0 | 49.6* |
-| GPT-Researcher | 2.0 | 37.7 |
-| Open Deep Search | 3.0 | 20.9 |
+| System | HLE-Search | GAIA | Avg. Rank | Includes Diagrams |
+|--------|:----------:|:----:|:---------:|:-----------------:|
+| TTD-DR | 33.9 | 69.1 | 1.0 | ✗ |
+| OpenAI Deep Research | 29.1 | 67.4 | 2.0 | ✗ |
+| AgentCore Deep Research** | 24.0 | 49.6* | 3.5 | ✓ |
+| Perplexity Deep Research | 14.5 | 54.5 | 4.0 | ✗ |
+| Grok DeeperSearch | 19.3 | 47.9 | 4.5 | ✗ |
+| AgentCore Deep Research (all tools)** | 24.0 | 41.7* | 5.5 | ✓ |
+| GPT-Researcher | 2.0 | 37.7 | 6.5 | ✗ |
+| Open Deep Search | 3.0 | 20.9 | 7.5 | ✗ |
 
 *\*GAIA evaluated on 127/165 validation questions (file-based questions excluded since the agent only has search tools).*
 
