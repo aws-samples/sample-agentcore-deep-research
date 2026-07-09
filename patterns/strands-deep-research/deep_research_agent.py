@@ -279,9 +279,7 @@ def create_deep_research_agent(
     system_prompt = load_system_prompt(enabled_sources, s3_file_uris)
     print(f"[AGENT] Enabled data sources: {enabled_sources or DEFAULT_ENABLED_SOURCES}")
 
-    model_id = os.environ.get(
-        "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-    )
+    model_id = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
     service_tier = get_service_tier()
     print(f"[AGENT] Using Bedrock service tier: {service_tier}")
     bedrock_model = BedrockModel(
