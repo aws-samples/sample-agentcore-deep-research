@@ -8,6 +8,7 @@ import { AppConfig } from "./utils/config-manager"
 export interface CognitoStackProps extends cdk.NestedStackProps {
   config: AppConfig
   callbackUrls?: string[]
+  frontendUrl?: string
 }
 
 export class CognitoStack extends cdk.NestedStack {
@@ -18,10 +19,14 @@ export class CognitoStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: CognitoStackProps) {
     super(scope, id, props)
 
-    this.createCognitoUserPool(props.config, props.callbackUrls)
+    this.createCognitoUserPool(props.config, props.callbackUrls, props.frontendUrl)
   }
 
-  private createCognitoUserPool(config: AppConfig, callbackUrls?: string[]): void {
+  private createCognitoUserPool(
+    config: AppConfig,
+    callbackUrls?: string[],
+    frontendUrl?: string
+  ): void {
     // Use provided callback URLs or defaults
     const defaultCallbackUrls = ["http://localhost:3000", "https://localhost:3000"]
     const finalCallbackUrls = callbackUrls || defaultCallbackUrls
@@ -53,9 +58,15 @@ export class CognitoStack extends cdk.NestedStack {
       userInvitation: {
         emailSubject: `Welcome to ${config.stack_name_base}!`,
         emailBody: `<p>Hello {username},</p>
-<p>Welcome to ${config.stack_name_base}! Your username is <strong>{username}</strong> and your temporary password is: <strong>{####}</strong></p>
+<p>Welcome to ${
+          config.stack_name_base
+        }! Your username is <strong>{username}</strong> and your temporary password is: <strong>{####}</strong></p>
 <p>Please use this temporary password to log in and set your permanent password.</p>
-<p>The CloudFront URL to your application is stored as an output in the "${config.stack_name_base}" stack, and will be printed to your terminal once the deployment process completes.</p>
+${
+  frontendUrl
+    ? `<p>Open the application here: <a href="${frontendUrl}">${frontendUrl}</a></p>`
+    : `<p>The CloudFront URL to your application is stored as an output in the "${config.stack_name_base}" stack, and will be printed to your terminal once the deployment process completes.</p>`
+}
 <p>Thanks,</p>
 <p>AgentCore Deep Research Team</p>`,
       },
