@@ -1,7 +1,7 @@
 # Deep research agent dependencies with pinned versions
 strands-agents==1.30.0
 strands-agents-tools==0.2.22
-mcp==1.26.0
+mcp==1.28.1
 bedrock-agentcore[strands-agents]==1.6.1
 PyJWT[crypto]>=2.10.1
 weasyprint>=62.0
