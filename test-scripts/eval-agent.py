@@ -284,7 +284,7 @@ def judge_correctness(
     question: str,
     ground_truth: str,
     predicted: str,
-    judge_model: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    judge_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0",
 ) -> dict:
     """
     Use an LLM judge to determine if the predicted answer is correct.
@@ -786,8 +786,8 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
     parser.add_argument(
         "--judge-model",
         type=str,
-        default="anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for the correctness judge (default: claude-sonnet-4)",
+        default="global.anthropic.claude-haiku-4-5-20251001-v1:0",
+        help="Bedrock model ID for the correctness judge (default: claude-haiku-4.5)",
     )
     parser.add_argument(
         "--resume",
@@ -805,6 +805,13 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         type=str,
         default=None,
         help="Directory for results files (default: test-scripts/results/)",
+    )
+    parser.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Tag for results filenames (e.g., 'baseline-qwen', 'frontier-haiku'). "
+        "Appended to output filenames for easy comparison.",
     )
     parser.add_argument(
         "--parallel",
@@ -910,12 +917,15 @@ def main():
 
     all_metrics = {}
 
+    # Construct tag suffix for filenames
+    tag_suffix = f"_{args.tag}" if args.tag else ""
+
     # --- GAIA Benchmark ---
     if args.benchmark in ("gaia", "both"):
         if args.resume and "gaia" in args.resume:
             results_file = Path(args.resume)
         else:
-            results_file = output_dir / f"eval_gaia_{run_timestamp}.jsonl"
+            results_file = output_dir / f"eval_gaia_{run_timestamp}{tag_suffix}.jsonl"
 
         questions = load_gaia_dataset()
 
@@ -937,7 +947,7 @@ def main():
         if args.resume and "hle" in args.resume:
             results_file = Path(args.resume)
         else:
-            results_file = output_dir / f"eval_hle_search_{run_timestamp}.jsonl"
+            results_file = output_dir / f"eval_hle_search_{run_timestamp}{tag_suffix}.jsonl"
 
         questions = load_hle_dataset(max_search_questions=args.max_questions or 200)
 
