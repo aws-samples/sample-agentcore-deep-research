@@ -173,14 +173,22 @@ def main():
     weight_files = {"model.safetensors.index.json", "config.json"}
 
     if os.path.exists(hf_save_path):
-        rollout_dirs = sorted(
-            [
-                d
-                for d in os.listdir(hf_save_path)
-                if os.path.isdir(os.path.join(hf_save_path, d))
-            ],
-            key=lambda x: int(x) if x.isdigit() else 0,
-        )
+
+        def _rollout_sort_key(name: str) -> int:
+            """Parse rollout directory name as int, returning -1 for non-numeric dirs."""
+            try:
+                return int(name)
+            except (ValueError, TypeError):
+                return -1
+
+        all_dirs = [
+            d
+            for d in os.listdir(hf_save_path)
+            if os.path.isdir(os.path.join(hf_save_path, d))
+        ]
+        # Only consider directories with valid numeric names (rollout checkpoints)
+        numeric_dirs = [d for d in all_dirs if _rollout_sort_key(d) >= 0]
+        rollout_dirs = sorted(numeric_dirs, key=_rollout_sort_key)
         if rollout_dirs:
             latest = os.path.join(hf_save_path, rollout_dirs[-1])
             print(f"Overwriting with trained weights from rollout {rollout_dirs[-1]}")

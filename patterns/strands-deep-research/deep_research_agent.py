@@ -283,6 +283,11 @@ def create_deep_research_agent(
     if os.environ.get("USE_SAGEMAKER_MODEL") == "true":
         from strands.models.sagemaker import SageMakerAIModel
         endpoint_name = os.environ.get("SAGEMAKER_ENDPOINT_NAME")
+        if not endpoint_name:
+            raise ValueError(
+                "SAGEMAKER_ENDPOINT_NAME environment variable is required "
+                "when USE_SAGEMAKER_MODEL=true"
+            )
         print(f"[AGENT] Using SageMaker model: {endpoint_name}")
         model = SageMakerAIModel(
             endpoint_config={"endpoint_name": endpoint_name},

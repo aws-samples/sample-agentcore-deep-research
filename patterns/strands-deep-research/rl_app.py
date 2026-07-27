@@ -238,7 +238,14 @@ def invoke_agent(payload: dict):
     # Run the agent
     try:
         response = agent(prompt)
-        response_text = response.message["content"][0]["text"] if response.message else ""
+        # Defensive extraction: response.message may be None, content may be empty or
+        # contain non-text blocks (e.g. toolUse). Guard against IndexError/TypeError.
+        response_text = ""
+        if response.message and response.message.get("content"):
+            for block in response.message["content"]:
+                if isinstance(block, dict) and block.get("text"):
+                    response_text = block["text"]
+                    break
     except Exception as e:
         print(f"[RL] Agent failed: {e}")
         traceback.print_exc()
