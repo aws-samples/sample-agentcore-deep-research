@@ -138,9 +138,12 @@ def main():
         reward_postprocessing="grpo",
         sglang_mem_fraction_static=sglang_mem_fraction_static,
         extra_flags=[
-            "--save", megatron_save_path,
-            "--save-interval", str(num_rollout),
-            "--save-hf", f"{hf_save_path}/{{rollout_id}}",
+            "--save",
+            megatron_save_path,
+            "--save-interval",
+            str(num_rollout),
+            "--save-hf",
+            f"{hf_save_path}/{{rollout_id}}",
         ],
     )
 
@@ -152,7 +155,7 @@ def main():
     # Save trained model to SageMaker output dir.
     # Strategy: start with the complete original model (has correct tokenizer,
     # config, etc.), then overwrite with trained weights from slime's HF export.
-    print(f"Preparing model for deployment...")
+    print("Preparing model for deployment...")
 
     # Step 1: Copy full original model to output (tokenizer, config, everything)
     for item in os.listdir(model_dir):
@@ -171,7 +174,11 @@ def main():
 
     if os.path.exists(hf_save_path):
         rollout_dirs = sorted(
-            [d for d in os.listdir(hf_save_path) if os.path.isdir(os.path.join(hf_save_path, d))],
+            [
+                d
+                for d in os.listdir(hf_save_path)
+                if os.path.isdir(os.path.join(hf_save_path, d))
+            ],
             key=lambda x: int(x) if x.isdigit() else 0,
         )
         if rollout_dirs:
@@ -179,7 +186,10 @@ def main():
             print(f"Overwriting with trained weights from rollout {rollout_dirs[-1]}")
             for item in os.listdir(latest):
                 # Only copy weight files and model config, skip tokenizer files
-                if any(item.endswith(ext) for ext in weight_extensions) or item in weight_files:
+                if (
+                    any(item.endswith(ext) for ext in weight_extensions)
+                    or item in weight_files
+                ):
                     src = os.path.join(latest, item)
                     dst = os.path.join(OUTPUT_DIR, item)
                     shutil.copy2(src, dst)

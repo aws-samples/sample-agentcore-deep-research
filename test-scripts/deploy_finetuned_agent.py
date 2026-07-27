@@ -26,8 +26,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Deploy the deep research agent with a fine-tuned SageMaker model"
     )
-    parser.add_argument("--endpoint-name", type=str, required=True, help="SageMaker endpoint name")
-    parser.add_argument("--region", type=str, default=os.environ.get("AWS_DEFAULT_REGION", "us-west-2"))
+    parser.add_argument(
+        "--endpoint-name", type=str, required=True, help="SageMaker endpoint name"
+    )
+    parser.add_argument(
+        "--region", type=str, default=os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
+    )
 
     args = parser.parse_args()
 
@@ -49,7 +53,7 @@ def main():
         content,
     )
     stack_file.write_text(content)
-    print(f"✓ Updated endpoint name in rl-training-stack.ts")
+    print("✓ Updated endpoint name in rl-training-stack.ts")
 
     # Redeploy RL stack (use bash -lc to pick up user's PATH with nvm/node)
     print("\nDeploying...")
@@ -65,16 +69,19 @@ def main():
 
     # Get the finetuned agent ARN
     import boto3
+
     cfn = boto3.client("cloudformation", region_name=args.region)
     resp = cfn.describe_stacks(StackName="deep-research-rl")
     outputs = {o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]}
     finetuned_arn = outputs.get("FinetunedAgentRuntimeArn", "unknown")
 
-    print(f"\n✓ Fine-tuned agent deployed!")
+    print("\n✓ Fine-tuned agent deployed!")
     print(f"  Runtime ARN: {finetuned_arn}")
     print(f"  Endpoint:    {args.endpoint_name}")
-    print(f"\nTo eval:")
-    print(f"  uv run test-scripts/eval-agent.py --benchmark hle-search --max-questions 10 --tag finetuned --runtime-arn {finetuned_arn}")
+    print("\nTo eval:")
+    print(
+        f"  uv run test-scripts/eval-agent.py --benchmark hle-search --max-questions 10 --tag finetuned --runtime-arn {finetuned_arn}"
+    )
 
 
 if __name__ == "__main__":

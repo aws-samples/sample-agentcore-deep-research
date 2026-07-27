@@ -829,7 +829,9 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
     return parser.parse_args()
 
 
-def setup_remote_connection(stack_cfg: dict, runtime_arn_override: str | None = None) -> tuple[str, dict[str, str]]:
+def setup_remote_connection(
+    stack_cfg: dict, runtime_arn_override: str | None = None
+) -> tuple[str, dict[str, str]]:
     """
     Set up remote agent connection with Cognito auth.
 
@@ -953,7 +955,9 @@ def main():
         if args.resume and "hle" in args.resume:
             results_file = Path(args.resume)
         else:
-            results_file = output_dir / f"eval_hle_search_{run_timestamp}{tag_suffix}.jsonl"
+            results_file = (
+                output_dir / f"eval_hle_search_{run_timestamp}{tag_suffix}.jsonl"
+            )
 
         questions = load_hle_dataset(max_search_questions=args.max_questions or 200)
 

@@ -45,12 +45,33 @@ def main():
     parser = argparse.ArgumentParser(
         description="Deploy fine-tuned model as a SageMaker endpoint"
     )
-    parser.add_argument("--job-name", type=str, default=None, help="SageMaker training job name")
-    parser.add_argument("--s3-uri", type=str, default=None, help="S3 URI of model weights (alternative to --job-name)")
-    parser.add_argument("--endpoint-name", type=str, default=None, help="Endpoint name (default: auto-generated)")
-    parser.add_argument("--instance-type", type=str, default="ml.g5.2xlarge", help="Endpoint instance type (default: ml.g5.2xlarge)")
-    parser.add_argument("--region", type=str, default=os.environ.get("AWS_DEFAULT_REGION", "us-west-2"))
-    parser.add_argument("--no-wait", action="store_true", help="Don't wait for endpoint to be InService")
+    parser.add_argument(
+        "--job-name", type=str, default=None, help="SageMaker training job name"
+    )
+    parser.add_argument(
+        "--s3-uri",
+        type=str,
+        default=None,
+        help="S3 URI of model weights (alternative to --job-name)",
+    )
+    parser.add_argument(
+        "--endpoint-name",
+        type=str,
+        default=None,
+        help="Endpoint name (default: auto-generated)",
+    )
+    parser.add_argument(
+        "--instance-type",
+        type=str,
+        default="ml.g5.2xlarge",
+        help="Endpoint instance type (default: ml.g5.2xlarge)",
+    )
+    parser.add_argument(
+        "--region", type=str, default=os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
+    )
+    parser.add_argument(
+        "--no-wait", action="store_true", help="Don't wait for endpoint to be InService"
+    )
 
     args = parser.parse_args()
 
@@ -75,7 +96,9 @@ def main():
     try:
         cfn = boto3.client("cloudformation", region_name=region)
         resp = cfn.describe_stacks(StackName="deep-research-rl")
-        outputs = {o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]}
+        outputs = {
+            o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]
+        }
         role_arn = outputs.get("RLTrainingRoleArn")
     except Exception:
         print("ERROR: Could not get role ARN from deep-research-rl stack")
@@ -87,9 +110,12 @@ def main():
     config_name = f"dr-rl-config-{timestamp}"
 
     # Choose container: DJL LMI with vLLM backend
-    is_training_output = model_data_url.endswith("model.tar.gz") or model_data_url.endswith("/output/")
+    is_training_output = model_data_url.endswith(
+        "model.tar.gz"
+    ) or model_data_url.endswith("/output/")
 
     from sagemaker.core import image_uris
+
     image = image_uris.retrieve(framework="djl-lmi", region=region, version="0.31.0")
 
     # For training outputs, SageMaker extracts model.tar.gz to /opt/ml/model
@@ -142,23 +168,27 @@ def main():
         "ml.g5.16xlarge",
     ]
     # Put requested type first, deduplicate
-    ordered = [args.instance_type] + [t for t in instance_pool_types if t != args.instance_type]
+    ordered = [args.instance_type] + [
+        t for t in instance_pool_types if t != args.instance_type
+    ]
     pools = [{"InstanceType": t, "Priority": i + 1} for i, t in enumerate(ordered[:5])]
 
-    print(f"Creating endpoint config with instance pools:")
+    print("Creating endpoint config with instance pools:")
     for p in pools:
         print(f"  Priority {p['Priority']}: {p['InstanceType']}")
     print()
 
     sagemaker.create_endpoint_config(
         EndpointConfigName=config_name,
-        ProductionVariants=[{
-            "VariantName": "primary",
-            "ModelName": model_name,
-            "InitialInstanceCount": 1,
-            "InstancePools": pools,
-            "VariantInstanceProvisionTimeoutInSeconds": 1800,
-        }],
+        ProductionVariants=[
+            {
+                "VariantName": "primary",
+                "ModelName": model_name,
+                "InitialInstanceCount": 1,
+                "InstancePools": pools,
+                "VariantInstanceProvisionTimeoutInSeconds": 1800,
+            }
+        ],
     )
 
     # Create endpoint
@@ -170,7 +200,9 @@ def main():
 
     if args.no_wait:
         print(f"\n✓ Endpoint creation started: {endpoint_name}")
-        print(f"  Check status: aws sagemaker describe-endpoint --endpoint-name {endpoint_name} --region {region}")
+        print(
+            f"  Check status: aws sagemaker describe-endpoint --endpoint-name {endpoint_name} --region {region}"
+        )
     else:
         print("Waiting for endpoint to be InService (tries all instance pools)...")
         start = time.time()
@@ -191,8 +223,10 @@ def main():
     endpoint_url = f"https://runtime.sagemaker.{region}.amazonaws.com/endpoints/{endpoint_name}/invocations"
     print(f"\n✓ Endpoint ready: {endpoint_name}")
     print(f"  URL: {endpoint_url}")
-    print(f"\n  Next: deploy the agent with this endpoint:")
-    print(f"    uv run test-scripts/deploy_finetuned_agent.py --endpoint-name {endpoint_name}")
+    print("\n  Next: deploy the agent with this endpoint:")
+    print(
+        f"    uv run test-scripts/deploy_finetuned_agent.py --endpoint-name {endpoint_name}"
+    )
 
 
 if __name__ == "__main__":
