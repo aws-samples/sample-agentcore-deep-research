@@ -1,5 +1,5 @@
 # Deep research agent dependencies with pinned versions
-strands-agents==1.30.0
+strands-agents[sagemaker]>=1.30.0
 strands-agents-tools==0.2.22
 mcp==1.26.0
 bedrock-agentcore[strands-agents]==1.6.1
