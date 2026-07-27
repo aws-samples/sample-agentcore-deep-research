@@ -819,11 +819,17 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         default=1,
         help="Number of parallel agent invocations (default: 1, sequential)",
     )
+    parser.add_argument(
+        "--runtime-arn",
+        type=str,
+        default=None,
+        help="Override the RuntimeArn to eval a different agent (e.g., fine-tuned agent)",
+    )
 
     return parser.parse_args()
 
 
-def setup_remote_connection(stack_cfg: dict) -> tuple[str, dict[str, str]]:
+def setup_remote_connection(stack_cfg: dict, runtime_arn_override: str | None = None) -> tuple[str, dict[str, str]]:
     """
     Set up remote agent connection with Cognito auth.
 
@@ -836,7 +842,7 @@ def setup_remote_connection(stack_cfg: dict) -> tuple[str, dict[str, str]]:
         print_msg(f"Missing required stack outputs: {', '.join(missing)}", "error")
         sys.exit(1)
 
-    runtime_arn = outputs["RuntimeArn"]
+    runtime_arn = runtime_arn_override or outputs["RuntimeArn"]
     region = stack_cfg["region"]
 
     # Authenticate
@@ -894,7 +900,7 @@ def main():
     else:
         print_msg("Using REMOTE deployed agent", "info")
         stack_cfg = get_stack_config()
-        url, headers = setup_remote_connection(stack_cfg)
+        url, headers = setup_remote_connection(stack_cfg, args.runtime_arn)
 
     # Timestamp for this run
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
