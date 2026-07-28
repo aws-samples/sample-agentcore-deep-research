@@ -10,6 +10,7 @@ Sample open-source app that automates deep research on [Amazon Bedrock AgentCore
 - **Data visualization**: Agent generates charts and diagrams to enrich reports with quantitative insights
 - **Real-time report display**: Split-pane UI shows the report being built in real-time and allows follow-ups
 - **Fact-checking and citations**: Every factual claim includes inline source citations with the references section
+- **RL fine-tuning**: Train and deploy your own model with reinforcement learning to optimize report quality at lower cost
 
 <p align="left">
   <img src="docs/figures/demo.gif" alt="AgentCore Deep Research demo" width="800">
