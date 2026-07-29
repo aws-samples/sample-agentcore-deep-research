@@ -15,6 +15,9 @@ import json
 import os
 import shutil
 import sys
+import tempfile
+from collections.abc import Callable
+from typing import Any
 
 # SageMaker paths
 OUTPUT_DIR = os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
@@ -28,7 +31,9 @@ else:
     hyperparameters = {}
 
 
-def get_hp(key, default=None, cast=None):
+def get_hp(
+    key: str, default: Any = None, cast: Callable[[Any], Any] | None = None
+) -> Any:
     """Get hyperparameter with optional type casting."""
     val = hyperparameters.get(key, os.environ.get(f"SM_HP_{key.upper()}", default))
     if val is not None and cast is not None:
@@ -36,7 +41,7 @@ def get_hp(key, default=None, cast=None):
     return val
 
 
-def resolve_data_path(data_path):
+def resolve_data_path(data_path: str) -> str:
     """Resolve data path — SageMaker puts files in a directory."""
     if os.path.isdir(data_path):
         jsonl_files = [f for f in os.listdir(data_path) if f.endswith(".jsonl")]
@@ -48,7 +53,7 @@ def resolve_data_path(data_path):
     return data_path
 
 
-def main():
+def main() -> None:
     from agentcore_rl_toolkit.backends.slime import SlimeRunner
     from huggingface_hub import snapshot_download
 
@@ -116,7 +121,7 @@ def main():
     # --save: Megatron format (needed for slime's save machinery to trigger)
     # --save-hf: HF safetensors export (what we deploy to SageMaker)
     hf_save_path = os.path.join(OUTPUT_DIR, "hf")
-    megatron_save_path = "/tmp/megatron_ckpts"
+    megatron_save_path = os.path.join(tempfile.gettempdir(), "megatron_ckpts")
 
     runner = SlimeRunner(
         exp_id=exp_id,
@@ -175,7 +180,7 @@ def main():
     if os.path.exists(hf_save_path):
 
         def _rollout_sort_key(name: str) -> int:
-            """Parse rollout directory name as int, returning -1 for non-numeric dirs."""
+            """Parse rollout dir name as int, returning -1 for non-numeric dirs."""
             try:
                 return int(name)
             except (ValueError, TypeError):

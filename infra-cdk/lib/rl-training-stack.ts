@@ -142,8 +142,14 @@ export class RLTrainingStack extends cdk.Stack {
 
     // Fine-tuned inference agent — same as production but uses SageMaker endpoint
     // JWT auth using same Cognito as production (read from SSM parameters written by main stack)
-    const cognitoUserPoolId = ssm.StringParameter.valueForStringParameter(this, "/deep-research/cognito-user-pool-id")
-    const cognitoClientId = ssm.StringParameter.valueForStringParameter(this, "/deep-research/cognito-user-pool-client-id")
+    const cognitoUserPoolId = ssm.StringParameter.valueForStringParameter(
+      this,
+      "/deep-research/cognito-user-pool-id"
+    )
+    const cognitoClientId = ssm.StringParameter.valueForStringParameter(
+      this,
+      "/deep-research/cognito-user-pool-client-id"
+    )
 
     const finetunedAuthConfig = agentcore.RuntimeAuthorizerConfiguration.usingJWT(
       `https://cognito-idp.${this.region}.amazonaws.com/${cognitoUserPoolId}/.well-known/openid-configuration`,
@@ -184,12 +190,11 @@ export class RLTrainingStack extends cdk.Stack {
     this.trainingRole = new iam.Role(this, "RLTrainingRole", {
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("sagemaker.amazonaws.com"),
-        new iam.ServicePrincipal("bedrock.amazonaws.com"),
+        new iam.ServicePrincipal("bedrock.amazonaws.com")
       ),
-      description: "Role for RL training jobs (GRPO with AgentCore RL Toolkit) and Bedrock model import",
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess"),
-      ],
+      description:
+        "Role for RL training jobs (GRPO with AgentCore RL Toolkit) and Bedrock model import",
+      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")],
     })
 
     this.rolloutBucket.grantReadWrite(this.trainingRole)
@@ -201,10 +206,7 @@ export class RLTrainingStack extends cdk.Stack {
           "bedrock-agentcore:InvokeAgentRuntimeStream",
           "bedrock-agentcore:StopRuntimeSession",
         ],
-        resources: [
-          rlRuntime.agentRuntimeArn,
-          `${rlRuntime.agentRuntimeArn}/*`,
-        ],
+        resources: [rlRuntime.agentRuntimeArn, `${rlRuntime.agentRuntimeArn}/*`],
       })
     )
     this.trainingRole.addToPolicy(
@@ -237,7 +239,9 @@ export class RLTrainingStack extends cdk.Stack {
     })
 
     new cdk.CfnOutput(this, "RLVpcSubnets", {
-      value: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds.join(","),
+      value: vpc
+        .selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS })
+        .subnetIds.join(","),
       description: "Private subnet IDs for SageMaker training",
     })
 

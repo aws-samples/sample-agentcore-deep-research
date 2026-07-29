@@ -13,7 +13,8 @@ behavior matches production. Only the model interface and entrypoint change.
 
 Deploy with:
     agentcore configure --entrypoint rl_app.py --name deep-research-rl \
-        --requirements-file requirements.txt --deployment-type container --non-interactive
+        --requirements-file requirements.txt --deployment-type container \
+        --non-interactive
     agentcore deploy --agent deep-research-rl
 """
 
@@ -59,6 +60,7 @@ DATA_SOURCES = {
 # Reward Function
 # ---------------------------------------------------------------------------
 
+
 class DeepResearchReward(RewardFunction):
     """
     Rubric-based reward for deep research reports.
@@ -70,25 +72,52 @@ class DeepResearchReward(RewardFunction):
     """
 
     RUBRICS = [
-        {"criterion": "The report directly addresses the research question", "weight": 0.25, "category": "coverage"},
-        {"criterion": "Factual claims have inline citations with sources", "weight": 0.25, "category": "citation"},
-        {"criterion": "Multiple sources are synthesized, not just listed", "weight": 0.20, "category": "synthesis"},
-        {"criterion": "Analysis identifies patterns or gaps across findings", "weight": 0.15, "category": "depth"},
-        {"criterion": "Conclusions are proportional to evidence", "weight": 0.15, "category": "accuracy"},
+        {
+            "criterion": "The report directly addresses the research question",
+            "weight": 0.25,
+            "category": "coverage",
+        },
+        {
+            "criterion": "Factual claims have inline citations with sources",
+            "weight": 0.25,
+            "category": "citation",
+        },
+        {
+            "criterion": "Multiple sources are synthesized, not just listed",
+            "weight": 0.20,
+            "category": "synthesis",
+        },
+        {
+            "criterion": "Analysis identifies patterns or gaps across findings",
+            "weight": 0.15,
+            "category": "depth",
+        },
+        {
+            "criterion": "Conclusions are proportional to evidence",
+            "weight": 0.15,
+            "category": "accuracy",
+        },
     ]
 
     JUDGE_PROMPT = (
-        "You are evaluating a deep research report. Score each criterion 0 (not met) or 1 (met).\n\n"
+        "You are evaluating a deep research report. "
+        "Score each criterion 0 (not met) or 1 (met).\n\n"
         "Question: {question}\n\nReport:\n{report}\n\nCriteria:\n{criteria}\n\n"
-        "Return ONLY a JSON object like {{\"0\": 1, \"1\": 0, \"2\": 1, \"3\": 1, \"4\": 0}}"
+        'Return ONLY a JSON object like {{"0": 1, "1": 0, "2": 1, "3": 1, "4": 0}}'
     )
 
-    def __call__(self, response_text: str = "", ground_truth: str = "", user_input: str = "", **kwargs) -> float:
+    def __call__(
+        self,
+        response_text: str = "",
+        ground_truth: str = "",
+        user_input: str = "",
+        **kwargs,
+    ) -> float:
         """Compute scalar reward for the report."""
         if not response_text or response_text.startswith("ERROR"):
             return 0.0
 
-        # Rubric reward via LLM judge (use the same model serving the policy — cheap and fast)
+        # rubric reward via LLM judge (same model serving the policy: cheap and fast)
         rubric_reward = self._judge_rubric(user_input, response_text)
 
         # Citation heuristic
@@ -113,11 +142,19 @@ class DeepResearchReward(RewardFunction):
         """Score report against rubrics using an LLM judge call."""
         import boto3
 
-        criteria = "\n".join(f"{i}. [{r['category']}] {r['criterion']}" for i, r in enumerate(self.RUBRICS))
-        prompt = self.JUDGE_PROMPT.format(question=question, report=report[:6000], criteria=criteria)
+        criteria = "\n".join(
+            f"{i}. [{r['category']}] {r['criterion']}"
+            for i, r in enumerate(self.RUBRICS)
+        )
+        prompt = self.JUDGE_PROMPT.format(
+            question=question, report=report[:6000], criteria=criteria
+        )
 
         try:
-            bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+            bedrock = boto3.client(
+                "bedrock-runtime",
+                region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+            )
             response = bedrock.converse(
                 modelId="global.anthropic.claude-haiku-4-5-20251001-v1:0",
                 messages=[{"role": "user", "content": [{"text": prompt}]}],
@@ -130,7 +167,9 @@ class DeepResearchReward(RewardFunction):
             scores = json.loads(text)
             rubric_scores = [scores.get(str(i), 0) for i in range(len(self.RUBRICS))]
             weights = [r["weight"] for r in self.RUBRICS]
-            return sum(s * w for s, w in zip(rubric_scores, weights)) / sum(weights)
+            return sum(
+                s * w for s, w in zip(rubric_scores, weights, strict=True)
+            ) / sum(weights)
         except Exception as e:
             print(f"[REWARD] Judge failed: {e}, defaulting to 0")
             return 0.0
@@ -143,13 +182,16 @@ reward_fn = DeepResearchReward()
 # Agent Creation (simplified for RL — no memory, no streaming hooks)
 # ---------------------------------------------------------------------------
 
+
 def load_system_prompt(enabled_sources: list[str]) -> str:
     """Load and customize system prompt for enabled sources."""
     with open(SYSTEM_PROMPT_PATH) as f:
         base_prompt = f.read()
 
     tools_section = "### Data Retrieval (via Gateway)\n"
-    tools_section += "The following Gateway tools are available (prefixed with `gateway___`):\n"
+    tools_section += (
+        "The following Gateway tools are available (prefixed with `gateway___`):\n"
+    )
     for key in enabled_sources:
         if key in DATA_SOURCES:
             tools_section += f"- {key}\n"
@@ -171,11 +213,17 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
     access_token = get_gateway_access_token()
 
     # Filter to enabled tools only
-    allowed_tools = [DATA_SOURCES[k]["tool"] for k in enabled_sources if k in DATA_SOURCES]
-    tool_filter = re.compile(r"^.*___(" + "|".join(re.escape(n) for n in allowed_tools) + r")$")
+    allowed_tools = [
+        DATA_SOURCES[k]["tool"] for k in enabled_sources if k in DATA_SOURCES
+    ]
+    tool_filter = re.compile(
+        r"^.*___(" + "|".join(re.escape(n) for n in allowed_tools) + r")$"
+    )
 
     return MCPClient(
-        lambda: streamablehttp_client(url=gateway_url, headers={"Authorization": f"Bearer {access_token}"}),
+        lambda: streamablehttp_client(
+            url=gateway_url, headers={"Authorization": f"Bearer {access_token}"}
+        ),
         tool_filters={"allowed": [tool_filter]},
         prefix="gateway",
     )
@@ -184,6 +232,7 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
 # ---------------------------------------------------------------------------
 # RL Entrypoint
 # ---------------------------------------------------------------------------
+
 
 @app.rollout_entrypoint
 def invoke_agent(payload: dict):
@@ -199,9 +248,15 @@ def invoke_agent(payload: dict):
     """
     # Extract rollout config (injected by training backend)
     cfg = payload.get("_rollout", {})
-    base_url = cfg.get("base_url", os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1"))
-    model_id = cfg.get("model_id", os.environ.get("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct"))
-    sampling_params = cfg.get("sampling_params", {"temperature": 0.7, "max_tokens": 4096})
+    base_url = cfg.get(
+        "base_url", os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
+    )
+    model_id = cfg.get(
+        "model_id", os.environ.get("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
+    )
+    sampling_params = cfg.get(
+        "sampling_params", {"temperature": 0.7, "max_tokens": 4096}
+    )
 
     # Get prompt and metadata
     prompt = payload.get("prompt", "")
@@ -252,8 +307,12 @@ def invoke_agent(payload: dict):
         response_text = f"ERROR: {e}"
 
     # Compute reward
-    reward = reward_fn(response_text=response_text, ground_truth=answer, user_input=prompt)
-    print(f"[RL] Rollout complete: reward={reward:.3f}, report_len={len(response_text)}")
+    reward = reward_fn(
+        response_text=response_text, ground_truth=answer, user_input=prompt
+    )
+    print(
+        f"[RL] Rollout complete: reward={reward:.3f}, report_len={len(response_text)}"
+    )
 
     return {"rewards": reward}
 

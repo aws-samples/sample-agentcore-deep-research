@@ -282,6 +282,7 @@ def create_deep_research_agent(
     # Model selection: SageMaker endpoint (fine-tuned) or Bedrock (production)
     if os.environ.get("USE_SAGEMAKER_MODEL") == "true":
         from strands.models.sagemaker import SageMakerAIModel
+
         endpoint_name = os.environ.get("SAGEMAKER_ENDPOINT_NAME")
         if not endpoint_name:
             raise ValueError(
