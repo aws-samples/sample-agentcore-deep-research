@@ -10,6 +10,7 @@ Sample open-source app that automates deep research on [Amazon Bedrock AgentCore
 - **Data visualization**: Agent generates charts and diagrams to enrich reports with quantitative insights
 - **Real-time report display**: Split-pane UI shows the report being built in real-time and allows follow-ups
 - **Fact-checking and citations**: Every factual claim includes inline source citations with the references section
+- **RL fine-tuning**: Train and deploy your own model with reinforcement learning to optimize report quality at lower cost
 
 <p align="left">
   <img src="docs/figures/demo.gif" alt="AgentCore Deep Research demo" width="800">
@@ -149,6 +150,141 @@ docker compose up --build
 - `AWS_DEFAULT_REGION`: The region where you deployed the stack (e.g., `us-east-1`)
 
 See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup instructions.
+
+
+## 🧠 RL Fine-Tuning (Experimental)
+
+Train a small open model to produce better deep research reports than a larger frontier model using reinforcement learning with rubric-based rewards, powered by [AgentCore RL Toolkit](https://github.com/awslabs/agentcore-rl-toolkit).
+
+**Goal:** A fine-tuned small model that beats a larger frontier model on report quality at a fraction of the inference cost.
+
+### How it works
+
+```
+TRAINING (SageMaker ml.g5.12xlarge)
+┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
+│  SlimeRunner (GRPO) │────►│  AgentCore Runtime       │────►│  AgentCore Gateway  │
+│  train.py on Ray    │     │  (RL agent with tools)   │     │  (Tavily, Nova,     │
+│                     │◄────│  returns rubric rewards   │     │   ArXiv, PubMed...) │
+└──────────┬──────────┘     └──────────────────────────┘     └─────────────────────┘
+           │
+           │ rllm-model-gateway captures token IDs + logprobs
+           │ vLLM serves current policy weights
+           │
+           ▼ --save-hf → model.tar.gz (HF safetensors + tokenizer)
+┌─────────────────────┐
+│  S3 Bucket          │
+└──────────┬──────────┘
+           │
+INFERENCE (SageMaker ml.g5.xlarge)
+           ▼
+┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
+│  SageMaker Endpoint │◄────│  AgentCore Runtime       │────►│  AgentCore Gateway  │
+│  (DJL/vLLM)        │     │  (finetuned agent, same  │     │  (same tools as     │
+│                     │     │   code as production)    │     │   production)       │
+└─────────────────────┘     └──────────────────────────┘     └─────────────────────┘
+                                        ▲
+                                        │
+                                   Eval / Users
+                               (same auth as production)
+```
+
+Each training step: prompts → agent produces full research reports using tools → reports scored against 5 rubric criteria (coverage, citations, synthesis, depth, accuracy) → GRPO computes advantages across N samples → model weights updated.
+
+### Prerequisites
+
+- Deployed deep research stack (`npm run deploy` from `infra-cdk/`)
+- AWS account with SageMaker GPU quota (`ml.g5.12xlarge` for training jobs — 4× A10G GPUs)
+- Cognito user credentials exported as `EVAL_USERNAME` and `EVAL_PASSWORD` (for eval)
+- Docker or Finch installed (for building the training container)
+- [AgentCore CLI](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/get-started-cli.html) installed (`npm install -g @aws/agentcore`)
+
+Check your GPU quotas:
+```bash
+aws service-quotas list-service-quotas --service-code sagemaker \
+  --query 'Quotas[?contains(QuotaName, `training`) && (contains(QuotaName, `ml.g`) || contains(QuotaName, `ml.p`))].{Name:QuotaName,Value:Value}' \
+  --output table
+```
+
+### Training data
+
+Prepare a JSONL file with one prompt per line:
+```json
+{"prompt": [{"role": "user", "content": "Research question here"}], "metadata": {"prompt": "Research question here", "answer": "optional ground truth"}}
+```
+
+The `prompt` field is a chat-format message list. The `metadata.answer` field is optional (used for evaluation only).
+
+### Steps
+
+```bash
+# 1. Deploy RL training infrastructure (S3 bucket, RL agent runtime, IAM roles)
+cd infra-cdk && npm run deploy:rl
+```
+
+Note the stack outputs — you'll need `RLAgentRuntimeArn` and `RLBucketName`:
+```bash
+aws cloudformation describe-stacks --stack-name deep-research-rl \
+    --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
+```
+
+```bash
+# 2. Build and push training container to ECR (builds for linux/amd64)
+./training/build_and_push.sh
+
+# 3. Train with GRPO (launches SageMaker job, runs ~2-4 hours)
+uv run test-scripts/rl_train.py \
+    --data test-scripts/results/rl_train_data.jsonl \
+    --agent-arn <RLAgentRuntimeArn> \
+    --s3-bucket <RLBucketName> \
+    --hf-model-id Qwen/Qwen2.5-3B-Instruct \
+    --model-type qwen2.5-3B \
+    --instance-type ml.g5.12xlarge
+
+# 4. Deploy fine-tuned model as a SageMaker endpoint (vLLM)
+uv run test-scripts/deploy_model.py --job-name <training-job-name> \
+    --endpoint-name dr-finetuned --instance-type ml.g5.xlarge
+
+# 5. Deploy a separate agent with the fine-tuned model
+uv run test-scripts/deploy_finetuned_agent.py --endpoint-name dr-finetuned
+
+# 6. Eval fine-tuned agent (runs alongside production agent)
+export EVAL_USERNAME=<your-cognito-username>
+export EVAL_PASSWORD=<your-cognito-password>
+uv run test-scripts/eval-agent.py --benchmark hle-search --max-questions 50 \
+    --tag finetuned
+```
+
+Monitor the training job in the [SageMaker console](https://console.aws.amazon.com/sagemaker/home#/jobs) or via CLI:
+```bash
+aws sagemaker describe-training-job --training-job-name <job-name> \
+    --query '{Status:TrainingJobStatus,SecondaryStatus:SecondaryStatus}'
+```
+
+The `--model-type` must match a slime model script (e.g., `qwen2.5-3B`, `qwen3-4B`). These define the model architecture args for Megatron. See the [slime model scripts](https://github.com/slimerl/slime/tree/main/scripts/models) for available types.
+
+### Reward function
+
+Reports are scored on a 0–1 scale combining three signals:
+
+| Signal | Weight | Method |
+|--------|:------:|--------|
+| Rubric quality | 70% | LLM judge scores 5 criteria (coverage, citations, synthesis, depth, accuracy) |
+| Citation density | 15% | Heuristic: 0→3+ inline `[Source:...]` references |
+| Format compliance | 15% | Checks for title, executive summary, findings, analysis, conclusions |
+
+### Architecture
+
+| Component | Role | Managed by |
+|-----------|------|------------|
+| AgentCore Runtime | Runs parallel agent rollouts in isolated microVMs | AWS (serverless) |
+| SageMaker Training | GPU cluster for GRPO weight updates | CDK stack |
+| rllm-model-gateway | Captures token IDs/logprobs from inference | Training container |
+| vLLM | Serves current policy weights during training and inference | Training container / SageMaker endpoint |
+| S3 | Data exchange: prompts ↔ rewards ↔ checkpoints | CDK stack |
+| `rl_app.py` | RL-adapted agent (same tools, `OpenAIModel` instead of `BedrockModel`) | This repo |
+
+See `test-scripts/rl_train.py` for the training script and `patterns/strands-deep-research/rl_app.py` for the RL-adapted agent.
 
 
 ## 📂 Project Structure

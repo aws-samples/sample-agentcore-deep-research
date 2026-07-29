@@ -9,8 +9,10 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "deploy": "cdk deploy --require-approval never && node scripts/post-deploy.js",
-    "deploy:frontend": "uv run python ../scripts/deploy-frontend.py"
+    "deploy": "cdk deploy deep-research --require-approval never && node scripts/post-deploy.js",
+    "deploy:frontend": "uv run python ../scripts/deploy-frontend.py",
+    "deploy:rl": "cdk deploy deep-research-rl --require-approval never",
+    "deploy:all": "cdk deploy --all --require-approval never && node scripts/post-deploy.js"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

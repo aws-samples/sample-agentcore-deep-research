@@ -284,7 +284,7 @@ def judge_correctness(
     question: str,
     ground_truth: str,
     predicted: str,
-    judge_model: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    judge_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0",
 ) -> dict:
     """
     Use an LLM judge to determine if the predicted answer is correct.
@@ -786,8 +786,8 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
     parser.add_argument(
         "--judge-model",
         type=str,
-        default="anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for the correctness judge (default: claude-sonnet-4)",
+        default="global.anthropic.claude-haiku-4-5-20251001-v1:0",
+        help="Bedrock model ID for the correctness judge (default: claude-haiku-4.5)",
     )
     parser.add_argument(
         "--resume",
@@ -807,16 +807,31 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         help="Directory for results files (default: test-scripts/results/)",
     )
     parser.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Tag for results filenames (e.g., 'baseline-qwen', 'frontier-haiku'). "
+        "Appended to output filenames for easy comparison.",
+    )
+    parser.add_argument(
         "--parallel",
         type=int,
         default=1,
         help="Number of parallel agent invocations (default: 1, sequential)",
     )
+    parser.add_argument(
+        "--runtime-arn",
+        type=str,
+        default=None,
+        help="Override the RuntimeArn to eval a different agent (e.g., fine-tuned agent)",
+    )
 
     return parser.parse_args()
 
 
-def setup_remote_connection(stack_cfg: dict) -> tuple[str, dict[str, str]]:
+def setup_remote_connection(
+    stack_cfg: dict, runtime_arn_override: str | None = None
+) -> tuple[str, dict[str, str]]:
     """
     Set up remote agent connection with Cognito auth.
 
@@ -829,7 +844,7 @@ def setup_remote_connection(stack_cfg: dict) -> tuple[str, dict[str, str]]:
         print_msg(f"Missing required stack outputs: {', '.join(missing)}", "error")
         sys.exit(1)
 
-    runtime_arn = outputs["RuntimeArn"]
+    runtime_arn = runtime_arn_override or outputs["RuntimeArn"]
     region = stack_cfg["region"]
 
     # Authenticate
@@ -887,7 +902,7 @@ def main():
     else:
         print_msg("Using REMOTE deployed agent", "info")
         stack_cfg = get_stack_config()
-        url, headers = setup_remote_connection(stack_cfg)
+        url, headers = setup_remote_connection(stack_cfg, args.runtime_arn)
 
     # Timestamp for this run
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -910,12 +925,15 @@ def main():
 
     all_metrics = {}
 
+    # Construct tag suffix for filenames
+    tag_suffix = f"_{args.tag}" if args.tag else ""
+
     # --- GAIA Benchmark ---
     if args.benchmark in ("gaia", "both"):
         if args.resume and "gaia" in args.resume:
             results_file = Path(args.resume)
         else:
-            results_file = output_dir / f"eval_gaia_{run_timestamp}.jsonl"
+            results_file = output_dir / f"eval_gaia_{run_timestamp}{tag_suffix}.jsonl"
 
         questions = load_gaia_dataset()
 
@@ -937,7 +955,9 @@ def main():
         if args.resume and "hle" in args.resume:
             results_file = Path(args.resume)
         else:
-            results_file = output_dir / f"eval_hle_search_{run_timestamp}.jsonl"
+            results_file = (
+                output_dir / f"eval_hle_search_{run_timestamp}{tag_suffix}.jsonl"
+            )
 
         questions = load_hle_dataset(max_search_questions=args.max_questions or 200)
 
