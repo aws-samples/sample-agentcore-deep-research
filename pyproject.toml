@@ -29,11 +29,19 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.1",
     "colorama>=0.4.6",
+    "agentcore-rl-toolkit>=0.1.3",
+    "sagemaker>=3.0.0",
 ]
 
 [project.optional-dependencies]
 # Development dependencies
-dev = ["pytest>=7.0.0", "ruff>=0.1.0", "mypy>=1.0.0"]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "datasets>=5.0.0",
+    "pillow>=12.3.0",
+]
 
 # Strands agent dependencies (for local development)
 agent-strands = [

@@ -21,3 +21,4 @@ build/
 !gateway/
 !pyproject.toml
 !patterns/
+!training/

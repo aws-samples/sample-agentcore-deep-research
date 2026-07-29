@@ -1,0 +1,227 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="diagram-1">
+    <mxGraphModel dx="1988" dy="1121" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1800" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title-group" connectable="0" parent="1" style="group;fontFamily=Helvetica;" value="" vertex="1">
+          <mxGeometry height="81" width="1103" x="50" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="title-text" parent="title-group" style="text;html=1;resizable=1;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=30;fontStyle=1;fontFamily=Helvetica;" value="RL Fine-Tuning Pipeline" vertex="1">
+          <mxGeometry height="40.98795180722892" width="588.2666666666667" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle-text" parent="title-group" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=16;fontFamily=Helvetica;" value="Train a small model with GRPO reinforcement learning, deploy as a SageMaker endpoint for inference" vertex="1">
+          <mxGeometry height="25" width="800" x="3.6766666666666663" y="39.036144578313255" as="geometry" />
+        </mxCell>
+        <mxCell id="title-separator" parent="title-group" style="line;strokeWidth=2;html=1;fontSize=14;strokeColor=#FF9900;fontFamily=Helvetica;" value="" vertex="1">
+          <mxGeometry height="9.759036144578314" width="1095.6466666666665" x="3.6766666666666663" y="68.3132530120482" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-cloud" parent="1" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud;strokeColor=#232F3E;fillColor=light-dark(#232F3E0D,#232F3E0D);fillStyle=auto;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0" value="AWS Cloud" vertex="1">
+          <mxGeometry height="900" width="1100" x="50" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="training-label" parent="aws-cloud" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#ED7100;fontFamily=Helvetica;" value="TRAINING (SageMaker ml.g5.12xlarge)" vertex="1">
+          <mxGeometry height="20" width="350" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="inference-label" parent="aws-cloud" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#01A88D;fontFamily=Helvetica;" value="INFERENCE (SageMaker ml.g5.xlarge)" vertex="1">
+          <mxGeometry height="20" width="350" x="12" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-training-job" parent="aws-cloud" style="fillColor=#FFF2E8;strokeColor=#ED7100;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#ED7100;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="SageMaker Training Job" vertex="1">
+          <mxGeometry height="380" width="340" x="40" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-slimerunner" parent="grp-training-job" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;fontFamily=Helvetica;shadow=1;" value="SlimeRunner&lt;div&gt;&lt;i&gt;GRPO on Ray&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="146" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-vllm" parent="grp-training-job" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;fontFamily=Helvetica;shadow=1;" value="vLLM&lt;div&gt;&lt;i&gt;policy weights&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="40" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-model-gw" parent="grp-training-job" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;fontFamily=Helvetica;shadow=1;" value="rllm-model-gateway&lt;div&gt;&lt;i&gt;token IDs + logprobs&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="250" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-slime-to-vllm" edge="1" parent="grp-training-job" source="svc-slimerunner" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-vllm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-slime-to-vllm-label" connectable="0" parent="edge-slime-to-vllm" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="weight updates" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="28" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-slime-to-modelgw" edge="1" parent="grp-training-job" source="svc-slimerunner" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-model-gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-slime-to-modelgw-label" connectable="0" parent="edge-slime-to-modelgw" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="reads logprobs" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="2" y="33" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-vllm-to-modelgw" edge="1" parent="grp-training-job" source="svc-vllm" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-model-gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-vllm-to-modelgw-label" connectable="0" parent="edge-vllm-to-modelgw" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="inference proxy" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="grp-s3" parent="aws-cloud" style="fillColor=#E8F5E9;strokeColor=#3F8624;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#3F8624;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Storage" vertex="1">
+          <mxGeometry height="120" width="120" x="52" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-s3" parent="grp-s3" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#3F8624;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fontFamily=Helvetica;shadow=1;" value="Amazon S3&lt;div&gt;&lt;i&gt;checkpoints &amp;amp; data&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-runtime-train" parent="aws-cloud" style="fillColor=#E0F2F1;strokeColor=#01A88D;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#01A88D;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Agent Runtime" vertex="1">
+          <mxGeometry height="120" width="120" x="500" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-runtime-train" parent="grp-runtime-train" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock_agentcore;fontFamily=Helvetica;shadow=1;" value="AgentCore Runtime&lt;div&gt;&lt;i&gt;RL agent rollouts&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-gateway-train" parent="aws-cloud" style="fillColor=#E0F2F1;strokeColor=#01A88D;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#01A88D;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Gateway" vertex="1">
+          <mxGeometry height="120" width="120" x="800" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-gateway-train" parent="grp-gateway-train" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock_agentcore;fontFamily=Helvetica;shadow=1;" value="AgentCore Gateway&lt;div&gt;&lt;i&gt;Tavily, Nova, ArXiv,&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;i&gt;PubMed...&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-endpoint" parent="aws-cloud" style="fillColor=#FFF2E8;strokeColor=#ED7100;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#ED7100;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Endpoint" vertex="1">
+          <mxGeometry height="120" width="120" x="280" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-endpoint" parent="grp-endpoint" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;fontFamily=Helvetica;shadow=1;" value="SageMaker Endpoint&lt;div&gt;&lt;i&gt;DJL/vLLM&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-runtime-infer" parent="aws-cloud" style="fillColor=#E0F2F1;strokeColor=#01A88D;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#01A88D;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Agent Runtime" vertex="1">
+          <mxGeometry height="120" width="120" x="500" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-runtime-infer" parent="grp-runtime-infer" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock_agentcore;fontFamily=Helvetica;shadow=1;" value="AgentCore Runtime&lt;div&gt;&lt;i&gt;finetuned agent&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;i&gt;(same code as prod)&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="grp-gateway-infer" parent="aws-cloud" style="fillColor=#E0F2F1;strokeColor=#01A88D;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#01A88D;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1.5;" value="Gateway" vertex="1">
+          <mxGeometry height="120" width="120" x="800" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-gateway-infer" parent="grp-gateway-infer" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock_agentcore;fontFamily=Helvetica;shadow=1;" value="AgentCore Gateway&lt;div&gt;&lt;i&gt;same tools as prod&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="users-container" parent="aws-cloud" style="fillColor=#f5f5f5;strokeColor=light-dark(#666666,#D4D4D4);rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#333333;fontFamily=Helvetica;container=1;collapsible=0;shadow=1;strokeWidth=1;perimeterSpacing=0;" value="Eval / Users" vertex="1">
+          <mxGeometry height="98" width="120" x="500" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="users-icon" parent="users-container" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#232F3D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.users;fontFamily=Helvetica;" value="" vertex="1">
+          <mxGeometry height="48" width="48" x="36" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-trainingjob-to-runtime" edge="1" parent="aws-cloud" source="svc-slimerunner" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;entryX=-0.018;entryY=0.448;entryDx=0;entryDy=0;entryPerimeter=0;" target="grp-runtime-train">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-trainingjob-to-runtime-label" connectable="0" parent="edge-trainingjob-to-runtime" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="prompts (rollouts)" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint x="79" y="27" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-to-trainingjob" edge="1" parent="aws-cloud" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;dashed=1;" target="svc-slimerunner">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="299.95" />
+              <mxPoint x="384.11" y="299.95" />
+              <mxPoint x="384.11" y="150.58" />
+            </Array>
+            <mxPoint x="560" y="246.37" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-to-trainingjob-label" connectable="0" parent="edge-runtime-to-trainingjob" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="rubric rewards" vertex="1">
+          <mxGeometry relative="1" x="0.2" as="geometry">
+            <mxPoint x="78" y="96" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-train-to-gateway" edge="1" parent="aws-cloud" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="624.11" y="174" as="sourcePoint" />
+            <mxPoint x="798.84" y="174" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-train-to-gateway-label" connectable="0" parent="edge-runtime-train-to-gateway" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="tool calls (MCP)" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-vllm-to-s3" edge="1" parent="aws-cloud" source="step-4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-s3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="112" y="364.26" />
+              <mxPoint x="112" y="364.26" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-s3-to-endpoint" edge="1" parent="aws-cloud" source="svc-s3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-endpoint">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-s3-to-endpoint-label" connectable="0" parent="edge-s3-to-endpoint" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="model.tar.gz" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-endpoint-to-runtime-infer" edge="1" parent="aws-cloud" source="svc-endpoint" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="svc-runtime-infer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-endpoint-to-runtime-infer-label" connectable="0" parent="edge-endpoint-to-runtime-infer" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="inference" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-infer-to-gateway" edge="1" parent="aws-cloud" source="svc-runtime-infer" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="798.84" y="594" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-runtime-infer-to-gateway-label" connectable="0" parent="edge-runtime-infer-to-gateway" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="tool calls (MCP)" vertex="1">
+          <mxGeometry relative="1" y="-10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-users-to-runtime-infer" edge="1" parent="aws-cloud" source="users-container" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="svc-runtime-infer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-users-to-runtime-infer-label" connectable="0" parent="edge-users-to-runtime-infer" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="research queries&lt;div&gt;&lt;i&gt;(same auth as prod)&lt;/i&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step-1" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="1" vertex="1">
+          <mxGeometry height="28" width="28" x="421" y="138" as="geometry" />
+        </mxCell>
+        <mxCell id="step-2" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;arcSize=0;" value="3" vertex="1">
+          <mxGeometry height="28" width="28" x="696" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="step-3" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="4" vertex="1">
+          <mxGeometry height="28" width="28" x="451" y="267" as="geometry" />
+        </mxCell>
+        <mxCell id="step-5" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="6" vertex="1">
+          <mxGeometry height="28" width="28" x="210" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="step-6" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="7" vertex="1">
+          <mxGeometry height="28" width="28" x="430" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="step-7" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="8" vertex="1">
+          <mxGeometry height="28" width="28" x="500" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="9uziT2gZF9m_6rIiZ9qi-3" edge="1" parent="aws-cloud" source="grp-runtime-train" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="svc-model-gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9uziT2gZF9m_6rIiZ9qi-4" connectable="0" parent="aws-cloud" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="model&lt;div&gt;inference&lt;/div&gt;" vertex="1">
+          <mxGeometry x="421" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="9uziT2gZF9m_6rIiZ9qi-5" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="2" vertex="1">
+          <mxGeometry height="28" width="28" x="451" y="216" as="geometry" />
+        </mxCell>
+        <mxCell id="step-4" parent="aws-cloud" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#007CBD;strokeColor=default;fontColor=#FFFFFF;fontStyle=1;fontSize=16;fontFamily=Helvetica;shadow=1;glass=0;strokeWidth=2;align=center;verticalAlign=middle;labelBackgroundColor=none;" value="5" vertex="1">
+          <mxGeometry height="28" width="28" x="98" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="9uziT2gZF9m_6rIiZ9qi-6" edge="1" parent="aws-cloud" source="svc-vllm" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;startArrow=none;endFill=1;strokeColor=#545B64;rounded=0;fontFamily=Helvetica;" target="step-4" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+            <mxPoint x="162" y="428" as="sourcePoint" />
+            <mxPoint x="162" y="710" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="9uziT2gZF9m_6rIiZ9qi-7" connectable="0" parent="9uziT2gZF9m_6rIiZ9qi-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontSize=11;fontFamily=Helvetica;" value="--save-hf" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

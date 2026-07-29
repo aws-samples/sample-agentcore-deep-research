@@ -279,32 +279,51 @@ def create_deep_research_agent(
     system_prompt = load_system_prompt(enabled_sources, s3_file_uris)
     print(f"[AGENT] Enabled data sources: {enabled_sources or DEFAULT_ENABLED_SOURCES}")
 
-    model_id = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
-    service_tier = get_service_tier()
-    print(f"[AGENT] Using Bedrock service tier: {service_tier}")
-    bedrock_model = BedrockModel(
-        model_id=model_id,
-        temperature=INFERENCE_CONFIG["temperature"],
-        max_tokens=INFERENCE_CONFIG["maxTokens"],
-        streaming=True,
-        boto_client_config=BEDROCK_CONFIG,
-        cache_config=CacheConfig(strategy="auto"),
-        additional_args={"serviceTier": {"type": service_tier}},
-    )
+    # Model selection: SageMaker endpoint (fine-tuned) or Bedrock (production)
+    if os.environ.get("USE_SAGEMAKER_MODEL") == "true":
+        from strands.models.sagemaker import SageMakerAIModel
+        endpoint_name = os.environ.get("SAGEMAKER_ENDPOINT_NAME")
+        if not endpoint_name:
+            raise ValueError(
+                "SAGEMAKER_ENDPOINT_NAME environment variable is required "
+                "when USE_SAGEMAKER_MODEL=true"
+            )
+        print(f"[AGENT] Using SageMaker model: {endpoint_name}")
+        model = SageMakerAIModel(
+            endpoint_config={"endpoint_name": endpoint_name},
+            payload_config={"max_tokens": 4096, "stream": True},
+        )
+    else:
+        model_id = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
+        service_tier = get_service_tier()
+        print(f"[AGENT] Using Bedrock model: {model_id}, tier: {service_tier}")
+        model = BedrockModel(
+            model_id=model_id,
+            temperature=INFERENCE_CONFIG["temperature"],
+            max_tokens=INFERENCE_CONFIG["maxTokens"],
+            streaming=True,
+            boto_client_config=BEDROCK_CONFIG,
+            cache_config=CacheConfig(strategy="auto"),
+            additional_args={"serviceTier": {"type": service_tier}},
+        )
 
     memory_id = os.environ.get("MEMORY_ID")
-    if not memory_id:
+    if not memory_id and os.environ.get("USE_SAGEMAKER_MODEL") != "true":
         raise ValueError("MEMORY_ID environment variable is required")
 
-    # Configure AgentCore Memory
-    agentcore_memory_config = AgentCoreMemoryConfig(
-        memory_id=memory_id, session_id=session_id, actor_id=user_id
-    )
+    # Configure AgentCore Memory (skip if no memory_id, e.g., finetuned eval mode)
+    agentcore_memory_config = None
+    if memory_id:
+        agentcore_memory_config = AgentCoreMemoryConfig(
+            memory_id=memory_id, session_id=session_id, actor_id=user_id
+        )
 
-    session_manager = AgentCoreMemorySessionManager(
-        agentcore_memory_config=agentcore_memory_config,
-        region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-    )
+    session_manager = None
+    if agentcore_memory_config:
+        session_manager = AgentCoreMemorySessionManager(
+            agentcore_memory_config=agentcore_memory_config,
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+        )
 
     # Collect all tools - file tools for local report management
     tools: list = [
@@ -339,7 +358,7 @@ def create_deep_research_agent(
             name="DeepResearchAgent",
             system_prompt=system_prompt,
             tools=tools,
-            model=bedrock_model,
+            model=model,
             session_manager=session_manager,
             hooks=[report_upload_hook],
             trace_attributes={
