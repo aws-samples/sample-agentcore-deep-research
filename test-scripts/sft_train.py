@@ -104,6 +104,15 @@ def main():
         help="Gradient accumulation steps (default: 8)",
     )
     parser.add_argument(
+        "--use-liger-kernel",
+        type=int,
+        default=1,
+        choices=[0, 1],
+        help="Use Liger fused kernels (default: 1). Cuts activation memory at long "
+        "sequence lengths, mainly via fused linear cross-entropy. Set 0 if the "
+        "architecture is unsupported.",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -248,6 +257,7 @@ def main():
         "max_steps": str(args.max_steps),
         "eval_fraction": str(args.eval_fraction),
         "seed": str(args.seed),
+        "use_liger_kernel": str(args.use_liger_kernel),
         "save_steps": str(args.save_steps),
         "save_total_limit": str(args.save_total_limit),
     }

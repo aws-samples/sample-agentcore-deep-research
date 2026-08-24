@@ -164,8 +164,8 @@ same judge, greedy sampling for both Qwen runs):
 
 | Model | Score | Rubric | Citation | Format |
 |---|--:|--:|--:|--:|
-| Claude Sonnet 4.6 (teacher) | 0.738 | 0.677 | 0.971 | 1.000 |
-| Claude Haiku 4.5 | 0.654 | 0.590 | 0.822 | 1.000 |
+| Teacher model (frontier) | 0.738 | 0.677 | 0.971 | 1.000 |
+| Mid-size reference model | 0.654 | 0.590 | 0.822 | 1.000 |
 | **Qwen3.5-9B + trajectory SFT** | **0.616** | 0.558 | 0.917 | 0.778 |
 | Qwen3.5-9B base | 0.487 | 0.458 | 0.247 | 0.957 |
 
@@ -188,16 +188,18 @@ model learns to invent search results.
 
 Masking depends on a detail in the chat template that is easy to miss. TRL's
 `assistant_only_loss` builds its mask from `{% generation %}` markers in the
-template, and Qwen3.5's published template has none. Enabling the flag against
-that template does not error — it silently trains on the whole sequence,
-observations included, which is precisely the failure being avoided. Observations
-are roughly half the tokens in a trajectory, so the loss curve looks plausible
-either way; the only visible signal is that loss starts much higher (4.06 versus
-0.56 on a one-step probe). Hence the vendored
-`training/qwen35_sft_template.jinja`, which differs from upstream only in
-splitting the assistant header from the assistant body so the generation block
-covers exactly the tokens the model produces. Training now refuses to start if
-those markers are absent.
+template, and most published templates — Qwen3.5's included — have none.
+Enabling the flag against such a template does not error: it silently trains on
+the whole sequence, observations included, which is precisely the failure being
+avoided. Observations are roughly half the tokens in a trajectory, so the loss
+curve looks plausible either way; the only visible signal is that loss starts
+much higher (4.06 versus 0.56 on a one-step probe).
+
+TRL handles this for recognised model families by swapping in a marked-up
+training template (see `trl/chat_templates/`), so there is nothing to configure.
+What this pipeline adds is an assertion: training **refuses to start** if neither
+the model's own template nor TRL provides generation markers, because for an
+unlisted family the failure would otherwise be silent.
 
 The same detail bites in reverse at inference time: `{% generation %}` is a
 training-only construct, so the merged checkpoint is written with the *published*
@@ -211,7 +213,7 @@ model was tuned on.
 DATA GENERATION (teacher agent on Bedrock)
 ┌──────────────────────┐    ┌───────────────────────────┐    ┌────────────────────┐
 │ sft_generate_data.py │───►│ Production agent          │───►│ AgentCore Gateway  │
-│ captures the full    │    │ (Sonnet 4.6 + tools)      │    │ (Nova, ArXiv,      │
+│ captures the full    │    │ (teacher model + tools)   │    │ (Nova, ArXiv,      │
 │ SSE trajectory       │◄───│ emits tool calls+results  │    │  PubMed, EDGAR...) │
 └──────────┬───────────┘    └───────────────────────────┘    └────────────────────┘
            │ TRL tool-calling format; observations kept but masked at train time
@@ -261,7 +263,8 @@ cd infra-cdk && npm run deploy:train && cd ..
 ./training/build_and_push.sh sft
 
 # 4. Train (LoRA). ~37h for 1,963 trajectories x 2 epochs on 4x L40S.
-#    --lora-alpha defaults to 2x rank; do not pin it independently (see note).
+#    --lora-alpha defaults to 2x rank; do not pin it independently.
+#    Liger fused kernels are on by default (--use-liger-kernel 0 to disable).
 uv run test-scripts/sft_train.py \
     --data test-scripts/results/sft_traces_2k_fitted.jsonl \
     --s3-bucket <sagemaker-bucket-in-training-region> \

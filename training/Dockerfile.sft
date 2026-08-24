@@ -30,6 +30,7 @@ WORKDIR /opt/ml/code
 RUN pip install --no-cache-dir --break-system-packages torch torchvision pillow
 RUN pip install --no-cache-dir --break-system-packages \
     "trl>=1.10.0" \
+    liger-kernel \
     peft \
     accelerate \
     datasets \
@@ -56,6 +57,5 @@ RUN pip uninstall -y pip wheel 2>/dev/null || true; \
 # Copy entry point
 ARG CACHEBUST=1
 COPY training/sft_entry.py /opt/ml/code/sft_entry.py
-COPY training/qwen35_sft_template.jinja /opt/ml/code/qwen35_sft_template.jinja
 
 ENTRYPOINT ["torchrun", "--nproc_per_node=4", "/opt/ml/code/sft_entry.py"]

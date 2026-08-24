@@ -115,6 +115,7 @@ def main():
     eval_fraction = get_hp("eval_fraction", 0.05, float)
     save_steps = get_hp("save_steps", 0, int)
     seed = get_hp("seed", 42, int)
+    use_liger = get_hp("use_liger_kernel", "1") in ("1", "true", "True")
     save_total_limit = get_hp("save_total_limit", 2, int)
 
     print("=" * 60)
@@ -122,6 +123,7 @@ def main():
     print("=" * 60)
     print(f"Model:          {hf_model_id}")
     print(f"Seed:           {seed}")
+    print(f"Liger kernel:   {use_liger}")
     print(f"LoRA rank:      {lora_rank}")
     print(f"LoRA alpha:     {lora_alpha} (alpha/r = {lora_alpha / lora_rank:.1f})")
     print(f"LR:             {lr}")
@@ -222,30 +224,44 @@ def main():
 
     tok = AutoTokenizer.from_pretrained(model_cache, trust_remote_code=True)
 
-    # Prefer a bundled SFT chat template when one exists for this model family.
-    # Qwen3.5's published template has no {% generation %} block, so TRL's
-    # assistant_only_loss would silently train on tool observations (~65% of a
-    # trajectory), teaching the model to fabricate retrieval results.
-    template_path = Path(__file__).parent / "qwen35_sft_template.jinja"
-    # Remember the published template. The SFT template below carries
-    # {% generation %} markers, which exist only so transformers can build a
-    # loss mask during training. They must NOT reach the served checkpoint: an
-    # inference stack applying that template either errors on the unknown tag or
-    # silently changes the prompt format the model was trained to expect. The
-    # upstream template is restored before the checkpoint is written.
+    # Loss masking needs {% generation %} markers in the chat template so
+    # transformers can build the assistant-token mask. Most published templates,
+    # Qwen3.5's included, do not have them — and enabling assistant_only_loss
+    # against such a template does NOT error, it silently trains on the whole
+    # sequence including tool observations, teaching the model to fabricate
+    # retrieval results.
+    #
+    # TRL handles this: SFTTrainer swaps in a marked-up training template for
+    # recognised model families (see trl/chat_templates/). We rely on that rather
+    # than vendoring a copy, which would only drift from upstream. What we add is
+    # the assertion below, because TRL only covers listed families and the
+    # failure is silent for anything else.
+    from trl.chat_template_utils import (
+        get_training_chat_template,
+        has_generation_markers,
+    )
+
+    # The published template is what gets saved with the merged checkpoint. The
+    # training template is training-only: its markers would either break a
+    # serving stack that does not know the tag, or silently change the prompt
+    # format the model was tuned on.
     upstream_chat_template = tok.chat_template
-    if template_path.exists() and "qwen3" in hf_model_id.lower():
-        tok.chat_template = template_path.read_text()
-        print(f"Applied SFT chat template: {template_path.name}", flush=True)
 
-    template = tok.chat_template or ""
-    # Must match the {% generation %} block tag specifically. A bare substring
-    # test for "generation" is a false positive on `add_generation_prompt`,
-    # which appears in essentially every chat template.
-    import re
-
-    assistant_only = bool(re.search(r"\{%-?\s*generation\s*-?%\}", template))
-    print(f"assistant_only_loss: {assistant_only} ({{% generation %}} block present)")
+    assistant_only = has_generation_markers(tok.chat_template or "")
+    if assistant_only:
+        source = "model's own template"
+    else:
+        # Not an error yet — this is the case TRL fixes for recognised families.
+        # It raises rather than returning None for a model with no chat template
+        # at all, so treat any failure as "masking unavailable" and let the guard
+        # below report it clearly.
+        try:
+            assistant_only = get_training_chat_template(tok) is not None
+        except Exception as exc:
+            print(f"No TRL training template available ({exc})", flush=True)
+            assistant_only = False
+        source = "TRL training template" if assistant_only else "unavailable"
+    print(f"assistant_only_loss: {assistant_only} (masking via {source})", flush=True)
 
     # Training on tool observations teaches the model to fabricate retrieval
     # results, which is the single worst failure mode for a research agent and
@@ -257,9 +273,9 @@ def main():
         raise RuntimeError(
             "Refusing to train: chat template for "
             f"{hf_model_id} has no {{% generation %}} block, so tool "
-            "observations cannot be masked out of the loss. Add a template with "
-            "generation markers (see training/qwen35_sft_template.jinja) or set "
-            "ALLOW_UNMASKED_OBSERVATIONS=1 to override."
+            "observations cannot be masked out of the loss, and TRL has no "
+            "training template for this family. Add {% generation %} markers to "
+            "the template, or set ALLOW_UNMASKED_OBSERVATIONS=1 to override."
         )
 
     # Training config. FSDP shards the base model across GPUs; TRL/accelerate
@@ -270,6 +286,13 @@ def main():
         # re-run reproduces the same shuffle order, dropout masks and LoRA init.
         seed=seed,
         data_seed=seed,
+        # Liger replaces RMSNorm/SwiGLU/RoPE and the cross-entropy head with
+        # fused Triton kernels. The fused linear cross-entropy is the large
+        # win here: it avoids materialising the full logits tensor, which at
+        # 32K sequence length dominates activation memory. Support is
+        # per-architecture, so this fails fast rather than silently if the
+        # model is unsupported — set --use-liger-kernel 0 in that case.
+        use_liger_kernel=use_liger,
         num_train_epochs=epochs,
         per_device_train_batch_size=per_device_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
