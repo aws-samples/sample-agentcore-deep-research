@@ -1,6 +1,8 @@
 #!/bin/bash
-# Build and push the RL training container to ECR.
-# Usage: ./training/build_and_push.sh
+# Build and push training containers to ECR.
+# Usage:
+#   ./training/build_and_push.sh         # RL container (default)
+#   ./training/build_and_push.sh sft     # SFT container
 
 set -e
 
@@ -8,6 +10,14 @@ REGION=${AWS_DEFAULT_REGION:-us-east-1}
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REPO_NAME="deep-research-rl-training"
 IMAGE_TAG=${1:-latest}
+
+# Select Dockerfile based on tag
+if [ "${IMAGE_TAG}" = "sft" ]; then
+    DOCKERFILE="training/Dockerfile.sft"
+else
+    DOCKERFILE="training/Dockerfile"
+fi
+
 FULL_URI="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}"
 
 # Use finch if available, otherwise docker
@@ -33,7 +43,7 @@ aws ecr get-login-password --region "${REGION}" | \
     ${CONTAINER_CLI} login --username AWS --password-stdin "${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 
 # Build (force amd64 — SageMaker GPU instances are x86_64)
-${CONTAINER_CLI} build --platform linux/amd64 -t "${REPO_NAME}:${IMAGE_TAG}" -f training/Dockerfile .
+${CONTAINER_CLI} build --platform linux/amd64 -t "${REPO_NAME}:${IMAGE_TAG}" -f "${DOCKERFILE}" .
 
 # Tag and push
 ${CONTAINER_CLI} tag "${REPO_NAME}:${IMAGE_TAG}" "${FULL_URI}"

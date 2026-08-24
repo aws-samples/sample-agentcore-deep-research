@@ -152,6 +152,141 @@ docker compose up --build
 See the [local development guide](docs/LOCAL_DEVELOPMENT.md) for detailed setup instructions.
 
 
+## 🎓 SFT Distillation (Experimental)
+
+Distil a frontier model's *research behaviour* into a small open model with LoRA
+SFT, then serve it self-hosted. The student learns the full agentic trajectory —
+which tools to call, in what order, how to build a report incrementally, and how
+to cite sources — not just what a finished report looks like.
+
+**Measured result** (98-question benchmark, identical harness for every model,
+same judge, greedy sampling for both Qwen runs):
+
+| Model | Score | Rubric | Citation | Format |
+|---|--:|--:|--:|--:|
+| Claude Sonnet 4.6 (teacher) | 0.738 | 0.677 | 0.971 | 1.000 |
+| Claude Haiku 4.5 | 0.654 | 0.590 | 0.822 | 1.000 |
+| **Qwen3.5-9B + trajectory SFT** | **0.616** | 0.558 | 0.917 | 0.778 |
+| Qwen3.5-9B base | 0.486 | 0.458 | 0.247 | 0.957 |
+
+SFT closes 58% of the base→teacher gap (+0.127, 95% CI [+0.088, +0.165], 72 wins
+/ 16 losses / 1 tie, sign test p=1.2e-09). Nearly all of the gain is citation
+quality: the base model emits unresolvable bare domains, the distilled model
+learned the teacher's habit of citing full URLs.
+
+### Why trajectories, not final reports
+
+An earlier version of this pipeline trained on `question → final_report` pairs.
+That teaches report-shaped prose without the research behaviour behind it, which
+is a good recipe for confident fabrication. Every paper in this area
+([DR-Venus](https://arxiv.org/abs/2604.19859),
+[DeepSearch-World](https://arxiv.org/abs/2607.07820),
+[DeepRubric](https://arxiv.org/abs/2606.17029),
+[R²-Searcher](https://arxiv.org/abs/2606.28566)) trains on full multi-step
+trajectories with tool observations **masked out of the loss** — otherwise the
+model learns to invent search results.
+
+Masking depends on a detail in the chat template that is easy to miss. TRL's
+`assistant_only_loss` builds its mask from `{% generation %}` markers in the
+template, and Qwen3.5's published template has none. Enabling the flag against
+that template does not error — it silently trains on the whole sequence,
+observations included, which is precisely the failure being avoided. Observations
+are roughly half the tokens in a trajectory, so the loss curve looks plausible
+either way; the only visible signal is that loss starts much higher (4.06 versus
+0.56 on a one-step probe). Hence the vendored
+`training/qwen35_sft_template.jinja`, which differs from upstream only in
+splitting the assistant header from the assistant body so the generation block
+covers exactly the tokens the model produces. Training now refuses to start if
+those markers are absent.
+
+The same detail bites in reverse at inference time: `{% generation %}` is a
+training-only construct, so the merged checkpoint is written with the *published*
+template restored. Shipping the training template would either break a serving
+stack that does not understand the tag, or silently change the prompt format the
+model was tuned on.
+
+### How it works
+
+```
+DATA GENERATION (teacher agent on Bedrock)
+┌──────────────────────┐    ┌───────────────────────────┐    ┌────────────────────┐
+│ sft_generate_data.py │───►│ Production agent          │───►│ AgentCore Gateway  │
+│ captures the full    │    │ (Sonnet 4.6 + tools)      │    │ (Nova, ArXiv,      │
+│ SSE trajectory       │◄───│ emits tool calls+results  │    │  PubMed, EDGAR...) │
+└──────────┬───────────┘    └───────────────────────────┘    └────────────────────┘
+           │ TRL tool-calling format; observations kept but masked at train time
+           ▼
+TRAINING (SageMaker ml.g6e.12xlarge — 4× L40S 48GB)
+┌──────────────────────┐
+│ TRL SFTTrainer       │  LoRA r=32 α=64, FSDP, max_seq_len 32768,
+│ assistant_only_loss  │  observations masked via {% generation %} template
+└──────────┬───────────┘  → merged HF checkpoint (model.tar.gz)
+           ▼
+INFERENCE (SageMaker ml.g6e.16xlarge — 1× L40S)
+┌──────────────────────┐    ┌───────────────────────────┐
+│ vLLM endpoint        │◄───│ AgentCore Runtime         │  same agent code and
+└──────────────────────┘    │ (same tools as prod)      │  same tools as production
+                            └───────────────────────────┘
+```
+
+### Hardware requirements
+
+| Stage | Instance | Why not smaller |
+|---|---|---|
+| Training | `ml.g6e.12xlarge` (4× L40S 48GB) | A trajectory is ~20K tokens, so `max_seq_length` must be 32768. That OOMs on 4× A10G 24GB (`ml.g5.12xlarge`). |
+| Serving | `ml.g6e.16xlarge` (1× L40S 48GB) | 9B in BF16 plus KV cache for a 64K context. |
+
+GPU capacity for these instance types fluctuates by region, and **available
+capacity is not the same as having quota** — a job can sit `Pending` for hours in
+one region while starting immediately in another. Launching in several regions
+and keeping whichever starts first is the pragmatic approach.
+
+### Steps
+
+```bash
+# 1. Generate research questions (seeded, so this is reproducible)
+uv run test-scripts/sft_generate_questions.py --count 1000 --eval-count 0 --seed 7 \
+    --output test-scripts/results/rl_train_data_1k.jsonl
+
+# 2. Collect teacher trajectories. Resume-safe; ~550 trajectories/hour at
+#    --max-concurrent 45. AgentCore parallelises well; Bedrock is the limit.
+export EVAL_USERNAME=<cognito-user> EVAL_PASSWORD=<cognito-password>
+uv run test-scripts/sft_generate_data.py \
+    --questions test-scripts/results/rl_train_data_1k.jsonl \
+    --max-concurrent 45 --observation-chars 1200 \
+    --output test-scripts/results/sft_traces_1k.jsonl
+
+# 3. Deploy training infra and build the training image
+cd infra-cdk && npm run deploy:train && cd ..
+./training/build_and_push.sh sft
+
+# 4. Train (LoRA). ~37h for 1,963 trajectories x 2 epochs on 4x L40S.
+#    --lora-alpha defaults to 2x rank; do not pin it independently (see note).
+uv run test-scripts/sft_train.py \
+    --data test-scripts/results/sft_traces_2k_fitted.jsonl \
+    --s3-bucket <sagemaker-bucket-in-training-region> \
+    --role-arn <RLTrainingRole ARN> \
+    --hf-model-id Qwen/Qwen3.5-9B \
+    --lora-rank 32 --epochs 2 --max-seq-length 32768 \
+    --eval-fraction 0.05 --max-runtime 259200 \
+    --instance-type ml.g6e.12xlarge
+
+# 5. Serve the merged checkpoint (must be in the agent's region)
+uv run test-scripts/deploy_model.py --job-name <training-job> \
+    --endpoint-name dr-sft --instance-type ml.g6e.16xlarge \
+    --tensor-parallel-degree 1 --max-model-len 65536 \
+    --tool-call-parser qwen3_coder --reasoning-parser qwen3 \
+    --enable-capacity-fallback --region us-west-2
+
+# 6. Point the agent at it, then WAIT ~15 min (AgentCore does not hot-swap
+#    images mid-session; evaluating too early scores an empty runtime)
+uv run test-scripts/deploy_finetuned_agent.py --endpoint-name dr-sft
+
+# 7. Evaluate against the frozen question set, and the base model for comparison
+uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \
+    --parallel 8 --tag sft --model qwen3.5-9b-sft --runtime-arn <finetuned runtime ARN>
+```
+
 ## 🧠 RL Fine-Tuning (Experimental)
 
 Train a small open model to produce better deep research reports than a larger frontier model using reinforcement learning with rubric-based rewards, powered by [AgentCore RL Toolkit](https://github.com/awslabs/agentcore-rl-toolkit).
@@ -208,18 +343,24 @@ aws service-quotas list-service-quotas --service-code sagemaker \
 
 ### Training data
 
-Prepare a JSONL file with one prompt per line:
-```json
-{"prompt": [{"role": "user", "content": "Research question here"}], "metadata": {"prompt": "Research question here", "answer": "optional ground truth"}}
+Generate research questions that exercise tool use (shared with SFT pipeline):
+```bash
+# Generate 500 training + 100 eval questions across multiple domains
+uv run test-scripts/sft_generate_questions.py --count 500 --eval-count 100
 ```
 
-The `prompt` field is a chat-format message list. The `metadata.answer` field is optional (used for evaluation only).
+This produces `test-scripts/results/rl_train_data.jsonl` with one prompt per line:
+```json
+{"prompt": [{"role": "user", "content": "Research question here"}], "enabled_sources": ["tavily", "nova"], "metadata": {"prompt": "Research question here", "domain": "general", "tools": ["tavily", "nova"]}}
+```
+
+The `prompt` field is a chat-format message list. The `enabled_sources` field controls which tools the agent uses during training rollouts. Questions span 6 domains (general, finance, science, medical, policy, technology) to ensure broad tool-use coverage.
 
 ### Steps
 
 ```bash
 # 1. Deploy RL training infrastructure (S3 bucket, RL agent runtime, IAM roles)
-cd infra-cdk && npm run deploy:rl
+cd infra-cdk && npm run deploy:train
 ```
 
 Note the stack outputs — you'll need `RLAgentRuntimeArn` and `RLBucketName`:
