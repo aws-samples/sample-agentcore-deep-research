@@ -277,7 +277,10 @@ def invoke_agent_sync(
         if report_url:
             try:
                 report_resp = requests.get(report_url, timeout=30)
-                if report_resp.status_code == 200 and len(report_resp.text.strip()) > 500:
+                if (
+                    report_resp.status_code == 200
+                    and len(report_resp.text.strip()) > 500
+                ):
                     return report_resp.text.strip()
             except Exception:
                 pass
@@ -292,7 +295,10 @@ def invoke_agent_sync(
             if match:
                 try:
                     report_resp = requests.get(match.group(1), timeout=30)
-                    if report_resp.status_code == 200 and len(report_resp.text.strip()) > 500:
+                    if (
+                        report_resp.status_code == 200
+                        and len(report_resp.text.strip()) > 500
+                    ):
                         return report_resp.text.strip()
                 except Exception:
                     pass
@@ -468,7 +474,13 @@ def score_report_rubric(
     rubric_mod = _load_shared_rubric()
 
     if not report or report.startswith("ERROR") or len(report) < 100:
-        return {"total": 0.0, "rubric": 0.0, "citation": 0.0, "format": 0.0, "per_criterion": {}}
+        return {
+            "total": 0.0,
+            "rubric": 0.0,
+            "citation": 0.0,
+            "format": 0.0,
+            "per_criterion": {},
+        }
 
     try:
         bedrock = _boto3.client(
@@ -527,15 +539,19 @@ def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
                     prompt_text = row["prompt"][0]["content"]
                 else:
                     prompt_text = row.get("metadata", {}).get("prompt", "")
-                questions.append({
-                    "id": row.get("metadata", {}).get("prompt", prompt_text)[:50],
-                    "question": prompt_text,
-                    "enabled_sources": row.get("enabled_sources", ["tavily", "nova"]),
-                    "metadata": {
-                        "source": "rubric",
-                        "domain": row.get("metadata", {}).get("domain", "unknown"),
-                    },
-                })
+                questions.append(
+                    {
+                        "id": row.get("metadata", {}).get("prompt", prompt_text)[:50],
+                        "question": prompt_text,
+                        "enabled_sources": row.get(
+                            "enabled_sources", ["tavily", "nova"]
+                        ),
+                        "metadata": {
+                            "source": "rubric",
+                            "domain": row.get("metadata", {}).get("domain", "unknown"),
+                        },
+                    }
+                )
             except (json.JSONDecodeError, KeyError):
                 continue
 
@@ -589,7 +605,7 @@ def run_rubric_evaluation(
 
     remaining = [q for q in questions if q["question"] not in completed_questions]
     if max_questions:
-        remaining = remaining[:max(0, max_questions - len(completed_questions))]
+        remaining = remaining[: max(0, max_questions - len(completed_questions))]
 
     if remaining:
         print_section("Running Rubric Evaluation")
@@ -601,8 +617,11 @@ def run_rubric_evaluation(
             session_id = generate_session_id()
             start_time = time.time()
             response = invoke_agent_sync(
-                url=url, prompt=q_text, session_id=session_id,
-                headers=get_headers(), enabled_sources=question.get("enabled_sources"),
+                url=url,
+                prompt=q_text,
+                session_id=session_id,
+                headers=get_headers(),
+                enabled_sources=question.get("enabled_sources"),
             )
             elapsed = time.time() - start_time
             scores = score_report_rubric(q_text, response, judge_model)
@@ -625,11 +644,19 @@ def run_rubric_evaluation(
                 try:
                     result = future.result()
                     save_result(results_file, result)
-                    status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if result["scores"]["total"] > 0.5 else f"{Fore.YELLOW}○{Style.RESET_ALL}"
-                    print(f"  {status} [{i}/{len(remaining)}] score={result['scores']['total']:.3f} "
-                          f"({result['metadata'].get('domain', '?')}) [{result['elapsed_seconds']:.0f}s]")
+                    status = (
+                        f"{Fore.GREEN}✓{Style.RESET_ALL}"
+                        if result["scores"]["total"] > 0.5
+                        else f"{Fore.YELLOW}○{Style.RESET_ALL}"
+                    )
+                    print(
+                        f"  {status} [{i}/{len(remaining)}] score={result['scores']['total']:.3f} "
+                        f"({result['metadata'].get('domain', '?')}) [{result['elapsed_seconds']:.0f}s]"
+                    )
                 except Exception as e:
-                    print(f"  {Fore.RED}✗{Style.RESET_ALL} [{i}/{len(remaining)}] Error: {e}")
+                    print(
+                        f"  {Fore.RED}✗{Style.RESET_ALL} [{i}/{len(remaining)}] Error: {e}"
+                    )
 
     # Compute metrics
     results = []
@@ -668,7 +695,9 @@ def run_rubric_evaluation(
     for r in results:
         d = r.get("metadata", {}).get("domain", "unknown")
         domains.setdefault(d, []).append(r["scores"]["total"])
-    metrics["per_domain"] = {d: round(sum(s) / len(s), 4) for d, s in sorted(domains.items())}
+    metrics["per_domain"] = {
+        d: round(sum(s) / len(s), 4) for d, s in sorted(domains.items())
+    }
 
     return metrics
 
@@ -1200,7 +1229,9 @@ def main():
     # Compare mode (no agent invocation needed)
     if args.compare:
         tags = [t.strip() for t in args.compare.split(",")]
-        print(f"\n{'Tag':<25} {'Total':>8} {'Rubric':>8} {'Citation':>8} {'Format':>8} {'N':>5}")
+        print(
+            f"\n{'Tag':<25} {'Total':>8} {'Rubric':>8} {'Citation':>8} {'Format':>8} {'N':>5}"
+        )
         print("-" * 65)
         for tag in tags:
             matches = sorted(output_dir.glob(f"eval_rubric_*_{tag}.jsonl"))
@@ -1220,7 +1251,9 @@ def main():
             rubric = sum(r["scores"]["rubric"] for r in results) / len(results)
             citation = sum(r["scores"]["citation"] for r in results) / len(results)
             fmt = sum(r["scores"]["format"] for r in results) / len(results)
-            print(f"{tag:<25} {total:>8.3f} {rubric:>8.3f} {citation:>8.3f} {fmt:>8.3f} {len(results):>5}")
+            print(
+                f"{tag:<25} {total:>8.3f} {rubric:>8.3f} {citation:>8.3f} {fmt:>8.3f} {len(results):>5}"
+            )
         print()
         return
 
@@ -1242,11 +1275,13 @@ def main():
         _username = os.environ.get("EVAL_USERNAME", "")
         _password = os.environ.get("EVAL_PASSWORD", "")
         if _username and _password:
+
             def auth_refresh_fn():
                 token, _, _ = authenticate_cognito(
                     _cognito_cfg["CognitoUserPoolId"],
                     _cognito_cfg["CognitoClientId"],
-                    _username, _password,
+                    _username,
+                    _password,
                 )
                 return token
 
@@ -1403,7 +1438,9 @@ def main():
             print(f"  Errors:           {metrics['errors']}")
             print(f"  Accuracy:         {metrics['accuracy'] * 100:.1f}%")
             if metrics["errors"] > 0:
-                print(f"  Accuracy (excl.): {metrics['accuracy_excl_errors'] * 100:.1f}%")
+                print(
+                    f"  Accuracy (excl.): {metrics['accuracy_excl_errors'] * 100:.1f}%"
+                )
             if "per_level" in metrics:
                 print("  Per level:")
                 for level, level_metrics in metrics["per_level"].items():

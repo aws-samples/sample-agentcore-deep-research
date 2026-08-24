@@ -159,7 +159,9 @@ def main():
 
     # Validate
     if not args.s3_bucket:
-        logger.error("--s3-bucket required (from `npm run deploy:train` output: RLBucketName)")
+        logger.error(
+            "--s3-bucket required (from `npm run deploy:train` output: RLBucketName)"
+        )
         sys.exit(1)
 
     data_path = Path(args.data)
@@ -184,14 +186,18 @@ def main():
     try:
         cfn = boto3.client("cloudformation")
         resp = cfn.describe_stacks(StackName="deep-research-rl")
-        outputs = {o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]}
+        outputs = {
+            o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]
+        }
         if not training_role:
             training_role = outputs.get("RLTrainingRoleArn")
     except Exception:
         pass
 
     if not training_role:
-        logger.error("--role-arn required (or deploy training stack first: npm run deploy:train)")
+        logger.error(
+            "--role-arn required (or deploy training stack first: npm run deploy:train)"
+        )
         sys.exit(1)
 
     logger.info("=" * 60)
@@ -220,7 +226,9 @@ def main():
 
     # Upload training data to S3
     s3 = boto3.client("s3")
-    job_name = f"deep-research-sft-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    job_name = (
+        f"deep-research-sft-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    )
     s3_data_key = f"sft-data/{job_name}/{data_path.name}"
     logger.info(f"Uploading training data to s3://{args.s3_bucket}/{s3_data_key}...")
     s3.upload_file(str(data_path), args.s3_bucket, s3_data_key)
@@ -260,7 +268,10 @@ def main():
             "MetricDefinitions": [
                 {"Name": "train:loss", "Regex": r"'loss': ([0-9\.\-e]+)"},
                 {"Name": "train:grad_norm", "Regex": r"'grad_norm': ([0-9\.\-e]+)"},
-                {"Name": "train:learning_rate", "Regex": r"'learning_rate': ([0-9\.\-e]+)"},
+                {
+                    "Name": "train:learning_rate",
+                    "Regex": r"'learning_rate': ([0-9\.\-e]+)",
+                },
                 {"Name": "train:epoch", "Regex": r"'epoch': ([0-9\.\-e]+)"},
             ],
         },
@@ -309,14 +320,20 @@ def main():
     sagemaker.create_training_job(**training_params)
 
     logger.info(f"✓ Job submitted: {job_name}")
-    logger.info(f"  Monitor: https://console.aws.amazon.com/sagemaker/home?region={region}#/jobs/{job_name}")
+    logger.info(
+        f"  Monitor: https://console.aws.amazon.com/sagemaker/home?region={region}#/jobs/{job_name}"
+    )
     logger.info(f"  Output:  s3://{args.s3_bucket}/checkpoints/{job_name}/output/")
     logger.info("")
     logger.info("Once complete, deploy the fine-tuned model:")
-    logger.info(f"  uv run test-scripts/deploy_model.py --job-name {job_name} --endpoint-name dr-finetuned")
+    logger.info(
+        f"  uv run test-scripts/deploy_model.py --job-name {job_name} --endpoint-name dr-finetuned"
+    )
     logger.info("")
     logger.info("Then run RL on top of the SFT checkpoint:")
-    logger.info(f"  uv run test-scripts/rl_train.py --hf-model-id s3://{args.s3_bucket}/checkpoints/{job_name}/output/model.tar.gz ...")
+    logger.info(
+        f"  uv run test-scripts/rl_train.py --hf-model-id s3://{args.s3_bucket}/checkpoints/{job_name}/output/model.tar.gz ..."
+    )
 
 
 if __name__ == "__main__":

@@ -223,9 +223,7 @@ def generate_questions(
 
         while generated < target:
             batch_size = min(25, target - generated)  # Max 25 per API call
-            batch = generate_batch(
-                bedrock, domain, domain_config, batch_size, model_id
-            )
+            batch = generate_batch(bedrock, domain, domain_config, batch_size, model_id)
             all_questions.extend(batch)
             generated += len(batch)
             logger.info(f"  {domain}: {generated}/{target} generated")
@@ -249,7 +247,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--count", type=int, default=500, help="Number of training questions (default: 500)"
+        "--count",
+        type=int,
+        default=500,
+        help="Number of training questions (default: 500)",
     )
     parser.add_argument(
         "--eval-count",
@@ -308,7 +309,9 @@ def main():
         domains = [d.strip() for d in args.domains.split(",")]
         invalid = [d for d in domains if d not in DOMAINS]
         if invalid:
-            logger.error(f"Invalid domains: {invalid}. Available: {list(DOMAINS.keys())}")
+            logger.error(
+                f"Invalid domains: {invalid}. Available: {list(DOMAINS.keys())}"
+            )
             sys.exit(1)
     else:
         domains = list(DOMAINS.keys())

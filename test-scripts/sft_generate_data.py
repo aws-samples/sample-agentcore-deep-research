@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
-from trajectory_format import build_sft_example, trajectory_stats
+from trajectory_format import build_sft_example
 
 # Add scripts directory for shared utils
 scripts_dir = Path(__file__).parent.parent / "scripts"
@@ -65,7 +65,7 @@ TOKEN_REFRESH_INTERVAL = 55 * 60  # 55 minutes
 
 def backoff_delay(attempt: int) -> float:
     """Compute exponential backoff with jitter."""
-    delay = min(INITIAL_BACKOFF * (BACKOFF_MULTIPLIER ** attempt), MAX_BACKOFF)
+    delay = min(INITIAL_BACKOFF * (BACKOFF_MULTIPLIER**attempt), MAX_BACKOFF)
     jitter = delay * JITTER_FACTOR * (2 * random.random() - 1)
     return max(0.5, delay + jitter)
 
@@ -91,7 +91,10 @@ class TokenManager:
         """Get a valid access token, refreshing if needed."""
         with self._lock:
             now = time.time()
-            if self._token is None or (now - self._obtained_at) > TOKEN_REFRESH_INTERVAL:
+            if (
+                self._token is None
+                or (now - self._obtained_at) > TOKEN_REFRESH_INTERVAL
+            ):
                 self._refresh()
             return self._token
 
@@ -107,7 +110,10 @@ class TokenManager:
 
     def get_headers(self) -> dict[str, str]:
         """Get auth headers with a fresh token."""
-        return {"Authorization": f"Bearer {self.get_token()}", "Content-Type": "application/json"}
+        return {
+            "Authorization": f"Bearer {self.get_token()}",
+            "Content-Type": "application/json",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +161,9 @@ def invoke_agent_with_retry(
                 token_manager._obtained_at = 0
                 delay = backoff_delay(0)  # Short delay
                 if attempt < max_retries - 1:
-                    logger.info(f"  Auth expired, refreshing token and retrying in {delay:.0f}s...")
+                    logger.info(
+                        f"  Auth expired, refreshing token and retrying in {delay:.0f}s..."
+                    )
                     time.sleep(delay)
                     continue
 
@@ -164,7 +172,9 @@ def invoke_agent_with_retry(
                 last_error = f"HTTP {response.status_code}"
                 delay = backoff_delay(attempt)
                 if attempt < max_retries - 1:
-                    logger.debug(f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})")
+                    logger.debug(
+                        f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})"
+                    )
                     time.sleep(delay)
                     continue
 
@@ -223,7 +233,10 @@ def invoke_agent_with_retry(
             if report_url:
                 try:
                     report_resp = requests.get(report_url, timeout=30)
-                    if report_resp.status_code == 200 and len(report_resp.text.strip()) > 500:
+                    if (
+                        report_resp.status_code == 200
+                        and len(report_resp.text.strip()) > 500
+                    ):
                         return {
                             "response": report_resp.text.strip(),
                             "trajectory": trajectory,
@@ -250,7 +263,9 @@ def invoke_agent_with_retry(
             last_error = f"No report (stream={len(stream_text)} chars, url={'found' if report_url else 'none'})"
             delay = backoff_delay(attempt)
             if attempt < max_retries - 1:
-                logger.debug(f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})")
+                logger.debug(
+                    f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})"
+                )
                 time.sleep(delay)
                 continue
 
@@ -263,7 +278,9 @@ def invoke_agent_with_retry(
 
         if attempt < max_retries - 1:
             delay = backoff_delay(attempt)
-            logger.debug(f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})")
+            logger.debug(
+                f"  Retry {attempt + 1}/{max_retries} after {delay:.1f}s ({last_error})"
+            )
             time.sleep(delay)
 
     return {
@@ -335,14 +352,16 @@ def load_questions(path: Path) -> list[dict]:
                 else:
                     prompt_text = row.get("metadata", {}).get("prompt", "")
 
-                questions.append({
-                    "prompt": prompt_text,
-                    "enabled_sources": row.get(
-                        "enabled_sources",
-                        row.get("metadata", {}).get("tools", ["tavily", "nova"]),
-                    ),
-                    "metadata": row.get("metadata", {}),
-                })
+                questions.append(
+                    {
+                        "prompt": prompt_text,
+                        "enabled_sources": row.get(
+                            "enabled_sources",
+                            row.get("metadata", {}).get("tools", ["tavily", "nova"]),
+                        ),
+                        "metadata": row.get("metadata", {}),
+                    }
+                )
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Skipping malformed line: {e}")
     return questions
@@ -444,7 +463,11 @@ def generate_traces(
                         # field rather than a positional message lookup.
                         report_len = len(result.get("report") or "")
                         src = result.get("source", "?")
-                        retries_info = f" r={result['attempts'] - 1}" if result.get("attempts", 1) > 1 else ""
+                        retries_info = (
+                            f" r={result['attempts'] - 1}"
+                            if result.get("attempts", 1) > 1
+                            else ""
+                        )
                         logger.info(
                             f"  [{i}/{len(remaining)}] ✓ {q['prompt'][:55]}... "
                             f"({result['elapsed_seconds']:.0f}s, {report_len} chars, {src}){retries_info}"
@@ -486,27 +509,39 @@ def main():
         description="Generate SFT training traces from deployed production agent",
     )
     parser.add_argument(
-        "--questions", type=str, default="test-scripts/results/rl_train_data.jsonl",
+        "--questions",
+        type=str,
+        default="test-scripts/results/rl_train_data.jsonl",
         help="Input questions JSONL (default: test-scripts/results/rl_train_data.jsonl)",
     )
     parser.add_argument(
-        "--output", type=str, default="test-scripts/results/sft_traces.jsonl",
+        "--output",
+        type=str,
+        default="test-scripts/results/sft_traces.jsonl",
         help="Output traces JSONL (default: test-scripts/results/sft_traces.jsonl)",
     )
     parser.add_argument(
-        "--max-concurrent", type=int, default=2,
+        "--max-concurrent",
+        type=int,
+        default=2,
         help="Max concurrent agent invocations (default: 2)",
     )
     parser.add_argument(
-        "--max-questions", type=int, default=None,
+        "--max-questions",
+        type=int,
+        default=None,
         help="Limit number of questions to process (default: all)",
     )
     parser.add_argument(
-        "--timeout", type=int, default=900,
+        "--timeout",
+        type=int,
+        default=900,
         help="Per-question timeout in seconds (default: 900)",
     )
     parser.add_argument(
-        "--observation-chars", type=int, default=2000,
+        "--observation-chars",
+        type=int,
+        default=2000,
         help="Truncate each tool observation to this many characters "
         "(default: 2000). Observations are masked from the loss but still "
         "consume sequence length; an uncapped trajectory runs ~37K tokens.",
@@ -577,8 +612,10 @@ def main():
     logger.info(f"Errors:           {stats['errors']}")
     logger.info(f"Avg attempts/q:   {stats.get('avg_attempts', 1)}")
     logger.info(f"Time:             {total_time / 60:.1f} min")
-    if stats['new'] > 0:
-        logger.info(f"Throughput:       {stats['new'] / (total_time / 60):.1f} traces/min")
+    if stats["new"] > 0:
+        logger.info(
+            f"Throughput:       {stats['new'] / (total_time / 60):.1f} traces/min"
+        )
     logger.info(f"Output:           {output_path}")
     logger.info("")
     logger.info("Next step: train with LoRA")

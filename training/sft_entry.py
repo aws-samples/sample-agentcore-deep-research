@@ -439,7 +439,9 @@ def main():
         ).save_pretrained(OUTPUT_DIR)
         print("Saved AutoProcessor (preprocessor configs) to output", flush=True)
     except Exception as exc:  # text-only base models have no processor
-        print(f"No AutoProcessor for this base model ({exc}); copying configs", flush=True)
+        print(
+            f"No AutoProcessor for this base model ({exc}); copying configs", flush=True
+        )
         for name in ("preprocessor_config.json", "video_preprocessor_config.json"):
             src = Path(model_cache) / name
             if src.exists():

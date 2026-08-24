@@ -85,7 +85,9 @@ def convert_trajectory(
         if isinstance(blocks, str):
             blocks = [{"text": blocks}]
 
-        tool_uses = [b["toolUse"] for b in blocks if isinstance(b, dict) and "toolUse" in b]
+        tool_uses = [
+            b["toolUse"] for b in blocks if isinstance(b, dict) and "toolUse" in b
+        ]
         tool_results = [
             b["toolResult"] for b in blocks if isinstance(b, dict) and "toolResult" in b
         ]

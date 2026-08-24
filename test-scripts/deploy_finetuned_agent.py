@@ -71,7 +71,9 @@ def main():
             f"\n\ntraining:\n  finetuned_endpoint_name: {args.endpoint_name}\n"
         )
     config_file.write_text(content)
-    print(f"✓ Set training.finetuned_endpoint_name = {args.endpoint_name} in config.yaml")
+    print(
+        f"✓ Set training.finetuned_endpoint_name = {args.endpoint_name} in config.yaml"
+    )
 
     # Also record the main stack's staging bucket. Without STAGING_BUCKET_NAME the
     # report upload hook skips S3 upload, no [REPORT_URL:...] is emitted, and the
@@ -85,7 +87,9 @@ def main():
             o["OutputValue"] for o in outputs if o["OutputKey"] == "StagingBucketName"
         )
     except Exception as e:  # noqa: BLE001
-        print(f"⚠ Could not resolve StagingBucketName ({e}); report URLs will be absent")
+        print(
+            f"⚠ Could not resolve StagingBucketName ({e}); report URLs will be absent"
+        )
         bucket = None
 
     if bucket:
