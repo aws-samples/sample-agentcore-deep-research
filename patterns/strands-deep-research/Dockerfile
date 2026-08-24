@@ -19,7 +19,9 @@ COPY gateway/ gateway/
 COPY tools/ tools/
 
 # Install system dependencies for weasyprint (PDF generation)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# `apt-get upgrade` applies OS security updates missing from the base image.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 \
     libcairo2 libffi-dev libglib2.0-0 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
@@ -43,6 +45,8 @@ EXPOSE 8080
 COPY patterns/strands-deep-research/deep_research_agent.py .
 COPY patterns/strands-deep-research/system_prompt.txt .
 COPY patterns/strands-deep-research/report_upload_hook.py .
+COPY patterns/strands-deep-research/strands_compat.py .
+COPY patterns/strands-deep-research/research_rubric.py .
 COPY patterns/strands-deep-research/pdf_generator.py .
 COPY patterns/utils/ utils/
 

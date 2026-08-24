@@ -27,6 +27,8 @@ from pathlib import Path
 
 os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
+import research_rubric
+import strands_compat
 from agentcore_rl_toolkit import AgentCoreRLApp, RewardFunction
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
@@ -65,115 +67,61 @@ class DeepResearchReward(RewardFunction):
     """
     Rubric-based reward for deep research reports.
 
-    Combines:
-    - Rubric quality (70%): LLM judge on 5 criteria
-    - Citation density (15%): [Source:...] count heuristic
-    - Format compliance (15%): structural section checks
+    The rubric is defined once in research_rubric.py and shared with the
+    offline eval (test-scripts/eval-agent.py). Do not re-implement it here:
+    the training reward and the reported metric must be the same measurement,
+    and the previous copy-paste arrangement is how they drift apart.
+
+    Note for RL specifically: the citation and format components are
+    string-matching heuristics and are therefore the most attackable part of
+    this reward. Before using it for RL, confirm a vacuous report scores far
+    below a real one
+    showed that section headings plus fabricated citation-shaped links scored
+    0.412 under the original weighting while the LLM judge rated the same text
+    2/10 on every criterion. research_rubric.py now validates citation URLs,
+    requires substantive content beneath headings, and down-weights both
+    heuristics to 10% each. Re-run that probe after any reward change.
     """
-
-    RUBRICS = [
-        {
-            "criterion": "The report directly addresses the research question",
-            "weight": 0.25,
-            "category": "coverage",
-        },
-        {
-            "criterion": "Factual claims have inline citations with sources",
-            "weight": 0.25,
-            "category": "citation",
-        },
-        {
-            "criterion": "Multiple sources are synthesized, not just listed",
-            "weight": 0.20,
-            "category": "synthesis",
-        },
-        {
-            "criterion": "Analysis identifies patterns or gaps across findings",
-            "weight": 0.15,
-            "category": "depth",
-        },
-        {
-            "criterion": "Conclusions are proportional to evidence",
-            "weight": 0.15,
-            "category": "accuracy",
-        },
-    ]
-
-    JUDGE_PROMPT = (
-        "You are evaluating a deep research report. "
-        "Score each criterion 0 (not met) or 1 (met).\n\n"
-        "Question: {question}\n\nReport:\n{report}\n\nCriteria:\n{criteria}\n\n"
-        'Return ONLY a JSON object like {{"0": 1, "1": 0, "2": 1, "3": 1, "4": 0}}'
-    )
 
     def __call__(
         self,
         response_text: str = "",
         ground_truth: str = "",
         user_input: str = "",
+        retrieved_urls: set | None = None,
         **kwargs,
     ) -> float:
         """Compute scalar reward for the report."""
         if not response_text or response_text.startswith("ERROR"):
             return 0.0
 
-        # rubric reward via LLM judge (same model serving the policy: cheap and fast)
         rubric_reward = self._judge_rubric(user_input, response_text)
-
-        # Citation heuristic
-        citations = re.findall(r"\[Source:.*?\]", response_text)
-        citation_reward = min(len(citations) / 3.0, 1.0)
-
-        # Format compliance
-        format_checks = [
-            response_text.startswith("#"),
-            "## Executive Summary" in response_text,
-            "## Key Findings" in response_text or "### Finding" in response_text,
-            "## Analysis" in response_text,
-            "## Conclusions" in response_text,
-        ]
-        format_reward = sum(format_checks) / len(format_checks)
-
-        # Weighted total
-        total = 0.7 * rubric_reward + 0.15 * citation_reward + 0.15 * format_reward
-        return total
+        citation_reward = research_rubric.score_citations(response_text, retrieved_urls)
+        format_reward = research_rubric.score_format(response_text)
+        return research_rubric.combine(rubric_reward, citation_reward, format_reward)
 
     def _judge_rubric(self, question: str, report: str) -> float:
-        """Score report against rubrics using an LLM judge call."""
+        """Score report against the shared rubric using an LLM judge call."""
         import boto3
-
-        criteria = "\n".join(
-            f"{i}. [{r['category']}] {r['criterion']}"
-            for i, r in enumerate(self.RUBRICS)
-        )
-        prompt = self.JUDGE_PROMPT.format(
-            question=question, report=report[:6000], criteria=criteria
-        )
 
         try:
             bedrock = boto3.client(
                 "bedrock-runtime",
                 region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
             )
-            response = bedrock.converse(
-                modelId="global.anthropic.claude-haiku-4-5-20251001-v1:0",
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={"maxTokens": 200, "temperature": 0.0},
+            score, _ = research_rubric.score_rubric_with_judge(
+                question,
+                report[:24000],
+                bedrock,
+                "global.anthropic.claude-haiku-4-5-20251001-v1:0",
             )
-            text = response["output"]["message"]["content"][0]["text"].strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-
-            scores = json.loads(text)
-            rubric_scores = [scores.get(str(i), 0) for i in range(len(self.RUBRICS))]
-            weights = [r["weight"] for r in self.RUBRICS]
-            return sum(
-                s * w for s, w in zip(rubric_scores, weights, strict=True)
-            ) / sum(weights)
+            return score
         except Exception as e:
             print(f"[REWARD] Judge failed: {e}, defaulting to 0")
             return 0.0
 
+
+strands_compat.apply_shims()
 
 reward_fn = DeepResearchReward()
 

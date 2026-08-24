@@ -25,6 +25,13 @@ const amplifyStack = new ADRMainStack(app, props.stack_name_base, {
 
 // Deploy RL training infrastructure (optional, via `npm run deploy:rl`)
 new RLTrainingStack(app, `${props.stack_name_base}-rl`, {
+  finetunedEndpointName: props.training?.finetuned_endpoint_name,
+  mainStackName: props.stack_name_base,
+  stagingBucketName: props.training?.staging_bucket_name,
+  toolsConfig: JSON.stringify(props.tools ?? {}),
+  sagemakerMaxTokens: props.training?.sagemaker_max_tokens,
+  sagemakerEnableThinking: props.training?.sagemaker_enable_thinking,
+  sagemakerTemperature: props.training?.sagemaker_temperature,
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: props.region || process.env.CDK_DEFAULT_REGION,

@@ -22,7 +22,14 @@ from strands.models import BedrockModel, CacheConfig
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
-from utils.inference import get_bedrock_config, get_inference_configs, get_service_tier
+import strands_compat
+from utils.inference import (
+    get_bedrock_config,
+    get_inference_configs,
+    get_max_output_tokens,
+    get_service_tier,
+    supports_streaming_tool_use,
+)
 from utils.ssm import get_ssm_parameter
 
 from tools.code_interpreter.execute_python_tool import execute_python
@@ -30,6 +37,8 @@ from tools.code_interpreter.execute_python_tool import execute_python
 # load inference configurations
 INFERENCE_CONFIG, _ = get_inference_configs()
 BEDROCK_CONFIG = get_bedrock_config()
+
+strands_compat.apply_shims()
 
 app = BedrockAgentCoreApp()
 
@@ -289,20 +298,56 @@ def create_deep_research_agent(
                 "SAGEMAKER_ENDPOINT_NAME environment variable is required "
                 "when USE_SAGEMAKER_MODEL=true"
             )
-        print(f"[AGENT] Using SageMaker model: {endpoint_name}")
+        region = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
+        print(f"[AGENT] Using SageMaker model: {endpoint_name} in {region}")
+        # Match the Bedrock path's sampling config, otherwise self-hosted models
+        # are handicapped in any cross-model comparison. The previous defaults
+        # (max_tokens=4096, temperature=0.7, thinking on) were each harmful:
+        #   - a research report is ~4,200 tokens, so 4,096 could not emit one
+        #     report, let alone the tool call wrapping it;
+        #   - temperature 0.7 vs 0.0 elsewhere produces malformed tool arguments
+        #     (measured: 12% tool error rate, 5/19 failed `editor` calls);
+        #   - thinking tokens consumed part of that same small budget.
+        sm_max_tokens = int(os.environ.get("SAGEMAKER_MAX_TOKENS", "16384"))
+        sm_thinking = os.environ.get("SAGEMAKER_ENABLE_THINKING", "false").lower() == "true"
+        # Do NOT inherit INFERENCE_CONFIG["temperature"] here. That value is
+        # forced to 1.0 because Anthropic *requires* temperature 1.0 in extended
+        # thinking mode — a constraint of the Bedrock models, not of a
+        # self-hosted one. Applying it to a 9B model running with thinking
+        # disabled just injects sampling noise: at temperature 0.7 this agent
+        # produced malformed `editor` arguments in 5 of 19 calls (12% tool error
+        # rate), and 1.0 is worse. Greedy decoding is also reproducible, which
+        # matters for a benchmark.
+        sm_temperature = float(os.environ.get("SAGEMAKER_TEMPERATURE", "0.0"))
+        print(
+            f"[AGENT] SageMaker payload: max_tokens={sm_max_tokens} "
+            f"temperature={sm_temperature} thinking={sm_thinking}"
+        )
         model = SageMakerAIModel(
-            endpoint_config={"endpoint_name": endpoint_name},
-            payload_config={"max_tokens": 4096, "stream": True},
+            endpoint_config={"endpoint_name": endpoint_name, "region_name": region},
+            payload_config={
+                "max_tokens": sm_max_tokens,
+                "temperature": sm_temperature,
+                "stream": True,
+                "additional_args": {
+                    "chat_template_kwargs": {"enable_thinking": sm_thinking},
+                },
+            },
         )
     else:
         model_id = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
         service_tier = get_service_tier()
-        print(f"[AGENT] Using Bedrock model: {model_id}, tier: {service_tier}")
+        max_output_tokens = get_max_output_tokens(model_id)
+        streaming = supports_streaming_tool_use(model_id)
+        print(
+            f"[AGENT] Using Bedrock model: {model_id}, tier: {service_tier}, "
+            f"max_tokens: {max_output_tokens}, streaming: {streaming}"
+        )
         model = BedrockModel(
             model_id=model_id,
             temperature=INFERENCE_CONFIG["temperature"],
-            max_tokens=INFERENCE_CONFIG["maxTokens"],
-            streaming=True,
+            max_tokens=max_output_tokens,
+            streaming=streaming,
             boto_client_config=BEDROCK_CONFIG,
             cache_config=CacheConfig(strategy="auto"),
             additional_args={"serviceTier": {"type": service_tier}},

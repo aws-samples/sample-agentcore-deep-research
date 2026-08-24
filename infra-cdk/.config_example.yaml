@@ -63,3 +63,19 @@ tools:
     default_on: true
     required:
       api_key: null # Get your key from https://tavily.com/
+
+# Fine-tuning / training infrastructure (used by `npm run deploy:rl`)
+training:
+  # SageMaker endpoint serving the fine-tuned model, consumed by the
+  # fine-tuned agent runtime. Set automatically by deploy_finetuned_agent.py.
+  finetuned_endpoint_name: dr-finetuned
+  # Instance type for training jobs and fine-tuned model endpoints.
+  instance_type: ml.g5.12xlarge
+  # Inference settings for the self-hosted (SageMaker) model. A research report
+  # is ~4,200 tokens, so this must be well above that or the model cannot emit one.
+  sagemaker_max_tokens: 16384
+  sagemaker_enable_thinking: false
+  # Sampling temperature for the self-hosted model. Kept separate from the
+  # Bedrock config, which must use 1.0 in extended thinking mode. Greedy (0.0)
+  # gives reproducible evals and far fewer malformed tool calls.
+  sagemaker_temperature: 0.0
