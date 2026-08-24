@@ -167,7 +167,7 @@ same judge, greedy sampling for both Qwen runs):
 | Claude Sonnet 4.6 (teacher) | 0.738 | 0.677 | 0.971 | 1.000 |
 | Claude Haiku 4.5 | 0.654 | 0.590 | 0.822 | 1.000 |
 | **Qwen3.5-9B + trajectory SFT** | **0.616** | 0.558 | 0.917 | 0.778 |
-| Qwen3.5-9B base | 0.486 | 0.458 | 0.247 | 0.957 |
+| Qwen3.5-9B base | 0.487 | 0.458 | 0.247 | 0.957 |
 
 SFT closes 58% of the base→teacher gap (+0.127, 95% CI [+0.088, +0.165], 72 wins
 / 16 losses / 1 tie, sign test p=1.2e-09). Nearly all of the gain is citation
