@@ -141,7 +141,9 @@ def main():
         f"  uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \\\n"
         f"      --parallel 8 --tag finetuned --runtime-arn {finetuned_arn}"
     )
-    print("  (match --parallel across runs being compared: 12 produced 21 failures vs 11 at 8)")
+    print(
+        "  (match --parallel across runs being compared: 12 produced 21 failures vs 11 at 8)"
+    )
 
 
 if __name__ == "__main__":

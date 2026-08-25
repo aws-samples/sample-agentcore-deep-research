@@ -116,7 +116,7 @@ def main():
         help="Use Liger fused kernels (default: 0 = off). Liger cuts activation "
         "memory via fused linear cross-entropy, but that kernel operates on plain "
         "tensors and fails under FSDP, where lm_head weights are sharded DTensors "
-        "(\"aten.mm.default got mixed torch.Tensor and DTensor\"). Only enable for "
+        '("aten.mm.default got mixed torch.Tensor and DTensor"). Only enable for '
         "single-GPU or other non-FSDP runs.",
     )
     parser.add_argument(
