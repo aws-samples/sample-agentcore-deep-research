@@ -99,13 +99,41 @@ class DeepResearchReward(RewardFunction):
         **kwargs,
     ) -> float:
         """Compute scalar reward for the report."""
+        total, _ = self.score(
+            response_text=response_text,
+            user_input=user_input,
+            retrieved_urls=retrieved_urls,
+        )
+        return total
+
+    def score(
+        self,
+        response_text: str = "",
+        user_input: str = "",
+        retrieved_urls: set | None = None,
+    ) -> tuple[float, dict]:
+        """
+        Reward plus its individual components.
+
+        GRPO only needs the scalar, but a scalar hides which part of the reward is
+        moving. That distinction is the difference between a genuine gain and
+        reward hacking: published results on judge-scored long-form generation
+        report citation and format scores climbing while overall report quality
+        falls, so the aggregate can rise for the wrong reason. Tracking the parts
+        separately makes that visible while a run is still in progress.
+        """
         if not response_text or response_text.startswith("ERROR"):
-            return 0.0
+            return 0.0, {"rubric": 0.0, "citation": 0.0, "format": 0.0}
 
         rubric_reward = self._judge_rubric(user_input, response_text)
         citation_reward = research_rubric.score_citations(response_text, retrieved_urls)
         format_reward = research_rubric.score_format(response_text)
-        return research_rubric.combine(rubric_reward, citation_reward, format_reward)
+        total = research_rubric.combine(rubric_reward, citation_reward, format_reward)
+        return total, {
+            "rubric": rubric_reward,
+            "citation": citation_reward,
+            "format": format_reward,
+        }
 
     def _judge_rubric(self, question: str, report: str) -> float:
         """
@@ -239,7 +267,6 @@ def invoke_agent(payload: dict):
 
     # Get prompt and metadata
     prompt = payload.get("prompt", "")
-    answer = payload.get("answer", "")
     enabled_sources = payload.get("enabled_sources", DEFAULT_RL_SOURCES)
 
     print(f"[RL] Rollout start: prompt={prompt[:80]}...")
@@ -299,14 +326,22 @@ def invoke_agent(payload: dict):
         response_text = f"ERROR: {e}"
 
     # Compute reward
-    reward = reward_fn(
-        response_text=response_text, ground_truth=answer, user_input=prompt
+    reward, components = reward_fn.score(
+        response_text=response_text, user_input=prompt
     )
+    # One greppable line per episode, so component trends can be recovered from
+    # training logs without re-running rollouts.
     print(
-        f"[RL] Rollout complete: reward={reward:.3f}, report_len={len(response_text)}"
+        f"[RL] Rollout complete: reward={reward:.3f} "
+        f"rubric={components['rubric']:.3f} "
+        f"citation={components['citation']:.3f} "
+        f"format={components['format']:.3f} "
+        f"report_len={len(response_text)}"
     )
 
-    return {"rewards": reward}
+    # Consumers read the scalar via .get("rewards"), so the breakdown rides along
+    # into the saved rollout data without affecting training.
+    return {"rewards": reward, "reward_components": components}
 
 
 if __name__ == "__main__":
