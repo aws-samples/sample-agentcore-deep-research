@@ -134,10 +134,14 @@ def main():
     print("\n✓ Fine-tuned agent deployed!")
     print(f"  Runtime ARN: {finetuned_arn}")
     print(f"  Endpoint:    {args.endpoint_name}")
+    print("\nWAIT ~15 min before evaluating: AgentCore does not hot-swap the")
+    print("image mid-session, so an immediate eval scores an empty runtime.")
     print("\nTo eval:")
     print(
-        f"  uv run test-scripts/eval-agent.py --benchmark hle-search --max-questions 10 --tag finetuned --runtime-arn {finetuned_arn}"
+        f"  uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \\\n"
+        f"      --parallel 8 --tag finetuned --runtime-arn {finetuned_arn}"
     )
+    print("  (match --parallel across runs being compared: 12 produced 21 failures vs 11 at 8)")
 
 
 if __name__ == "__main__":

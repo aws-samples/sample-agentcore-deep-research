@@ -668,8 +668,14 @@ def main():
         )
     logger.info(f"Output:           {output_path}")
     logger.info("")
-    logger.info("Next step: train with LoRA")
-    logger.info(f"  uv run test-scripts/sft_train.py --data {output_path}")
+    logger.info("Next step: train (see sft_train.py --help for all options)")
+    logger.info(
+        f"  uv run test-scripts/sft_train.py --data {output_path} \\\n"
+        "      --s3-bucket <sagemaker-bucket-in-training-region> \\\n"
+        "      --role-arn <RLTrainingRole ARN> --hf-model-id Qwen/Qwen3.5-9B \\\n"
+        "      --lora-rank 32 --epochs 2 --max-seq-length 32768 \\\n"
+        "      --instance-type ml.g6e.12xlarge --max-runtime 259200"
+    )
 
 
 if __name__ == "__main__":

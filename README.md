@@ -327,7 +327,7 @@ INFERENCE (SageMaker ml.g5.xlarge)
                                (same auth as production)
 ```
 
-Each training step: prompts → agent produces full research reports using tools → reports scored against 5 rubric criteria (coverage, citations, synthesis, depth, accuracy) → GRPO computes advantages across N samples → model weights updated.
+Each training step: prompts → agent produces full research reports using tools → reports scored against the shared rubric in `research_rubric.py` → GRPO computes advantages across N samples → model weights updated.
 
 ### Prerequisites
 
@@ -409,13 +409,15 @@ The `--model-type` must match a slime model script (e.g., `qwen2.5-3B`, `qwen3-4
 
 ### Reward function
 
-Reports are scored on a 0–1 scale combining three signals:
+Reports are scored on a 0–1 scale combining three signals. The weights and all
+scoring logic live in `patterns/strands-deep-research/research_rubric.py`, which
+is the single source of truth shared by evaluation and RL:
 
 | Signal | Weight | Method |
 |--------|:------:|--------|
-| Rubric quality | 70% | LLM judge scores 5 criteria (coverage, citations, synthesis, depth, accuracy) |
-| Citation density | 15% | Heuristic: 0→3+ inline `[Source:...]` references |
-| Format compliance | 15% | Checks for title, executive summary, findings, analysis, conclusions |
+| Rubric quality | 80% | LLM judge scores 6 criteria, including grounding of claims in sources |
+| Citation validity | 10% | Counts *distinct well-formed URLs*, and rejects citations absent from the URLs the tools actually returned |
+| Format compliance | 10% | Each expected section must carry real body text, not just a heading |
 
 ### Architecture
 

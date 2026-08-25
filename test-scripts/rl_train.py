@@ -324,7 +324,15 @@ def main():
     logger.info("")
     logger.info("Once complete, deploy the fine-tuned model:")
     logger.info(
-        f"  uv run test-scripts/deploy_model.py --job-name {job_name} --endpoint-name dr-finetuned --instance-type ml.g5.xlarge"
+        f"  uv run test-scripts/deploy_model.py --job-name {job_name} \\\n"
+        "      --endpoint-name dr-rl --instance-type ml.g6e.16xlarge \\\n"
+        "      --tensor-parallel-degree 1 --max-model-len 65536 \\\n"
+        "      --tool-call-parser qwen3_coder --reasoning-parser qwen3 \\\n"
+        "      --enable-capacity-fallback --region us-west-2"
+    )
+    logger.info(
+        "  (size the instance to the policy: a 9B in BF16 plus KV cache needs a "
+        "48GB card, not ml.g5.xlarge's 24GB)"
     )
 
 

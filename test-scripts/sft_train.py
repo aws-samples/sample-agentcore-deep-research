@@ -111,11 +111,13 @@ def main():
     parser.add_argument(
         "--use-liger-kernel",
         type=int,
-        default=1,
+        default=0,
         choices=[0, 1],
-        help="Use Liger fused kernels (default: 1). Cuts activation memory at long "
-        "sequence lengths, mainly via fused linear cross-entropy. Set 0 if the "
-        "architecture is unsupported.",
+        help="Use Liger fused kernels (default: 0 = off). Liger cuts activation "
+        "memory via fused linear cross-entropy, but that kernel operates on plain "
+        "tensors and fails under FSDP, where lm_head weights are sharded DTensors "
+        "(\"aten.mm.default got mixed torch.Tensor and DTensor\"). Only enable for "
+        "single-GPU or other non-FSDP runs.",
     )
     parser.add_argument(
         "--seed",
@@ -342,12 +344,26 @@ def main():
     logger.info("")
     logger.info("Once complete, deploy the fine-tuned model:")
     logger.info(
-        f"  uv run test-scripts/deploy_model.py --job-name {job_name} --endpoint-name dr-finetuned"
+        f"  uv run test-scripts/deploy_model.py --job-name {job_name} \\\n"
+        "      --endpoint-name dr-sft --instance-type ml.g6e.16xlarge \\\n"
+        "      --tensor-parallel-degree 1 --max-model-len 65536 \\\n"
+        "      --tool-call-parser qwen3_coder --reasoning-parser qwen3 \\\n"
+        "      --enable-capacity-fallback --region us-west-2"
+    )
+    logger.info(
+        "  (endpoint must be in the agent's region; the parsers must match the "
+        "served model or tool calls will not parse)"
     )
     logger.info("")
     logger.info("Then run RL on top of the SFT checkpoint:")
     logger.info(
-        f"  uv run test-scripts/rl_train.py --hf-model-id s3://{args.s3_bucket}/checkpoints/{job_name}/output/model.tar.gz ..."
+        f"  uv run test-scripts/rl_train.py --sft-job-name {job_name} \\\n"
+        "      --data <rl-prompts.jsonl> --agent-arn <RLAgentRuntimeArn> \\\n"
+        "      --s3-bucket <RLBucketName> --model-type qwen3.5-9B"
+    )
+    logger.info(
+        "  (--sft-job-name resolves this job's artifact; it must be in the same "
+        "region as the RL job)"
     )
 
 
