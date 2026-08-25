@@ -84,6 +84,15 @@ def main() -> None:
     max_concurrent = get_hp("max_concurrent", 10, int)
     acr_timeout = get_hp("acr_timeout", 900, int)
     sglang_mem_fraction_static = get_hp("sglang_mem_fraction_static", 0.7, float)
+    # SGLang serving options for the rollout engine. These must match the served
+    # model or tool calls silently fail to parse — the same lesson as the SFT
+    # serving path, which needs an explicit tool-call parser for Qwen.
+    sglang_tool_call_parser = get_hp("sglang_tool_call_parser", "qwen")
+    sglang_reasoning_parser = get_hp("sglang_reasoning_parser") or None
+    # An agentic episode runs ~20-32K tokens of context, well past SGLang's
+    # default, so cap it explicitly rather than discovering the ceiling mid-rollout.
+    sglang_context_length = get_hp("sglang_context_length", 32768, int)
+    sglang_data_parallel_size = get_hp("sglang_data_parallel_size", 1, int)
 
     # Resolve data path
     data_path = resolve_data_path(data_path)
@@ -110,6 +119,11 @@ def main() -> None:
     print(f"Max resp len:  {rollout_max_response_len}")
     print(f"LR:            {lr}")
     print(f"SGLang mem:    {sglang_mem_fraction_static}")
+    print(
+        f"SGLang parsers: tool={sglang_tool_call_parser} "
+        f"reasoning={sglang_reasoning_parser}"
+    )
+    print(f"SGLang ctx len: {sglang_context_length}")
     print(f"Output:        {OUTPUT_DIR}")
     print()
 
@@ -145,6 +159,10 @@ def main() -> None:
         max_concurrent=max_concurrent,
         acr_timeout=acr_timeout,
         reward_postprocessing="grpo",
+        sglang_tool_call_parser=sglang_tool_call_parser,
+        sglang_reasoning_parser=sglang_reasoning_parser,
+        sglang_context_length=sglang_context_length,
+        sglang_data_parallel_size=sglang_data_parallel_size,
         sglang_mem_fraction_static=sglang_mem_fraction_static,
         extra_flags=[
             "--save",
