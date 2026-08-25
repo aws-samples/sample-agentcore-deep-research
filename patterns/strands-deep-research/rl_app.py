@@ -44,8 +44,15 @@ app = AgentCoreRLApp()
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
-# Default data sources for training rollouts (web search only — fast and general)
-DEFAULT_RL_SOURCES = ["tavily", "nova"]
+# Where the system prompt instructs the agent to write its report. The reward is
+# computed from this file, not from the agent's closing chat message.
+REPORT_PATH = "/tmp/research_report.md"
+
+# Default data sources for training rollouts. Key-free tools only: a source that
+# needs an API key fails intermittently if the key is absent or rate-limited, and
+# an intermittent tool failure is indistinguishable from a bad policy, so it adds
+# pure noise to the reward.
+DEFAULT_RL_SOURCES = ["nova", "arxiv", "pubmed"]
 
 # Tool name mapping (same as production agent)
 DATA_SOURCES = {
@@ -177,6 +184,23 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
     )
 
 
+def read_report(path: str = REPORT_PATH) -> str:
+    """
+    Read the report the agent wrote.
+
+    AgentCore gives each session its own microVM, so this path is private to the
+    rollout and cannot be clobbered by concurrent rollouts.
+    """
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return ""
+    except Exception as exc:
+        print(f"[RL] Could not read {path}: {exc}", flush=True)
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # RL Entrypoint
 # ---------------------------------------------------------------------------
@@ -241,14 +265,26 @@ def invoke_agent(payload: dict):
     # Run the agent
     try:
         response = agent(prompt)
-        # Defensive extraction: response.message may be None, content may be empty or
-        # contain non-text blocks (e.g. toolUse). Guard against IndexError/TypeError.
-        response_text = ""
-        if response.message and response.message.get("content"):
-            for block in response.message["content"]:
-                if isinstance(block, dict) and block.get("text"):
-                    response_text = block["text"]
-                    break
+        # The final assistant message is NOT the report. The agent writes the
+        # report incrementally into REPORT_PATH via file_write/editor and then
+        # says something like "The report is complete." — measured across 400 real
+        # trajectories, that closing message has a median length of 21 characters
+        # while the report itself is ~15,000. Scoring the message instead of the
+        # file gives every rollout the same near-floor reward (~0.08), which
+        # flattens GRPO advantages to zero and produces no gradient at all.
+        response_text = read_report()
+        if not response_text:
+            if response.message and response.message.get("content"):
+                for block in response.message["content"]:
+                    if isinstance(block, dict) and block.get("text"):
+                        response_text = block["text"]
+                        break
+            print(
+                f"[RL] WARNING: no report at {REPORT_PATH}; "
+                f"falling back to final message ({len(response_text)} chars). "
+                "Reward will be near zero.",
+                flush=True,
+            )
     except Exception as e:
         print(f"[RL] Agent failed: {e}")
         traceback.print_exc()

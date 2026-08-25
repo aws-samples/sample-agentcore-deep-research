@@ -74,7 +74,11 @@ def main() -> None:
     rollout_gpus_per_engine = get_hp("rollout_gpus_per_engine", 2, int)
     rollout_batch_size = get_hp("rollout_batch_size", 8, int)
     n_samples_per_prompt = get_hp("n_samples_per_prompt", 4, int)
-    rollout_max_response_len = get_hp("rollout_max_response_len", 1024, int)
+    # A research report is ~4,200 tokens and the policy generates ~10,300 tokens
+    # across a full episode (measured over real trajectories). 1024 truncates the
+    # rollout long before a report exists, so every episode scores at the floor
+    # and GRPO sees no signal.
+    rollout_max_response_len = get_hp("rollout_max_response_len", 16384, int)
     rollout_temperature = get_hp("rollout_temperature", 1.0, float)
     lr = get_hp("lr", 1e-6, float)
     max_concurrent = get_hp("max_concurrent", 10, int)

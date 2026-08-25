@@ -107,8 +107,10 @@ def main():
     parser.add_argument(
         "--max-response-len",
         type=int,
-        default=1024,
-        help="Max response tokens (default: 1024)",
+        default=16384,
+        help="Max response tokens per episode (default: 16384). A report is ~4,200 "
+        "tokens and a full episode generates ~10,300, so a small value truncates "
+        "the rollout before a report exists and every episode scores at the floor.",
     )
     parser.add_argument(
         "--temperature",
