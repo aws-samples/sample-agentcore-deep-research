@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
-from trajectory_format import build_sft_example
+from trajectory_format import build_sft_example, has_malformed_tool_call
 
 # Add scripts directory for shared utils
 scripts_dir = Path(__file__).parent.parent / "scripts"
@@ -326,6 +326,7 @@ def format_sft_example(
     report: str,
     trajectory: list[dict] | None = None,
     observation_chars: int = 2000,
+    reject_malformed: bool = True,
 ) -> dict:
     """
     Format one collected run into a TRL SFT example.
@@ -342,6 +343,14 @@ def format_sft_example(
     if trajectory:
         example = build_sft_example(question, trajectory, observation_chars)
         example["report"] = report
+        # Reject trajectories where a tool rejected a malformed call. Such a call
+        # lives in an assistant turn and is therefore trained on, while the
+        # corrective error lives in the masked tool result — so the model learns
+        # to emit the broken call and never sees why it was wrong.
+        if reject_malformed:
+            reason = has_malformed_tool_call(example)
+            if reason:
+                example["rejected"] = reason
         return example
 
     return {
@@ -405,6 +414,7 @@ def generate_traces(
     max_questions: int | None = None,
     timeout: int = 900,
     observation_chars: int = 2000,
+    reject_malformed: bool = True,
 ) -> dict:
     """
     Generate SFT traces with parallel execution, backoff, and token refresh.
@@ -439,6 +449,7 @@ def generate_traces(
     )
 
     success_count = 0
+    rejected_count = 0
     error_count = 0
     total_attempts = 0
     lock = threading.Lock()
@@ -458,6 +469,7 @@ def generate_traces(
                 result["response"],
                 trajectory=result.get("trajectory"),
                 observation_chars=observation_chars,
+                reject_malformed=reject_malformed,
             )
             return {
                 **sft_example,
@@ -477,7 +489,12 @@ def generate_traces(
             try:
                 result = future.result()
                 with lock:
-                    if result:
+                    if result and result.get("rejected"):
+                        rejected_count += 1
+                        logger.warning(
+                            f"  [{i}/{len(remaining)}] ⊘ rejected: {result['rejected']}"
+                        )
+                    elif result:
                         with open(output_path, "a") as f:
                             f.write(json.dumps(result) + "\n")
                         success_count += 1
@@ -518,6 +535,7 @@ def generate_traces(
     return {
         "total": len(completed) + success_count,
         "new": success_count,
+        "rejected_malformed": rejected_count,
         "errors": error_count,
         "avg_attempts": round(total_attempts / max(success_count, 1), 2),
     }
@@ -561,6 +579,13 @@ def main():
         type=int,
         default=900,
         help="Per-question timeout in seconds (default: 900)",
+    )
+    parser.add_argument(
+        "--keep-malformed",
+        action="store_true",
+        help="Keep trajectories where a tool rejected a malformed call. Off by "
+        "default: such a call is trained on as an assistant token while the "
+        "corrective error is masked, so the model learns to emit it.",
     )
     parser.add_argument(
         "--observation-chars",
@@ -624,6 +649,7 @@ def main():
         max_questions=args.max_questions,
         timeout=args.timeout,
         observation_chars=args.observation_chars,
+        reject_malformed=not args.keep_malformed,
     )
     total_time = time.time() - start_time
 

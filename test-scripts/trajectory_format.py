@@ -218,6 +218,34 @@ def trajectory_stats(example: dict) -> dict:
     }
 
 
+def has_malformed_tool_call(example: dict) -> str | None:
+    """
+    Detect a tool call the tool itself rejected as malformed.
+
+    Returns a short reason string, or None if the trajectory is clean.
+
+    Why this matters: a malformed tool call sits in an ASSISTANT turn, so it is
+    trained on, while the corrective error sits in the masked tool result. The
+    model therefore learns to emit the broken call and never sees why it was
+    wrong. Measured on 1,963 teacher trajectories, 130 (6.6%) contain an
+    `editor(str_replace)` call missing the required `path`, and the student
+    subsequently omitted required arguments from `file_write` — 60 failures in a
+    98-question eval, two of which stalled the run entirely.
+
+    Detection is on the tool's own validation error rather than a schema we
+    maintain, so it stays correct as tools change.
+    """
+    for msg in example.get("messages", []):
+        if msg.get("role") != "tool":
+            continue
+        head = (msg.get("content") or "")[:400].lower()
+        if "validation failed for input parameters" in head or (
+            "field required" in head and head.startswith("error")
+        ):
+            return f"tool '{msg.get('name')}' rejected a malformed call"
+    return None
+
+
 def retruncate_observations(example: dict, max_chars: int) -> dict:
     """
     Shrink already-collected tool observations to fit a sequence-length budget.
