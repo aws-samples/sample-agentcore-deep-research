@@ -63,6 +63,22 @@ JITTER_FACTOR = 0.3
 TOKEN_REFRESH_INTERVAL = 55 * 60  # 55 minutes
 
 
+def extract_stream_error(stream_text: str) -> str:
+    """
+    Pull the agent's error message out of an SSE stream, if it reported one.
+
+    The runtime emits {"status": "error", "error": "..."} rather than failing the
+    HTTP request, so a rollout that produced no report may still carry a precise
+    explanation.
+    """
+    for match in re.finditer(r'\{"status":\s*"error".*?\}', stream_text, re.DOTALL):
+        try:
+            return json.loads(match.group(0)).get("error", "")
+        except json.JSONDecodeError:
+            continue
+    return ""
+
+
 def backoff_delay(attempt: int) -> float:
     """Compute exponential backoff with jitter."""
     delay = min(INITIAL_BACKOFF * (BACKOFF_MULTIPLIER**attempt), MAX_BACKOFF)
@@ -259,8 +275,16 @@ def invoke_agent_with_retry(
                     "source": "stream",
                 }
 
-            # Not enough content — retry
-            last_error = f"No report (stream={len(stream_text)} chars, url={'found' if report_url else 'none'})"
+            # Not enough content — retry. Surface the agent's own error if it
+            # emitted one: the runtime reports the real cause in the stream (for
+            # example Bedrock's "maximum tokens you requested exceeds the model
+            # limit of N"), and reporting only "no report" hides it, which turns
+            # a self-explanatory failure into a debugging session.
+            agent_error = extract_stream_error(stream_text)
+            if agent_error:
+                last_error = f"Agent error: {agent_error[:300]}"
+            else:
+                last_error = f"No report (stream={len(stream_text)} chars, url={'found' if report_url else 'none'})"
             delay = backoff_delay(attempt)
             if attempt < max_retries - 1:
                 logger.debug(

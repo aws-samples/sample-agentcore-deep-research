@@ -108,24 +108,31 @@ class DeepResearchReward(RewardFunction):
         return research_rubric.combine(rubric_reward, citation_reward, format_reward)
 
     def _judge_rubric(self, question: str, report: str) -> float:
-        """Score report against the shared rubric using an LLM judge call."""
+        """
+        Score report against the shared rubric using an LLM judge call.
+
+        Deliberately does not catch judge failures. A throttled or unparseable
+        judge is missing data, and returning 0.0 would hand GRPO a false label
+        saying this report is worthless — which is worse than a failed rollout,
+        because it is indistinguishable from signal. Throttling also correlates
+        with rollout concurrency, so the noise would be systematic rather than
+        random. Let it raise and lose the rollout instead.
+        """
         import boto3
 
-        try:
-            bedrock = boto3.client(
-                "bedrock-runtime",
-                region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-            )
-            score, _ = research_rubric.score_rubric_with_judge(
-                question,
-                report[:24000],
-                bedrock,
-                "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-            )
-            return score
-        except Exception as e:
-            print(f"[REWARD] Judge failed: {e}, defaulting to 0")
-            return 0.0
+        bedrock = boto3.client(
+            "bedrock-runtime",
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+        )
+        score, _ = research_rubric.score_rubric_with_judge(
+            question,
+            report,
+            bedrock,
+            os.environ.get(
+                "JUDGE_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ),
+        )
+        return score
 
 
 strands_compat.apply_shims()
@@ -191,13 +198,13 @@ def read_report(path: str = REPORT_PATH) -> str:
     AgentCore gives each session its own microVM, so this path is private to the
     rollout and cannot be clobbered by concurrent rollouts.
     """
+    # Only a missing file is a legitimate "no report". Any other error (encoding,
+    # permissions) is a real fault and should surface rather than masquerade as an
+    # empty report and a near-zero reward.
     try:
         with open(path) as f:
             return f.read().strip()
     except FileNotFoundError:
-        return ""
-    except Exception as exc:
-        print(f"[RL] Could not read {path}: {exc}", flush=True)
         return ""
 
 
@@ -249,11 +256,11 @@ def invoke_agent(payload: dict):
     system_prompt = load_system_prompt(enabled_sources)
     tools = [file_read, file_write, editor, execute_python]
 
-    try:
-        gateway_client = create_gateway_client(enabled_sources)
-        tools.append(gateway_client)
-    except Exception as e:
-        print(f"[RL] Gateway unavailable ({e}), proceeding with local tools only")
+    # No fallback to local-only tools. Without Gateway the agent cannot retrieve
+    # anything, so it would write from parametric memory, score badly, and teach
+    # the policy from a broken environment rather than a bad decision.
+    gateway_client = create_gateway_client(enabled_sources)
+    tools.append(gateway_client)
 
     agent = Agent(
         name="DeepResearchRL",
@@ -272,6 +279,7 @@ def invoke_agent(payload: dict):
         # while the report itself is ~15,000. Scoring the message instead of the
         # file gives every rollout the same near-floor reward (~0.08), which
         # flattens GRPO advantages to zero and produces no gradient at all.
+        # So read the artefact, and keep the message only as a fallback.
         response_text = read_report()
         if not response_text:
             if response.message and response.message.get("content"):

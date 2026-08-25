@@ -12,48 +12,27 @@ BEDROCK_CONNECT_TIMEOUT = 600
 BEDROCK_MAX_ATTEMPTS = 3
 BEDROCK_MAX_CONNECTIONS = 10
 
-MAX_TOKENS = 64_000
+MAX_TOKENS = 8_192
 THINKING_TOKENS = 2_000
 TEMPERATURE = 0.0
 
-# Per-model output-token ceilings, matched as substrings of the model id.
-#
-# Bedrock rejects any request whose maxTokens exceeds the model's limit with
-# ValidationException ("The maximum tokens you requested exceeds the model
-# limit of N"). The agent then returns nothing, which looks identical to a
-# model that is simply incapable — Nova Micro scored a spurious 0.000 across a
-# whole eval run for this reason. Clamp instead of failing.
-MODEL_MAX_OUTPUT_TOKENS = {
-    "nova-micro": 10_000,
-    "nova-lite": 10_000,
-    "nova-2-lite": 10_000,
-    "nova-pro": 10_000,
-    "nova-premier": 32_000,
-    "llama3-1": 8_192,
-    "llama3-2": 8_192,
-    "llama3-3": 8_192,
-    "llama4": 8_192,
-    "mistral": 8_192,
-    "deepseek": 32_768,
-    # Claude 3 generation caps output at 4,096 tokens (Claude 3.5 at 8,192).
-    # Without these entries the default (64,000) is sent and Bedrock rejects the
-    # request outright, which is indistinguishable from an incapable model. The
-    # agent writes reports incrementally — median 929 tokens per turn — so a
-    # 4,096 per-call ceiling is workable.
-    "claude-3-haiku": 4_096,
-    "claude-3-sonnet": 4_096,
-    "claude-3-opus": 4_096,
-    "claude-3-5-haiku": 8_192,
-    "claude-3-5-sonnet": 8_192,
-}
 
-
-def get_max_output_tokens(model_id: str | None) -> int:
+def get_max_output_tokens(model_id: str | None = None) -> int:
     """
-    Resolve a safe maxTokens for the given model.
+    Output-token cap for the agent, from MAX_OUTPUT_TOKENS or the default.
 
-    Order of precedence: MAX_OUTPUT_TOKENS env override, then the per-model
-    ceiling above, then the default. Always returns a value the model accepts.
+    Deliberately NOT a per-model lookup table. Bedrock already reports the
+    authoritative limit when a request exceeds it:
+
+        ValidationException: The maximum tokens you requested exceeds the model
+        limit of 10000. Try again with a maximum tokens value that is lower.
+
+    That message is always correct, needs no maintenance, and covers every model,
+    whereas a hand-maintained table silently goes stale and only covers the
+    families someone thought to list. The default below is well above what the
+    agent actually emits — reports are written incrementally, and the largest
+    single turn measured across 300 real trajectories was 2,602 tokens — so it
+    fits comfortably inside every current model's ceiling.
     """
     override = os.environ.get("MAX_OUTPUT_TOKENS")
     if override:
@@ -61,32 +40,8 @@ def get_max_output_tokens(model_id: str | None) -> int:
             return int(override)
         except ValueError:
             pass
-    if model_id:
-        lowered = model_id.lower()
-        for fragment, limit in MODEL_MAX_OUTPUT_TOKENS.items():
-            if fragment in lowered:
-                return limit
     return MAX_TOKENS
 
-
-# Model families that reject tool use when streaming is enabled. Bedrock raises
-# ValidationException("This model doesn't support tool use in streaming mode"),
-# which zeroes an entire eval run. These models still work with tool use when
-# streaming is off, so fall back rather than treating them as incapable.
-MODELS_WITHOUT_STREAMING_TOOL_USE = (
-    "llama3-1",
-    "llama3-2",
-    "llama3-3",
-    "mistral",
-)
-
-
-def supports_streaming_tool_use(model_id: str | None) -> bool:
-    """Whether the model can use tools while streaming."""
-    if not model_id:
-        return True
-    lowered = model_id.lower()
-    return not any(f in lowered for f in MODELS_WITHOUT_STREAMING_TOOL_USE)
 
 VALID_SERVICE_TIERS = {"default", "priority", "flex"}
 

@@ -28,7 +28,6 @@ from utils.inference import (
     get_inference_configs,
     get_max_output_tokens,
     get_service_tier,
-    supports_streaming_tool_use,
 )
 from utils.ssm import get_ssm_parameter
 
@@ -337,17 +336,15 @@ def create_deep_research_agent(
     else:
         model_id = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
         service_tier = get_service_tier()
-        max_output_tokens = get_max_output_tokens(model_id)
-        streaming = supports_streaming_tool_use(model_id)
+        max_output_tokens = get_max_output_tokens()
         print(
             f"[AGENT] Using Bedrock model: {model_id}, tier: {service_tier}, "
-            f"max_tokens: {max_output_tokens}, streaming: {streaming}"
+            f"max_tokens: {max_output_tokens}"
         )
         model = BedrockModel(
             model_id=model_id,
             temperature=INFERENCE_CONFIG["temperature"],
             max_tokens=max_output_tokens,
-            streaming=streaming,
             boto_client_config=BEDROCK_CONFIG,
             cache_config=CacheConfig(strategy="auto"),
             additional_args={"serviceTier": {"type": service_tier}},

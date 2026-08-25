@@ -482,18 +482,24 @@ def score_report_rubric(
             "per_criterion": {},
         }
 
-    try:
-        bedrock = _boto3.client(
-            "bedrock-runtime",
-            region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-        )
-        # Judge the whole report. Truncating at 6K chars previously hid most of
-        # a 13-19K char frontier report from the judge, penalising length.
-        rubric_reward, per_criterion = rubric_mod.score_rubric_with_judge(
-            question, report[:24000], bedrock, judge_model
-        )
-    except Exception:
-        rubric_reward, per_criterion = 0.0, {}
+    bedrock = _boto3.client(
+        "bedrock-runtime",
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+    )
+    # The WHOLE report goes to the judge. An earlier version truncated at 6K
+    # chars, which hid most of a 13-19K char report and penalised length; a later
+    # 24K cap was equally silent, just further out. If a report ever exceeds the
+    # judge's context the model raises, which is visible — unlike quietly scoring
+    # a partial report and reporting the number as if it were complete.
+    #
+    # Judge failures are likewise NOT caught. Scoring them 0.0 would silently
+    # depress a model's mean with no trace in the results, the same class of
+    # problem as counting an empty response as a quality score of zero. Letting
+    # it raise records the question as an error and the run reports fewer
+    # questions than requested, which is visible.
+    rubric_reward, per_criterion = rubric_mod.score_rubric_with_judge(
+        question, report, bedrock, judge_model
+    )
 
     citation_reward = rubric_mod.score_citations(report, retrieved_urls)
     format_reward = rubric_mod.score_format(report)
@@ -914,7 +920,10 @@ def _evaluate_single_question(
         "id": question["id"],
         "question": q_text,
         "ground_truth": question["answer"],
-        "response": response[:5000],
+        # Full response, not a 5,000-char slice: the saved record is what any
+        # later re-scoring or inspection reads, so truncating it silently
+        # discards evidence.
+        "response": response,
         "extracted_answer": judgment["extracted_answer"],
         "correct": judgment["correct"],
         "raw_judgment": judgment["raw_judgment"],

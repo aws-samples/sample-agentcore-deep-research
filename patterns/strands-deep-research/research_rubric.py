@@ -226,6 +226,17 @@ def score_format(report: str) -> float:
     return sum(checks) / len(checks)
 
 
+class RubricJudgeError(RuntimeError):
+    """
+    The judge could not be scored — as distinct from scoring zero.
+
+    Raised rather than returning 0.0 because the two are not interchangeable: a
+    throttled or unparseable judge is missing data, while 0.0 is a claim about
+    report quality. Conflating them corrupts eval means and, in RL, becomes a
+    false training label.
+    """
+
+
 def score_rubric_with_judge(
     question: str,
     report: str,
@@ -251,7 +262,13 @@ def score_rubric_with_judge(
     )
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
-        return 0.0, {}
+        # Returning 0.0 here would be a lie: it is indistinguishable from a
+        # genuinely worthless report. In eval that silently depresses a model's
+        # score; in RL it actively teaches the policy that a good report is bad.
+        # Raise so the caller can treat it as missing data.
+        raise RubricJudgeError(
+            f"Judge returned no JSON object (first 200 chars: {text[:200]!r})"
+        )
     parsed = json.loads(match.group(0))
     scores = [int(parsed.get(str(i), 0)) for i in range(len(RUBRICS))]
     normalized = sum(s / 10.0 for s in scores) / len(RUBRICS)
