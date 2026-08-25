@@ -124,7 +124,10 @@ def main():
     print(f"Model:          {hf_model_id}")
     print(f"Seed:           {seed}")
     print(f"Liger kernel:   {use_liger}")
-    print(f"LoRA rank:      {lora_rank}")
+    print(
+        "Fine-tuning:    "
+        + (f"LoRA r={lora_rank}" if lora_rank > 0 else "FULL-PARAMETER (no adapters)")
+    )
     print(f"LoRA alpha:     {lora_alpha} (alpha/r = {lora_alpha / lora_rank:.1f})")
     print(f"LR:             {lr}")
     print(f"Epochs:         {epochs}")
@@ -206,14 +209,24 @@ def main():
     # receive gradient. They stay zero-initialised and merge as identity, so
     # results are unaffected — but they consume GPU memory and merge time for
     # nothing. Excluding them puts the whole memory budget behind the text model.
-    lora_config = LoraConfig(
-        r=lora_rank,
-        lora_alpha=lora_alpha,
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM",
-        target_modules="all-linear",
-        exclude_modules=r".*\.?(visual|vision_tower|vision_model)\..*",
+    # lora_rank <= 0 means full-parameter fine-tuning: no adapters, every weight
+    # trained. That needs far more memory — weights + grads + Adam states rather
+    # than weights + a small adapter — so it relies on FSDP sharding those states
+    # across ranks, and may additionally need optimizer offload at long sequence
+    # lengths.
+    use_lora = lora_rank > 0
+    lora_config = (
+        LoraConfig(
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=0.05,
+            bias="none",
+            task_type="CAUSAL_LM",
+            target_modules="all-linear",
+            exclude_modules=r".*\.?(visual|vision_tower|vision_model)\..*",
+        )
+        if use_lora
+        else None
     )
 
     # assistant_only_loss masks the loss to assistant turns, but it requires the
@@ -406,15 +419,19 @@ def main():
     # python storage". Instead: let the trainer gather the adapter to a full
     # state dict, then merge into the base model in a single process on CPU
     # (the instance has ample host RAM for a BF16 copy).
-    adapter_dir = "/opt/ml/checkpoints/adapter"
-    print("Saving LoRA adapter (gathering sharded state)...", flush=True)
-    trainer.save_model(adapter_dir)
+    save_dir = "/opt/ml/checkpoints/adapter" if use_lora else OUTPUT_DIR
+    print(
+        f"Saving {'LoRA adapter' if use_lora else 'full model'} "
+        "(gathering sharded state)...",
+        flush=True,
+    )
+    trainer.save_model(save_dir)
 
     if torch.distributed.is_initialized():
         torch.distributed.barrier()
 
     if RANK != 0:
-        print(f"[rank{RANK}] adapter saved by rank 0; exiting.", flush=True)
+        print(f"[rank{RANK}] checkpoint saved by rank 0; exiting.", flush=True)
         return
 
     # Free GPU memory held by the sharded training model before the CPU merge
@@ -422,24 +439,32 @@ def main():
     del trainer
     torch.cuda.empty_cache()
 
-    print("Merging adapter into base weights on CPU...", flush=True)
+    # Full-parameter training already wrote real weights to OUTPUT_DIR, so the
+    # merge step is LoRA-only.
+    if not use_lora:
+        print(
+            "Full-parameter run: weights already written, no merge needed.", flush=True
+        )
     import transformers
-    from peft import PeftModel
     from transformers import AutoConfig
 
     # Resolve the concrete model class from the checkpoint rather than assuming
     # AutoModelForCausalLM — current Qwen/Gemma checkpoints are vision-language
     # classes (e.g. Qwen3_5ForConditionalGeneration).
-    cfg = AutoConfig.from_pretrained(model_cache, trust_remote_code=True)
-    model_cls = getattr(transformers, cfg.architectures[0])
-    base = model_cls.from_pretrained(
-        model_cache,
-        dtype=torch.bfloat16,
-        device_map="cpu",
-        trust_remote_code=True,
-    )
-    merged = PeftModel.from_pretrained(base, adapter_dir).merge_and_unload()
-    merged.save_pretrained(OUTPUT_DIR, safe_serialization=True)
+    if use_lora:
+        print("Merging adapter into base weights on CPU...", flush=True)
+        from peft import PeftModel
+
+        cfg = AutoConfig.from_pretrained(model_cache, trust_remote_code=True)
+        model_cls = getattr(transformers, cfg.architectures[0])
+        base = model_cls.from_pretrained(
+            model_cache,
+            dtype=torch.bfloat16,
+            device_map="cpu",
+            trust_remote_code=True,
+        )
+        merged = PeftModel.from_pretrained(base, save_dir).merge_and_unload()
+        merged.save_pretrained(OUTPUT_DIR, safe_serialization=True)
 
     # Serve with the published template, not the training one (see above).
     if upstream_chat_template is not None:
@@ -471,6 +496,19 @@ def main():
                 shutil.copy2(src, Path(OUTPUT_DIR) / name)
                 print(f"  copied {name}", flush=True)
     print(f"Merged model saved to {OUTPUT_DIR}", flush=True)
+
+    # Both LoRA and full-parameter runs must leave the same artifact shape, since
+    # deployment and RL both consume it as a plain HF checkpoint and neither knows
+    # how it was trained. Check here rather than letting vLLM fail to start or RL
+    # fail inside Megatron.
+    required = ("config.json", "tokenizer_config.json")
+    missing = [n for n in required if not (Path(OUTPUT_DIR) / n).exists()]
+    weights = list(Path(OUTPUT_DIR).glob("*.safetensors"))
+    if missing or not weights:
+        raise RuntimeError(
+            f"Incomplete checkpoint in {OUTPUT_DIR}: missing {missing or 'no .safetensors'}. "
+            f"Contents: {sorted(f.name for f in Path(OUTPUT_DIR).iterdir())[:20]}"
+        )
 
     output_files = list(Path(OUTPUT_DIR).glob("*"))
     total_size = sum(f.stat().st_size for f in output_files if f.is_file())

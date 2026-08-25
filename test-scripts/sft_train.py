@@ -80,7 +80,12 @@ def main():
     )
     # LoRA hyperparameters
     parser.add_argument(
-        "--lora-rank", type=int, default=64, help="LoRA rank (default: 64)"
+        "--lora-rank",
+        type=int,
+        default=64,
+        help="LoRA rank (default: 64). Set 0 for full-parameter fine-tuning, "
+        "which trains every weight and therefore needs FSDP to shard the "
+        "optimizer states — far more memory than adapters.",
     )
     parser.add_argument(
         "--lora-alpha",
