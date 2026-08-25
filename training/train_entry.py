@@ -53,9 +53,58 @@ def resolve_data_path(data_path: str) -> str:
     return data_path
 
 
+def resolve_model_dir(hf_model_id: str, dest: str) -> str:
+    """
+    Materialise the policy weights locally, from the HF Hub or an S3 tarball.
+
+    RL continues from the SFT checkpoint, which SageMaker writes to S3 as
+    model.tar.gz. Supporting only the Hub meant RL could start from a public base
+    model but never from our own SFT run, so the two stages could not be chained.
+
+    Accepts an HF Hub repo id (Qwen/Qwen3.5-9B) or an S3 tarball
+    (s3://bucket/.../output/model.tar.gz).
+    """
+    if not hf_model_id.startswith("s3://"):
+        from huggingface_hub import snapshot_download
+
+        print(f"Downloading from HuggingFace: {hf_model_id}", flush=True)
+        snapshot_download(repo_id=hf_model_id, local_dir=dest)
+        return dest
+
+    if not hf_model_id.endswith(".tar.gz"):
+        raise ValueError(
+            f"S3 model must be a .tar.gz archive, got {hf_model_id}. "
+            "SageMaker training jobs write model.tar.gz."
+        )
+
+    import tarfile
+
+    import boto3
+
+    bucket, _, key = hf_model_id[len("s3://") :].partition("/")
+    os.makedirs(dest, exist_ok=True)
+    archive = os.path.join(dest, "model.tar.gz")
+
+    print(f"Downloading {hf_model_id}", flush=True)
+    boto3.client("s3").download_file(bucket, key, archive)
+    with tarfile.open(archive) as tar:
+        # filter="data" refuses absolute paths and parent-directory escapes.
+        tar.extractall(dest, filter="data")
+    os.remove(archive)
+
+    # Without config.json this fails much later inside Megatron with an
+    # unhelpful error, so check where the cause is still obvious.
+    if not os.path.exists(os.path.join(dest, "config.json")):
+        raise RuntimeError(
+            f"No config.json in {dest} after extracting {hf_model_id}. "
+            f"Contents: {sorted(os.listdir(dest))[:20]}"
+        )
+    print(f"Model ready at: {dest}", flush=True)
+    return dest
+
+
 def main() -> None:
     from agentcore_rl_toolkit.backends.slime import SlimeRunner
-    from huggingface_hub import snapshot_download
 
     # Required params
     agent_runtime_arn = get_hp("agent_runtime_arn")
@@ -98,10 +147,8 @@ def main() -> None:
     data_path = resolve_data_path(data_path)
 
     # Download model from HuggingFace
-    model_dir = f"/opt/ml/model-cache/{hf_model_id.replace('/', '_')}"
-    print(f"Downloading model from HuggingFace: {hf_model_id}")
-    snapshot_download(repo_id=hf_model_id, local_dir=model_dir)
-    print(f"Model downloaded to: {model_dir}")
+    safe_name = hf_model_id.replace("/", "_").replace(":", "_")
+    model_dir = resolve_model_dir(hf_model_id, f"/opt/ml/model-cache/{safe_name}")
 
     print("=" * 60)
     print("AgentCore Deep Research — Agentic RL Training (SlimeRunner)")

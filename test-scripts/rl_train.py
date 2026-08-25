@@ -56,7 +56,17 @@ def main():
         "--hf-model-id",
         type=str,
         default="Qwen/Qwen3.5-4B",
-        help="HuggingFace model ID (default: Qwen/Qwen3.5-4B)",
+        help="Policy to start from: an HF Hub id or an S3 model.tar.gz "
+        "(default: Qwen/Qwen3.5-4B). Use --sft-job-name to continue from an SFT "
+        "run instead of naming the artifact by hand.",
+    )
+    parser.add_argument(
+        "--sft-job-name",
+        type=str,
+        default=None,
+        help="Continue RL from this completed SFT training job. Resolves the "
+        "job's model artifact and overrides --hf-model-id. This is the SFT -> RL "
+        "hand-off: the literature treats SFT purely as an RL cold start.",
     )
     parser.add_argument(
         "--model-type",
@@ -174,6 +184,20 @@ def main():
     logger.info(f"Image:         {image_uri}")
     logger.info(f"Num rollouts:  {args.num_rollout}")
     logger.info("")
+
+    # Resolve an SFT job to its artifact so RL can continue from it.
+    if args.sft_job_name:
+        sm = boto3.client("sagemaker", region_name=region)
+        job = sm.describe_training_job(TrainingJobName=args.sft_job_name)
+        status = job["TrainingJobStatus"]
+        if status != "Completed":
+            logger.error(
+                f"SFT job '{args.sft_job_name}' is '{status}', not 'Completed'"
+            )
+            sys.exit(1)
+        args.hf_model_id = job["ModelArtifacts"]["S3ModelArtifacts"]
+        logger.info(f"Continuing RL from SFT job {args.sft_job_name}")
+        logger.info(f"  policy artifact: {args.hf_model_id}")
 
     # Upload training data to S3
     s3 = boto3.client("s3")
