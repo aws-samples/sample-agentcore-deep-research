@@ -29,6 +29,14 @@ export interface AppConfig {
     service_tier: ServiceTier
   }
   tools?: Record<string, ToolConfig>
+  training?: {
+    finetuned_endpoint_name?: string
+    instance_type?: string
+    staging_bucket_name?: string
+    sagemaker_max_tokens?: number
+    sagemaker_enable_thinking?: boolean
+    sagemaker_temperature?: number
+  }
 }
 
 export class ConfigManager {
@@ -125,6 +133,16 @@ export class ConfigManager {
           service_tier: serviceTier,
         },
         tools,
+        training: {
+          finetuned_endpoint_name:
+            parsedConfig.training?.finetuned_endpoint_name || "dr-finetuned",
+          instance_type: parsedConfig.training?.instance_type || "ml.g5.12xlarge",
+          staging_bucket_name: parsedConfig.training?.staging_bucket_name,
+          sagemaker_max_tokens: parsedConfig.training?.sagemaker_max_tokens ?? 16384,
+          sagemaker_enable_thinking:
+            parsedConfig.training?.sagemaker_enable_thinking ?? false,
+          sagemaker_temperature: parsedConfig.training?.sagemaker_temperature ?? 0.0,
+        },
       }
     } catch (error) {
       throw new Error(`Failed to parse configuration file ${configPath}: ${error}`)

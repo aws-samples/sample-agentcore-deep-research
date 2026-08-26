@@ -42,18 +42,74 @@ def main():
     print(f"  Region:   {args.region}")
     print()
 
-    # Update the endpoint name in the CDK stack
+    # Set the endpoint name in config.yaml (the CDK stack reads it from there,
+    # so infrastructure code stays free of environment-specific values).
     cdk_dir = Path(__file__).parent.parent / "infra-cdk"
-    stack_file = cdk_dir / "lib" / "rl-training-stack.ts"
+    config_file = cdk_dir / "config.yaml"
 
-    content = stack_file.read_text()
-    content = re.sub(
-        r'SAGEMAKER_ENDPOINT_NAME: ".*?"',
-        f'SAGEMAKER_ENDPOINT_NAME: "{args.endpoint_name}"',
-        content,
+    if not config_file.exists():
+        print(f"ERROR: {config_file} not found. Copy .config_example.yaml first.")
+        sys.exit(1)
+
+    content = config_file.read_text()
+    if re.search(r"^\s*finetuned_endpoint_name:", content, flags=re.MULTILINE):
+        content = re.sub(
+            r"^(\s*)finetuned_endpoint_name:.*$",
+            rf"\g<1>finetuned_endpoint_name: {args.endpoint_name}",
+            content,
+            flags=re.MULTILINE,
+        )
+    elif re.search(r"^training:\s*$", content, flags=re.MULTILINE):
+        content = re.sub(
+            r"^(training:\s*)$",
+            rf"\g<1>\n  finetuned_endpoint_name: {args.endpoint_name}",
+            content,
+            flags=re.MULTILINE,
+        )
+    else:
+        content = content.rstrip("\n") + (
+            f"\n\ntraining:\n  finetuned_endpoint_name: {args.endpoint_name}\n"
+        )
+    config_file.write_text(content)
+    print(
+        f"✓ Set training.finetuned_endpoint_name = {args.endpoint_name} in config.yaml"
     )
-    stack_file.write_text(content)
-    print("✓ Updated endpoint name in rl-training-stack.ts")
+
+    # Also record the main stack's staging bucket. Without STAGING_BUCKET_NAME the
+    # report upload hook skips S3 upload, no [REPORT_URL:...] is emitted, and the
+    # eval silently scores the agent's narration instead of its report.
+    try:
+        import boto3
+
+        cfn = boto3.client("cloudformation", region_name=args.region)
+        outputs = cfn.describe_stacks(StackName="deep-research")["Stacks"][0]["Outputs"]
+        bucket = next(
+            o["OutputValue"] for o in outputs if o["OutputKey"] == "StagingBucketName"
+        )
+    except Exception as e:  # noqa: BLE001
+        print(
+            f"⚠ Could not resolve StagingBucketName ({e}); report URLs will be absent"
+        )
+        bucket = None
+
+    if bucket:
+        content = config_file.read_text()
+        if re.search(r"^\s*staging_bucket_name:", content, flags=re.MULTILINE):
+            content = re.sub(
+                r"^(\s*)staging_bucket_name:.*$",
+                rf"\g<1>staging_bucket_name: {bucket}",
+                content,
+                flags=re.MULTILINE,
+            )
+        else:
+            content = re.sub(
+                r"^(\s*finetuned_endpoint_name:.*)$",
+                rf"\g<1>\n  staging_bucket_name: {bucket}",
+                content,
+                flags=re.MULTILINE,
+            )
+        config_file.write_text(content)
+        print(f"✓ Set training.staging_bucket_name = {bucket}")
 
     # Redeploy RL stack (use bash -lc to pick up user's PATH with nvm/node)
     print("\nDeploying...")
@@ -78,9 +134,15 @@ def main():
     print("\n✓ Fine-tuned agent deployed!")
     print(f"  Runtime ARN: {finetuned_arn}")
     print(f"  Endpoint:    {args.endpoint_name}")
+    print("\nWAIT ~15 min before evaluating: AgentCore does not hot-swap the")
+    print("image mid-session, so an immediate eval scores an empty runtime.")
     print("\nTo eval:")
     print(
-        f"  uv run test-scripts/eval-agent.py --benchmark hle-search --max-questions 10 --tag finetuned --runtime-arn {finetuned_arn}"
+        f"  uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \\\n"
+        f"      --parallel 8 --tag finetuned --runtime-arn {finetuned_arn}"
+    )
+    print(
+        "  (match --parallel across runs being compared: 12 produced 21 failures vs 11 at 8)"
     )
 
 

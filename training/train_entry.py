@@ -53,9 +53,58 @@ def resolve_data_path(data_path: str) -> str:
     return data_path
 
 
+def resolve_model_dir(hf_model_id: str, dest: str) -> str:
+    """
+    Materialise the policy weights locally, from the HF Hub or an S3 tarball.
+
+    RL continues from the SFT checkpoint, which SageMaker writes to S3 as
+    model.tar.gz. Supporting only the Hub meant RL could start from a public base
+    model but never from our own SFT run, so the two stages could not be chained.
+
+    Accepts an HF Hub repo id (Qwen/Qwen3.5-9B) or an S3 tarball
+    (s3://bucket/.../output/model.tar.gz).
+    """
+    if not hf_model_id.startswith("s3://"):
+        from huggingface_hub import snapshot_download
+
+        print(f"Downloading from HuggingFace: {hf_model_id}", flush=True)
+        snapshot_download(repo_id=hf_model_id, local_dir=dest)
+        return dest
+
+    if not hf_model_id.endswith(".tar.gz"):
+        raise ValueError(
+            f"S3 model must be a .tar.gz archive, got {hf_model_id}. "
+            "SageMaker training jobs write model.tar.gz."
+        )
+
+    import tarfile
+
+    import boto3
+
+    bucket, _, key = hf_model_id[len("s3://") :].partition("/")
+    os.makedirs(dest, exist_ok=True)
+    archive = os.path.join(dest, "model.tar.gz")
+
+    print(f"Downloading {hf_model_id}", flush=True)
+    boto3.client("s3").download_file(bucket, key, archive)
+    with tarfile.open(archive) as tar:
+        # filter="data" refuses absolute paths and parent-directory escapes.
+        tar.extractall(dest, filter="data")
+    os.remove(archive)
+
+    # Without config.json this fails much later inside Megatron with an
+    # unhelpful error, so check where the cause is still obvious.
+    if not os.path.exists(os.path.join(dest, "config.json")):
+        raise RuntimeError(
+            f"No config.json in {dest} after extracting {hf_model_id}. "
+            f"Contents: {sorted(os.listdir(dest))[:20]}"
+        )
+    print(f"Model ready at: {dest}", flush=True)
+    return dest
+
+
 def main() -> None:
     from agentcore_rl_toolkit.backends.slime import SlimeRunner
-    from huggingface_hub import snapshot_download
 
     # Required params
     agent_runtime_arn = get_hp("agent_runtime_arn")
@@ -74,21 +123,32 @@ def main() -> None:
     rollout_gpus_per_engine = get_hp("rollout_gpus_per_engine", 2, int)
     rollout_batch_size = get_hp("rollout_batch_size", 8, int)
     n_samples_per_prompt = get_hp("n_samples_per_prompt", 4, int)
-    rollout_max_response_len = get_hp("rollout_max_response_len", 1024, int)
+    # A research report is ~4,200 tokens and the policy generates ~10,300 tokens
+    # across a full episode (measured over real trajectories). 1024 truncates the
+    # rollout long before a report exists, so every episode scores at the floor
+    # and GRPO sees no signal.
+    rollout_max_response_len = get_hp("rollout_max_response_len", 16384, int)
     rollout_temperature = get_hp("rollout_temperature", 1.0, float)
     lr = get_hp("lr", 1e-6, float)
     max_concurrent = get_hp("max_concurrent", 10, int)
     acr_timeout = get_hp("acr_timeout", 900, int)
     sglang_mem_fraction_static = get_hp("sglang_mem_fraction_static", 0.7, float)
+    # SGLang serving options for the rollout engine. These must match the served
+    # model or tool calls silently fail to parse — the same lesson as the SFT
+    # serving path, which needs an explicit tool-call parser for Qwen.
+    sglang_tool_call_parser = get_hp("sglang_tool_call_parser", "qwen")
+    sglang_reasoning_parser = get_hp("sglang_reasoning_parser") or None
+    # An agentic episode runs ~20-32K tokens of context, well past SGLang's
+    # default, so cap it explicitly rather than discovering the ceiling mid-rollout.
+    sglang_context_length = get_hp("sglang_context_length", 32768, int)
+    sglang_data_parallel_size = get_hp("sglang_data_parallel_size", 1, int)
 
     # Resolve data path
     data_path = resolve_data_path(data_path)
 
     # Download model from HuggingFace
-    model_dir = f"/opt/ml/model-cache/{hf_model_id.replace('/', '_')}"
-    print(f"Downloading model from HuggingFace: {hf_model_id}")
-    snapshot_download(repo_id=hf_model_id, local_dir=model_dir)
-    print(f"Model downloaded to: {model_dir}")
+    safe_name = hf_model_id.replace("/", "_").replace(":", "_")
+    model_dir = resolve_model_dir(hf_model_id, f"/opt/ml/model-cache/{safe_name}")
 
     print("=" * 60)
     print("AgentCore Deep Research — Agentic RL Training (SlimeRunner)")
@@ -106,6 +166,11 @@ def main() -> None:
     print(f"Max resp len:  {rollout_max_response_len}")
     print(f"LR:            {lr}")
     print(f"SGLang mem:    {sglang_mem_fraction_static}")
+    print(
+        f"SGLang parsers: tool={sglang_tool_call_parser} "
+        f"reasoning={sglang_reasoning_parser}"
+    )
+    print(f"SGLang ctx len: {sglang_context_length}")
     print(f"Output:        {OUTPUT_DIR}")
     print()
 
@@ -141,6 +206,10 @@ def main() -> None:
         max_concurrent=max_concurrent,
         acr_timeout=acr_timeout,
         reward_postprocessing="grpo",
+        sglang_tool_call_parser=sglang_tool_call_parser,
+        sglang_reasoning_parser=sglang_reasoning_parser,
+        sglang_context_length=sglang_context_length,
+        sglang_data_parallel_size=sglang_data_parallel_size,
         sglang_mem_fraction_static=sglang_mem_fraction_static,
         extra_flags=[
             "--save",

@@ -56,7 +56,17 @@ def main():
         "--hf-model-id",
         type=str,
         default="Qwen/Qwen3.5-4B",
-        help="HuggingFace model ID (default: Qwen/Qwen3.5-4B)",
+        help="Policy to start from: an HF Hub id or an S3 model.tar.gz "
+        "(default: Qwen/Qwen3.5-4B). Use --sft-job-name to continue from an SFT "
+        "run instead of naming the artifact by hand.",
+    )
+    parser.add_argument(
+        "--sft-job-name",
+        type=str,
+        default=None,
+        help="Continue RL from this completed SFT training job. Resolves the "
+        "job's model artifact and overrides --hf-model-id. This is the SFT -> RL "
+        "hand-off: the literature treats SFT purely as an RL cold start.",
     )
     parser.add_argument(
         "--model-type",
@@ -107,8 +117,10 @@ def main():
     parser.add_argument(
         "--max-response-len",
         type=int,
-        default=1024,
-        help="Max response tokens (default: 1024)",
+        default=16384,
+        help="Max response tokens per episode (default: 16384). A report is ~4,200 "
+        "tokens and a full episode generates ~10,300, so a small value truncates "
+        "the rollout before a report exists and every episode scores at the floor.",
     )
     parser.add_argument(
         "--temperature",
@@ -172,6 +184,20 @@ def main():
     logger.info(f"Image:         {image_uri}")
     logger.info(f"Num rollouts:  {args.num_rollout}")
     logger.info("")
+
+    # Resolve an SFT job to its artifact so RL can continue from it.
+    if args.sft_job_name:
+        sm = boto3.client("sagemaker", region_name=region)
+        job = sm.describe_training_job(TrainingJobName=args.sft_job_name)
+        status = job["TrainingJobStatus"]
+        if status != "Completed":
+            logger.error(
+                f"SFT job '{args.sft_job_name}' is '{status}', not 'Completed'"
+            )
+            sys.exit(1)
+        args.hf_model_id = job["ModelArtifacts"]["S3ModelArtifacts"]
+        logger.info(f"Continuing RL from SFT job {args.sft_job_name}")
+        logger.info(f"  policy artifact: {args.hf_model_id}")
 
     # Upload training data to S3
     s3 = boto3.client("s3")
@@ -298,7 +324,15 @@ def main():
     logger.info("")
     logger.info("Once complete, deploy the fine-tuned model:")
     logger.info(
-        f"  uv run test-scripts/deploy_model.py --job-name {job_name} --endpoint-name dr-finetuned --instance-type ml.g5.xlarge"
+        f"  uv run test-scripts/deploy_model.py --job-name {job_name} \\\n"
+        "      --endpoint-name dr-rl --instance-type ml.g6e.16xlarge \\\n"
+        "      --tensor-parallel-degree 1 --max-model-len 65536 \\\n"
+        "      --tool-call-parser qwen3_coder --reasoning-parser qwen3 \\\n"
+        "      --enable-capacity-fallback --region us-west-2"
+    )
+    logger.info(
+        "  (size the instance to the policy: a 9B in BF16 plus KV cache needs a "
+        "48GB card, not ml.g5.xlarge's 24GB)"
     )
 
 

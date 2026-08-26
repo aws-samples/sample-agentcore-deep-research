@@ -27,6 +27,8 @@ from pathlib import Path
 
 os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
+import research_rubric
+import strands_compat
 from agentcore_rl_toolkit import AgentCoreRLApp, RewardFunction
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
@@ -42,8 +44,15 @@ app = AgentCoreRLApp()
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
-# Default data sources for training rollouts (web search only — fast and general)
-DEFAULT_RL_SOURCES = ["tavily", "nova"]
+# Where the system prompt instructs the agent to write its report. The reward is
+# computed from this file, not from the agent's closing chat message.
+REPORT_PATH = "/tmp/research_report.md"
+
+# Default data sources for training rollouts. Key-free tools only: a source that
+# needs an API key fails intermittently if the key is absent or rate-limited, and
+# an intermittent tool failure is indistinguishable from a bad policy, so it adds
+# pure noise to the reward.
+DEFAULT_RL_SOURCES = ["nova", "arxiv", "pubmed"]
 
 # Tool name mapping (same as production agent)
 DATA_SOURCES = {
@@ -65,115 +74,96 @@ class DeepResearchReward(RewardFunction):
     """
     Rubric-based reward for deep research reports.
 
-    Combines:
-    - Rubric quality (70%): LLM judge on 5 criteria
-    - Citation density (15%): [Source:...] count heuristic
-    - Format compliance (15%): structural section checks
+    The rubric is defined once in research_rubric.py and shared with the
+    offline eval (test-scripts/eval-agent.py). Do not re-implement it here:
+    the training reward and the reported metric must be the same measurement,
+    and the previous copy-paste arrangement is how they drift apart.
+
+    Note for RL specifically: the citation and format components are
+    string-matching heuristics and are therefore the most attackable part of
+    this reward. Before using it for RL, confirm a vacuous report scores far
+    below a real one
+    showed that section headings plus fabricated citation-shaped links scored
+    0.412 under the original weighting while the LLM judge rated the same text
+    2/10 on every criterion. research_rubric.py now validates citation URLs,
+    requires substantive content beneath headings, and down-weights both
+    heuristics to 10% each. Re-run that probe after any reward change.
     """
-
-    RUBRICS = [
-        {
-            "criterion": "The report directly addresses the research question",
-            "weight": 0.25,
-            "category": "coverage",
-        },
-        {
-            "criterion": "Factual claims have inline citations with sources",
-            "weight": 0.25,
-            "category": "citation",
-        },
-        {
-            "criterion": "Multiple sources are synthesized, not just listed",
-            "weight": 0.20,
-            "category": "synthesis",
-        },
-        {
-            "criterion": "Analysis identifies patterns or gaps across findings",
-            "weight": 0.15,
-            "category": "depth",
-        },
-        {
-            "criterion": "Conclusions are proportional to evidence",
-            "weight": 0.15,
-            "category": "accuracy",
-        },
-    ]
-
-    JUDGE_PROMPT = (
-        "You are evaluating a deep research report. "
-        "Score each criterion 0 (not met) or 1 (met).\n\n"
-        "Question: {question}\n\nReport:\n{report}\n\nCriteria:\n{criteria}\n\n"
-        'Return ONLY a JSON object like {{"0": 1, "1": 0, "2": 1, "3": 1, "4": 0}}'
-    )
 
     def __call__(
         self,
         response_text: str = "",
         ground_truth: str = "",
         user_input: str = "",
+        retrieved_urls: set | None = None,
         **kwargs,
     ) -> float:
         """Compute scalar reward for the report."""
-        if not response_text or response_text.startswith("ERROR"):
-            return 0.0
-
-        # rubric reward via LLM judge (same model serving the policy: cheap and fast)
-        rubric_reward = self._judge_rubric(user_input, response_text)
-
-        # Citation heuristic
-        citations = re.findall(r"\[Source:.*?\]", response_text)
-        citation_reward = min(len(citations) / 3.0, 1.0)
-
-        # Format compliance
-        format_checks = [
-            response_text.startswith("#"),
-            "## Executive Summary" in response_text,
-            "## Key Findings" in response_text or "### Finding" in response_text,
-            "## Analysis" in response_text,
-            "## Conclusions" in response_text,
-        ]
-        format_reward = sum(format_checks) / len(format_checks)
-
-        # Weighted total
-        total = 0.7 * rubric_reward + 0.15 * citation_reward + 0.15 * format_reward
+        total, _ = self.score(
+            response_text=response_text,
+            user_input=user_input,
+            retrieved_urls=retrieved_urls,
+        )
         return total
 
+    def score(
+        self,
+        response_text: str = "",
+        user_input: str = "",
+        retrieved_urls: set | None = None,
+    ) -> tuple[float, dict]:
+        """
+        Reward plus its individual components.
+
+        GRPO only needs the scalar, but a scalar hides which part of the reward is
+        moving. That distinction is the difference between a genuine gain and
+        reward hacking: published results on judge-scored long-form generation
+        report citation and format scores climbing while overall report quality
+        falls, so the aggregate can rise for the wrong reason. Tracking the parts
+        separately makes that visible while a run is still in progress.
+        """
+        if not response_text or response_text.startswith("ERROR"):
+            return 0.0, {"rubric": 0.0, "citation": 0.0, "format": 0.0}
+
+        rubric_reward = self._judge_rubric(user_input, response_text)
+        citation_reward = research_rubric.score_citations(response_text, retrieved_urls)
+        format_reward = research_rubric.score_format(response_text)
+        total = research_rubric.combine(rubric_reward, citation_reward, format_reward)
+        return total, {
+            "rubric": rubric_reward,
+            "citation": citation_reward,
+            "format": format_reward,
+        }
+
     def _judge_rubric(self, question: str, report: str) -> float:
-        """Score report against rubrics using an LLM judge call."""
+        """
+        Score report against the shared rubric using an LLM judge call.
+
+        Deliberately does not catch judge failures. A throttled or unparseable
+        judge is missing data, and returning 0.0 would hand GRPO a false label
+        saying this report is worthless — which is worse than a failed rollout,
+        because it is indistinguishable from signal. Throttling also correlates
+        with rollout concurrency, so the noise would be systematic rather than
+        random. Let it raise and lose the rollout instead.
+        """
         import boto3
 
-        criteria = "\n".join(
-            f"{i}. [{r['category']}] {r['criterion']}"
-            for i, r in enumerate(self.RUBRICS)
+        bedrock = boto3.client(
+            "bedrock-runtime",
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
         )
-        prompt = self.JUDGE_PROMPT.format(
-            question=question, report=report[:6000], criteria=criteria
+        score, _ = research_rubric.score_rubric_with_judge(
+            question,
+            report,
+            bedrock,
+            os.environ.get(
+                "JUDGE_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ),
         )
+        return score
 
-        try:
-            bedrock = boto3.client(
-                "bedrock-runtime",
-                region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-            )
-            response = bedrock.converse(
-                modelId="global.anthropic.claude-haiku-4-5-20251001-v1:0",
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={"maxTokens": 200, "temperature": 0.0},
-            )
-            text = response["output"]["message"]["content"][0]["text"].strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].rsplit("```", 1)[0]
 
-            scores = json.loads(text)
-            rubric_scores = [scores.get(str(i), 0) for i in range(len(self.RUBRICS))]
-            weights = [r["weight"] for r in self.RUBRICS]
-            return sum(
-                s * w for s, w in zip(rubric_scores, weights, strict=True)
-            ) / sum(weights)
-        except Exception as e:
-            print(f"[REWARD] Judge failed: {e}, defaulting to 0")
-            return 0.0
-
+strands_compat.apply_shims()
 
 reward_fn = DeepResearchReward()
 
@@ -229,6 +219,23 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
     )
 
 
+def read_report(path: str = REPORT_PATH) -> str:
+    """
+    Read the report the agent wrote.
+
+    AgentCore gives each session its own microVM, so this path is private to the
+    rollout and cannot be clobbered by concurrent rollouts.
+    """
+    # Only a missing file is a legitimate "no report". Any other error (encoding,
+    # permissions) is a real fault and should surface rather than masquerade as an
+    # empty report and a near-zero reward.
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # RL Entrypoint
 # ---------------------------------------------------------------------------
@@ -260,7 +267,6 @@ def invoke_agent(payload: dict):
 
     # Get prompt and metadata
     prompt = payload.get("prompt", "")
-    answer = payload.get("answer", "")
     enabled_sources = payload.get("enabled_sources", DEFAULT_RL_SOURCES)
 
     print(f"[RL] Rollout start: prompt={prompt[:80]}...")
@@ -277,11 +283,11 @@ def invoke_agent(payload: dict):
     system_prompt = load_system_prompt(enabled_sources)
     tools = [file_read, file_write, editor, execute_python]
 
-    try:
-        gateway_client = create_gateway_client(enabled_sources)
-        tools.append(gateway_client)
-    except Exception as e:
-        print(f"[RL] Gateway unavailable ({e}), proceeding with local tools only")
+    # No fallback to local-only tools. Without Gateway the agent cannot retrieve
+    # anything, so it would write from parametric memory, score badly, and teach
+    # the policy from a broken environment rather than a bad decision.
+    gateway_client = create_gateway_client(enabled_sources)
+    tools.append(gateway_client)
 
     agent = Agent(
         name="DeepResearchRL",
@@ -293,28 +299,49 @@ def invoke_agent(payload: dict):
     # Run the agent
     try:
         response = agent(prompt)
-        # Defensive extraction: response.message may be None, content may be empty or
-        # contain non-text blocks (e.g. toolUse). Guard against IndexError/TypeError.
-        response_text = ""
-        if response.message and response.message.get("content"):
-            for block in response.message["content"]:
-                if isinstance(block, dict) and block.get("text"):
-                    response_text = block["text"]
-                    break
+        # The final assistant message is NOT the report. The agent writes the
+        # report incrementally into REPORT_PATH via file_write/editor and then
+        # says something like "The report is complete." — measured across 400 real
+        # trajectories, that closing message has a median length of 21 characters
+        # while the report itself is ~15,000. Scoring the message instead of the
+        # file gives every rollout the same near-floor reward (~0.08), which
+        # flattens GRPO advantages to zero and produces no gradient at all.
+        # So read the artefact, and keep the message only as a fallback.
+        response_text = read_report()
+        if not response_text:
+            if response.message and response.message.get("content"):
+                for block in response.message["content"]:
+                    if isinstance(block, dict) and block.get("text"):
+                        response_text = block["text"]
+                        break
+            print(
+                f"[RL] WARNING: no report at {REPORT_PATH}; "
+                f"falling back to final message ({len(response_text)} chars). "
+                "Reward will be near zero.",
+                flush=True,
+            )
     except Exception as e:
         print(f"[RL] Agent failed: {e}")
         traceback.print_exc()
         response_text = f"ERROR: {e}"
 
     # Compute reward
-    reward = reward_fn(
-        response_text=response_text, ground_truth=answer, user_input=prompt
+    reward, components = reward_fn.score(
+        response_text=response_text, user_input=prompt
     )
+    # One greppable line per episode, so component trends can be recovered from
+    # training logs without re-running rollouts.
     print(
-        f"[RL] Rollout complete: reward={reward:.3f}, report_len={len(response_text)}"
+        f"[RL] Rollout complete: reward={reward:.3f} "
+        f"rubric={components['rubric']:.3f} "
+        f"citation={components['citation']:.3f} "
+        f"format={components['format']:.3f} "
+        f"report_len={len(response_text)}"
     )
 
-    return {"rewards": reward}
+    # Consumers read the scalar via .get("rewards"), so the breakdown rides along
+    # into the saved rollout data without affecting training.
+    return {"rewards": reward, "reward_components": components}
 
 
 if __name__ == "__main__":

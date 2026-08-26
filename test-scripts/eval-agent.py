@@ -242,13 +242,15 @@ def invoke_agent_sync(
         if response.status_code != 200:
             return f"ERROR: HTTP {response.status_code}: {response.text[:500]}"
 
-        # Collect full text response from streaming
+        # Collect full text response from streaming + look for report URL
         full_text = ""
+        report_url = None
         for line in response.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):
                 continue
+            raw_line = line[6:]
             try:
-                chunk = json.loads(line[6:])
+                chunk = json.loads(raw_line)
 
                 # Strands: text token
                 if isinstance(chunk.get("data"), str):
@@ -263,7 +265,43 @@ def invoke_agent_sync(
                             full_text += block["text"]
 
             except (json.JSONDecodeError, KeyError):
-                continue
+                pass
+
+            # Look for report URL in raw line
+            if "[REPORT_URL:" in raw_line:
+                match = re.search(r"\[REPORT_URL:(https://[^\]]+)\]", raw_line)
+                if match:
+                    report_url = match.group(1)
+
+        # If we found a report URL, download the actual report
+        if report_url:
+            try:
+                report_resp = requests.get(report_url, timeout=30)
+                if (
+                    report_resp.status_code == 200
+                    and len(report_resp.text.strip()) > 500
+                ):
+                    return report_resp.text.strip()
+            except Exception:
+                pass
+
+        # Fallback: stream text if it looks like a report
+        if full_text.strip().startswith("#") and len(full_text.strip()) > 1000:
+            return full_text.strip()
+
+        # Also check stream text for report URL
+        if "[REPORT_URL:" in full_text:
+            match = re.search(r"\[REPORT_URL:(https://[^\]]+)\]", full_text)
+            if match:
+                try:
+                    report_resp = requests.get(match.group(1), timeout=30)
+                    if (
+                        report_resp.status_code == 200
+                        and len(report_resp.text.strip()) > 500
+                    ):
+                        return report_resp.text.strip()
+                except Exception:
+                    pass
 
         return full_text.strip()
 
@@ -380,6 +418,294 @@ def judge_correctness(
         "extracted_answer": extracted_answer,
         "raw_judgment": judgment,
     }
+
+
+# ---------------------------------------------------------------------------
+# Rubric-based evaluation (report quality scoring for SFT/RL training eval)
+#
+# The rubric itself lives in patterns/strands-deep-research/research_rubric.py
+# so that this offline eval metric and the RL training reward in rl_app.py are
+# the same code. It is loaded by path because rl_app.py runs inside the agent
+# container (where it is a sibling module) while this script runs locally.
+# ---------------------------------------------------------------------------
+
+_SHARED_RUBRIC = None
+
+
+def _load_shared_rubric():
+    """Load the shared rubric module from the agent pattern directory."""
+    global _SHARED_RUBRIC
+    if _SHARED_RUBRIC is None:
+        import importlib.util
+
+        path = (
+            Path(__file__).parent.parent
+            / "patterns"
+            / "strands-deep-research"
+            / "research_rubric.py"
+        )
+        spec = importlib.util.spec_from_file_location("research_rubric", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SHARED_RUBRIC = module
+    return _SHARED_RUBRIC
+
+
+def score_report_rubric(
+    question: str,
+    report: str,
+    judge_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    retrieved_urls: set | None = None,
+) -> dict:
+    """
+    Score a research report using the shared rubric (see research_rubric.py).
+
+    The rubric lives in patterns/strands-deep-research/research_rubric.py so
+    that this offline metric and the RL training reward are literally the same
+    code rather than two copies kept in sync by hand.
+
+    Pass `retrieved_urls` (URLs actually returned by tool calls) to enable the
+    grounding gate, which discards fabricated citations.
+
+    Returns dict with total (0-1), rubric, citation, format, and per_criterion.
+    """
+    import boto3 as _boto3
+
+    rubric_mod = _load_shared_rubric()
+
+    if not report or report.startswith("ERROR") or len(report) < 100:
+        return {
+            "total": 0.0,
+            "rubric": 0.0,
+            "citation": 0.0,
+            "format": 0.0,
+            "per_criterion": {},
+        }
+
+    bedrock = _boto3.client(
+        "bedrock-runtime",
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+    )
+    # The WHOLE report goes to the judge. An earlier version truncated at 6K
+    # chars, which hid most of a 13-19K char report and penalised length; a later
+    # 24K cap was equally silent, just further out. If a report ever exceeds the
+    # judge's context the model raises, which is visible — unlike quietly scoring
+    # a partial report and reporting the number as if it were complete.
+    #
+    # Judge failures are likewise NOT caught. Scoring them 0.0 would silently
+    # depress a model's mean with no trace in the results, the same class of
+    # problem as counting an empty response as a quality score of zero. Letting
+    # it raise records the question as an error and the run reports fewer
+    # questions than requested, which is visible.
+    rubric_reward, per_criterion = rubric_mod.score_rubric_with_judge(
+        question, report, bedrock, judge_model
+    )
+
+    citation_reward = rubric_mod.score_citations(report, retrieved_urls)
+    format_reward = rubric_mod.score_format(report)
+    total = rubric_mod.combine(rubric_reward, citation_reward, format_reward)
+
+    return {
+        "total": round(total, 4),
+        "rubric": round(rubric_reward, 4),
+        "citation": round(citation_reward, 4),
+        "format": round(format_reward, 4),
+        "per_criterion": per_criterion,
+    }
+
+
+def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
+    """Load research questions for rubric-based evaluation."""
+    # Comparing models is only meaningful on IDENTICAL questions. Generate this
+    # file once with sft_generate_questions.py and then leave it alone for the
+    # lifetime of a comparison — regenerating with a different seed silently
+    # swaps the exam, which previously left different models scored on entirely
+    # different question sets. Pass --rubric-questions to pin an explicit path.
+    path = Path(questions_path or "test-scripts/results/sft_eval_questions.jsonl")
+    if not path.exists():
+        print_msg(f"Rubric eval questions not found: {path}", "error")
+        print_msg(
+            "Generate one with: uv run test-scripts/sft_generate_questions.py "
+            "--count 400 --eval-count 100 --seed 42",
+            "info",
+        )
+        print_msg(
+            "Then keep it fixed: every model in a comparison must see the "
+            "same questions, and check it does not overlap your training set.",
+            "info",
+        )
+        sys.exit(1)
+
+    questions = []
+    with open(path) as f:
+        for line in f:
+            try:
+                row = json.loads(line)
+                if isinstance(row.get("prompt"), list):
+                    prompt_text = row["prompt"][0]["content"]
+                else:
+                    prompt_text = row.get("metadata", {}).get("prompt", "")
+                questions.append(
+                    {
+                        "id": row.get("metadata", {}).get("prompt", prompt_text)[:50],
+                        "question": prompt_text,
+                        "enabled_sources": row.get(
+                            "enabled_sources", ["tavily", "nova"]
+                        ),
+                        "metadata": {
+                            "source": "rubric",
+                            "domain": row.get("metadata", {}).get("domain", "unknown"),
+                        },
+                    }
+                )
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    print_msg(f"Loaded {len(questions)} rubric eval questions", "success")
+    return questions
+
+
+def run_rubric_evaluation(
+    questions: list[dict],
+    url: str,
+    headers: dict[str, str],
+    results_file: Path,
+    judge_model: str,
+    max_questions: int | None = None,
+    parallel: int = 1,
+    auth_refresh_fn=None,
+) -> dict:
+    """Run rubric-based evaluation: invoke agent, score reports with rubric."""
+    import threading as _threading
+
+    # Token refresh state
+    _token_lock = _threading.Lock()
+    _current_headers = dict(headers)
+    _last_refresh = [time.time()]
+
+    def get_headers():
+        """Get current auth headers, refreshing if needed (every 50 min)."""
+        with _token_lock:
+            if auth_refresh_fn and (time.time() - _last_refresh[0]) > 3000:
+                try:
+                    new_token = auth_refresh_fn()
+                    _current_headers["Authorization"] = f"Bearer {new_token}"
+                    _last_refresh[0] = time.time()
+                    print_msg("Token refreshed", "info")
+                except Exception as e:
+                    print_msg(f"Token refresh failed: {e}", "error")
+            return dict(_current_headers)
+
+    # Resume support
+    completed_questions = set()
+    if results_file.exists():
+        with open(results_file) as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                    completed_questions.add(r.get("question", ""))
+                except json.JSONDecodeError:
+                    continue
+        if completed_questions:
+            print_msg(f"Resuming: {len(completed_questions)} already scored", "info")
+
+    remaining = [q for q in questions if q["question"] not in completed_questions]
+    if max_questions:
+        remaining = remaining[: max(0, max_questions - len(completed_questions))]
+
+    if remaining:
+        print_section("Running Rubric Evaluation")
+        print(f"Questions: {len(remaining)}")
+        print(f"Parallel: {parallel}\n")
+
+        def eval_one(question):
+            q_text = question["question"]
+            session_id = generate_session_id()
+            start_time = time.time()
+            response = invoke_agent_sync(
+                url=url,
+                prompt=q_text,
+                session_id=session_id,
+                headers=get_headers(),
+                enabled_sources=question.get("enabled_sources"),
+            )
+            elapsed = time.time() - start_time
+            scores = score_report_rubric(q_text, response, judge_model)
+            return {
+                "question": q_text,
+                "response_length": len(response),
+                # Persist the report itself. Without it, a rubric change forces
+                # a full re-run of every baseline just to re-score, and there
+                # is no way to audit qualitatively what the model produced.
+                "response": response,
+                "scores": scores,
+                "elapsed_seconds": round(elapsed, 2),
+                "metadata": question.get("metadata", {}),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+        with ThreadPoolExecutor(max_workers=parallel) as executor:
+            futures = {executor.submit(eval_one, q): q for q in remaining}
+            for i, future in enumerate(as_completed(futures), 1):
+                try:
+                    result = future.result()
+                    save_result(results_file, result)
+                    status = (
+                        f"{Fore.GREEN}✓{Style.RESET_ALL}"
+                        if result["scores"]["total"] > 0.5
+                        else f"{Fore.YELLOW}○{Style.RESET_ALL}"
+                    )
+                    print(
+                        f"  {status} [{i}/{len(remaining)}] score={result['scores']['total']:.3f} "
+                        f"({result['metadata'].get('domain', '?')}) [{result['elapsed_seconds']:.0f}s]"
+                    )
+                except Exception as e:
+                    print(
+                        f"  {Fore.RED}✗{Style.RESET_ALL} [{i}/{len(remaining)}] Error: {e}"
+                    )
+
+    # Compute metrics
+    results = []
+    if results_file.exists():
+        with open(results_file) as f:
+            for line in f:
+                try:
+                    results.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    if not results:
+        return {"total": 0, "mean_score": 0.0}
+
+    scores = [r["scores"]["total"] for r in results]
+    rubrics = [r["scores"]["rubric"] for r in results]
+    citations = [r["scores"]["citation"] for r in results]
+    formats = [r["scores"]["format"] for r in results]
+
+    metrics = {
+        "total": len(results),
+        "mean_score": round(sum(scores) / len(scores), 4),
+        "mean_rubric": round(sum(rubrics) / len(rubrics), 4),
+        "mean_citation": round(sum(citations) / len(citations), 4),
+        "mean_format": round(sum(formats) / len(formats), 4),
+        # Empty responses mean the agent produced nothing at all, which is an
+        # infrastructure failure rather than a quality score of zero. Surfaced in
+        # the summary so a failed run cannot masquerade as a real measurement.
+        "empty_responses": sum(
+            1 for r in results if not (r.get("response") or "").strip()
+        ),
+    }
+
+    # Per-domain
+    domains = {}
+    for r in results:
+        d = r.get("metadata", {}).get("domain", "unknown")
+        domains.setdefault(d, []).append(r["scores"]["total"])
+    metrics["per_domain"] = {
+        d: round(sum(s) / len(s), 4) for d, s in sorted(domains.items())
+    }
+
+    return metrics
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +920,10 @@ def _evaluate_single_question(
         "id": question["id"],
         "question": q_text,
         "ground_truth": question["answer"],
-        "response": response[:5000],
+        # Full response, not a 5,000-char slice: the saved record is what any
+        # later re-scoring or inspection reads, so truncating it silently
+        # discards evidence.
+        "response": response,
         "extracted_answer": judgment["extracted_answer"],
         "correct": judgment["correct"],
         "raw_judgment": judgment["raw_judgment"],
@@ -760,9 +1089,9 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
 
     parser.add_argument(
         "--benchmark",
-        choices=["gaia", "hle-search", "both"],
+        choices=["gaia", "hle-search", "rubric", "both"],
         default="both",
-        help="Which benchmark to run (default: both)",
+        help="Which benchmark to run: gaia, hle-search, rubric (report quality), or both (gaia+hle)",
     )
     parser.add_argument(
         "--max-questions",
@@ -824,6 +1153,20 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         type=str,
         default=None,
         help="Override the RuntimeArn to eval a different agent (e.g., fine-tuned agent)",
+    )
+    parser.add_argument(
+        "--rubric-questions",
+        type=str,
+        default=None,
+        help="Path to rubric eval questions JSONL (default: test-scripts/results/sft_eval_questions.jsonl). "
+        "Only used with --benchmark rubric.",
+    )
+    parser.add_argument(
+        "--compare",
+        type=str,
+        default=None,
+        help="Compare rubric results by tags (comma-separated, e.g., 'haiku-baseline,sft-model'). "
+        "Prints a comparison table and exits.",
     )
 
     return parser.parse_args()
@@ -892,10 +1235,42 @@ def main():
     # Determine output directory
     output_dir = Path(args.output_dir) if args.output_dir else RESULTS_DIR
 
+    # Compare mode (no agent invocation needed)
+    if args.compare:
+        tags = [t.strip() for t in args.compare.split(",")]
+        print(
+            f"\n{'Tag':<25} {'Total':>8} {'Rubric':>8} {'Citation':>8} {'Format':>8} {'N':>5}"
+        )
+        print("-" * 65)
+        for tag in tags:
+            matches = sorted(output_dir.glob(f"eval_rubric_*_{tag}.jsonl"))
+            if not matches:
+                print(f"{tag:<25} (not found)")
+                continue
+            results = []
+            with open(matches[-1]) as f:
+                for line in f:
+                    try:
+                        results.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+            if not results:
+                continue
+            total = sum(r["scores"]["total"] for r in results) / len(results)
+            rubric = sum(r["scores"]["rubric"] for r in results) / len(results)
+            citation = sum(r["scores"]["citation"] for r in results) / len(results)
+            fmt = sum(r["scores"]["format"] for r in results) / len(results)
+            print(
+                f"{tag:<25} {total:>8.3f} {rubric:>8.3f} {citation:>8.3f} {fmt:>8.3f} {len(results):>5}"
+            )
+        print()
+        return
+
     # Parse enabled tools
     enabled_sources = args.tools.split(",") if args.tools else None
 
     # Set up connection
+    auth_refresh_fn = None
     if args.local:
         print_msg("Using LOCAL agent (localhost:8080)", "info")
         url, headers = setup_local_connection()
@@ -903,6 +1278,21 @@ def main():
         print_msg("Using REMOTE deployed agent", "info")
         stack_cfg = get_stack_config()
         url, headers = setup_remote_connection(stack_cfg, args.runtime_arn)
+
+        # Create token refresh function for long-running evals
+        _cognito_cfg = stack_cfg["outputs"]
+        _username = os.environ.get("EVAL_USERNAME", "")
+        _password = os.environ.get("EVAL_PASSWORD", "")
+        if _username and _password:
+
+            def auth_refresh_fn():
+                token, _, _ = authenticate_cognito(
+                    _cognito_cfg["CognitoUserPoolId"],
+                    _cognito_cfg["CognitoClientId"],
+                    _username,
+                    _password,
+                )
+                return token
 
     # Timestamp for this run
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -974,6 +1364,23 @@ def main():
         )
         all_metrics["hle-search"] = metrics
 
+    # --- Rubric Benchmark (report quality) ---
+    if args.benchmark == "rubric":
+        results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
+        questions = load_rubric_dataset(args.rubric_questions)
+
+        metrics = run_rubric_evaluation(
+            questions=questions,
+            url=url,
+            headers=headers,
+            results_file=results_file,
+            judge_model=args.judge_model,
+            max_questions=args.max_questions,
+            parallel=args.parallel,
+            auth_refresh_fn=auth_refresh_fn,
+        )
+        all_metrics["rubric"] = metrics
+
     # --- Final Summary ---
     print_section("EVALUATION RESULTS")
 
@@ -1000,20 +1407,56 @@ def main():
         print(f"{'─' * 50}")
         print(f"  {benchmark.upper()}")
         print(f"{'─' * 50}")
-        print(f"  Total questions:  {metrics['total']}")
-        print(f"  Correct:          {metrics['correct']}")
-        print(f"  Errors:           {metrics['errors']}")
-        print(f"  Accuracy:         {metrics['accuracy'] * 100:.1f}%")
-        if metrics["errors"] > 0:
-            print(f"  Accuracy (excl.): {metrics['accuracy_excl_errors'] * 100:.1f}%")
 
-        if "per_level" in metrics:
-            print("  Per level:")
-            for level, level_metrics in metrics["per_level"].items():
+        # A run where the agent returned nothing is an infrastructure failure,
+        # not a score of zero. Reporting 0.000 here is how a meaningless number
+        # ends up in a results table and gets compared against real ones, so say
+        # so loudly instead. Causes seen in practice: the runtime still swapping
+        # images after a deploy, an invalid model identifier, or a missing
+        # environment variable on the runtime.
+        empty = metrics.get("empty_responses", 0)
+        n_total = metrics.get("total", 0)
+        if empty and n_total:
+            pct = 100 * empty / n_total
+            label = "ALL" if empty == n_total else f"{empty}/{n_total}"
+            print(
+                f"  ⚠ WARNING: {label} responses were empty ({pct:.0f}%). "
+                "Scores below are NOT valid."
+            )
+            print(
+                "    Check: runtime status READY and fully swapped (idle ~15 "
+                "min after deploy), model_id valid, runtime env vars present."
+            )
+            print()
+
+        if benchmark == "rubric":
+            # Rubric eval uses quality scores, not correctness
+            print(f"  Total questions:  {metrics['total']}")
+            print(f"  Mean score:       {metrics.get('mean_score', 0.0):.3f}")
+            print(f"    Rubric:         {metrics.get('mean_rubric', 0.0):.3f}")
+            print(f"    Citation:       {metrics['mean_citation']:.3f}")
+            print(f"    Format:         {metrics['mean_format']:.3f}")
+            if "per_domain" in metrics:
+                print("  Per domain:")
+                for domain, score in metrics["per_domain"].items():
+                    print(f"    {domain:<15} {score:.3f}")
+        else:
+            # Correctness-based benchmarks (GAIA, HLE-search)
+            print(f"  Total questions:  {metrics['total']}")
+            print(f"  Correct:          {metrics['correct']}")
+            print(f"  Errors:           {metrics['errors']}")
+            print(f"  Accuracy:         {metrics['accuracy'] * 100:.1f}%")
+            if metrics["errors"] > 0:
                 print(
-                    f"    Level {level}: {level_metrics['correct']}/{level_metrics['total']} "
-                    f"({level_metrics['accuracy'] * 100:.1f}%)"
+                    f"  Accuracy (excl.): {metrics['accuracy_excl_errors'] * 100:.1f}%"
                 )
+            if "per_level" in metrics:
+                print("  Per level:")
+                for level, level_metrics in metrics["per_level"].items():
+                    print(
+                        f"    Level {level}: {level_metrics['correct']}/{level_metrics['total']} "
+                        f"({level_metrics['accuracy'] * 100:.1f}%)"
+                    )
         print()
 
     # Save final summary

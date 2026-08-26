@@ -12,9 +12,36 @@ BEDROCK_CONNECT_TIMEOUT = 600
 BEDROCK_MAX_ATTEMPTS = 3
 BEDROCK_MAX_CONNECTIONS = 10
 
-MAX_TOKENS = 64_000
+MAX_TOKENS = 8_192
 THINKING_TOKENS = 2_000
 TEMPERATURE = 0.0
+
+
+def get_max_output_tokens(model_id: str | None = None) -> int:
+    """
+    Output-token cap for the agent, from MAX_OUTPUT_TOKENS or the default.
+
+    Deliberately NOT a per-model lookup table. Bedrock already reports the
+    authoritative limit when a request exceeds it:
+
+        ValidationException: The maximum tokens you requested exceeds the model
+        limit of 10000. Try again with a maximum tokens value that is lower.
+
+    That message is always correct, needs no maintenance, and covers every model,
+    whereas a hand-maintained table silently goes stale and only covers the
+    families someone thought to list. The default below is well above what the
+    agent actually emits — reports are written incrementally, and the largest
+    single turn measured across 300 real trajectories was 2,602 tokens — so it
+    fits comfortably inside every current model's ceiling.
+    """
+    override = os.environ.get("MAX_OUTPUT_TOKENS")
+    if override:
+        try:
+            return int(override)
+        except ValueError:
+            pass
+    return MAX_TOKENS
+
 
 VALID_SERVICE_TIERS = {"default", "priority", "flex"}
 

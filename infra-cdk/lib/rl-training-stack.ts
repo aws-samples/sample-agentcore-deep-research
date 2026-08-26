@@ -21,11 +21,32 @@ import { Construct } from "constructs"
  *
  * Usage: npm run deploy:rl (or cdk deploy deep-research-rl)
  */
+export interface TrainingStackProps extends cdk.StackProps {
+  /** SageMaker endpoint serving the fine-tuned model. From config.yaml. */
+  readonly finetunedEndpointName?: string
+  /** Name of the main stack, used to resolve Gateway/Memory config at runtime. */
+  readonly mainStackName?: string
+  /** Staging bucket for report uploads; required for [REPORT_URL:...] emission. */
+  readonly stagingBucketName?: string
+  /** Serialised tool config, so tool gating matches the production agent. */
+  readonly toolsConfig?: string
+  /** Max output tokens for the self-hosted model. */
+  readonly sagemakerMaxTokens?: number
+  /** Whether to enable thinking mode on the self-hosted model. */
+  readonly sagemakerEnableThinking?: boolean
+  /**
+   * Sampling temperature for the self-hosted model. Deliberately separate from
+   * the Bedrock inference config, which is pinned to 1.0 because Anthropic
+   * requires that in extended thinking mode.
+   */
+  readonly sagemakerTemperature?: number
+}
+
 export class RLTrainingStack extends cdk.Stack {
   public readonly rolloutBucket: s3.Bucket
   public readonly trainingRole: iam.Role
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: TrainingStackProps) {
     super(scope, id, {
       ...props,
       description: "AgentCore Deep Research - RL Training Infrastructure",
@@ -92,6 +113,19 @@ export class RLTrainingStack extends cdk.Stack {
         resources: ["*"],
       })
     )
+    // Write access to the main stack's staging bucket so the report upload hook
+    // can emit [REPORT_URL:...]. Without this the hook fails with AccessDenied,
+    // no report URL is produced, and the eval silently scores the agent's
+    // narration instead of its report.
+    if (props?.stagingBucketName) {
+      agentRole.addToPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["s3:PutObject", "s3:GetObject"],
+          resources: [`arn:aws:s3:::${props.stagingBucketName}/*`],
+        })
+      )
+    }
 
     // VPC for RL training — shared between AgentCore agent and SageMaker training
     const vpc = new ec2.Vpc(this, "RLVpc", {
@@ -176,9 +210,23 @@ export class RLTrainingStack extends cdk.Stack {
       },
       environmentVariables: {
         AWS_DEFAULT_REGION: this.region,
-        STACK_NAME: "deep-research",
+        STACK_NAME: props?.mainStackName ?? "deep-research",
         USE_SAGEMAKER_MODEL: "true",
-        SAGEMAKER_ENDPOINT_NAME: "dr-finetuned", // Updated by deploy_finetuned_agent.py
+        SAGEMAKER_ENDPOINT_NAME: props?.finetunedEndpointName ?? "dr-finetuned",
+        // Without STAGING_BUCKET_NAME the report upload hook silently skips S3
+        // upload, so no [REPORT_URL:...] is emitted and the eval falls back to
+        // scoring the agent's narration instead of its report. That made a
+        // self-hosted model appear to score 0.000 on format while its actual
+        // written report scored 1.0.
+        ...(props?.stagingBucketName
+          ? { STAGING_BUCKET_NAME: props.stagingBucketName }
+          : {}),
+        // Keep the tool gating identical to the production agent, otherwise the
+        // two runtimes expose different tool sets and are not comparable.
+        ...(props?.toolsConfig ? { TOOLS_CONFIG: props.toolsConfig } : {}),
+        SAGEMAKER_MAX_TOKENS: String(props?.sagemakerMaxTokens ?? 16384),
+        SAGEMAKER_ENABLE_THINKING: String(props?.sagemakerEnableThinking ?? false),
+        SAGEMAKER_TEMPERATURE: String(props?.sagemakerTemperature ?? 0.0),
       },
       description: "Fine-tuned deep research agent (SageMaker endpoint)",
       lifecycleConfiguration: {

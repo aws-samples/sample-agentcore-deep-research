@@ -1,0 +1,61 @@
+# SFT training container for LoRA fine-tuning with TRL v1.3+.
+# TRL v1.3 ships native Qwen3.6 support (FSDP, chat template, tool-call schema).
+# Runs on SageMaker ml.g5.12xlarge (4x A10G, 96GB VRAM).
+#
+# Build and push:
+#   ./training/build_and_push.sh sft
+
+FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# System deps.
+# `apt-get upgrade` applies OS security updates: the CUDA base image pins the
+# package versions it was built with, so without this the image ships known
+# vulnerable openssl/glibc/gnutls/binutils packages and fails container scanning.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
+    python3 python3-venv python3-dev python3-pip git curl && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ml/code
+
+# Install PyTorch + TRL.
+# torchvision/pillow are required because the current Qwen and Gemma checkpoints
+# are vision-language models: TRL builds an AutoProcessor, which constructs an
+# image processor even when the training data is text-only.
+RUN pip install --no-cache-dir --break-system-packages torch torchvision pillow
+RUN pip install --no-cache-dir --break-system-packages \
+    "trl>=1.10.0" \
+    liger-kernel \
+    peft \
+    accelerate \
+    datasets \
+    bitsandbytes \
+    boto3 \
+    huggingface_hub \
+    safetensors \
+    sentencepiece
+
+# Drop the build-time Python packaging tools from the shipped image. Ubuntu's
+# python3-pip / python3-wheel carry CVEs whose fixes are published only through
+# ESM (the advisory versions are +esm1 / ~esm1), so they are unreachable from the
+# public apt repos no matter how thorough `apt-get upgrade` is — they were the
+# only findings left after the OS upgrade. Nothing at runtime installs packages:
+# training and merging import already-installed libraries. Removing them clears
+# the findings and follows the usual rule of not shipping build tooling in a
+# runtime image. `|| true` because these may already have been pulled out as
+# dependencies.
+RUN pip uninstall -y pip wheel 2>/dev/null || true; \
+    apt-get purge -y --auto-remove python3-pip python3-pip-whl python3-wheel \
+      python-pip-whl 2>/dev/null || true; \
+    rm -rf /var/lib/apt/lists/* /root/.cache
+
+# Copy entry point
+ARG CACHEBUST=1
+COPY training/sft_entry.py /opt/ml/code/sft_entry.py
+
+ENTRYPOINT ["torchrun", "--nproc_per_node=4", "/opt/ml/code/sft_entry.py"]
