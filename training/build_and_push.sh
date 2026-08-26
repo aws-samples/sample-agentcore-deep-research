@@ -53,4 +53,15 @@ echo ""
 echo "✓ Pushed: ${FULL_URI}"
 echo ""
 echo "Use with:"
-echo "  uv run test-scripts/rl_train.py train --image-uri ${FULL_URI} --data <training.jsonl> ..."
+if [ "${IMAGE_TAG}" = "sft" ]; then
+    echo "  uv run test-scripts/sft_train.py --image-uri ${FULL_URI} \\"
+    echo "      --data <traces.jsonl> --s3-bucket <bucket> --role-arn <role> \\"
+    echo "      --hf-model-id Qwen/Qwen3.5-9B --lora-rank 32 --epochs 2 \\"
+    echo "      --max-seq-length 32768 --instance-type ml.g6e.12xlarge"
+else
+    echo "  uv run test-scripts/rl_train.py --image-uri ${FULL_URI} \\"
+    echo "      --data <rl-prompts.jsonl> --agent-arn <RLAgentRuntimeArn> \\"
+    echo "      --s3-bucket <RLBucketName> --sft-job-name <sft-job> --model-type qwen3.5-9B"
+fi
+echo ""
+echo "Note: the image must be in the same region as the training job."
