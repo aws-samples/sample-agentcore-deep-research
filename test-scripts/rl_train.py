@@ -28,7 +28,8 @@ import boto3
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-INSTANCE_TYPE = "ml.g6e.12xlarge"  # 4x L40S 48GB; smaller cards do not fit a 9B
+# 4x L40S 48GB = 192 GB, no NVLink. ml.p5.48xlarge (8x H100 80GB = 640 GB, NVLink)
+INSTANCE_TYPE = "ml.g6e.12xlarge"  # smaller cards do not fit a 9B
 VAL_PROMPTS = 32  # verl requires a validation file; this is enough to track drift
 
 
@@ -101,6 +102,7 @@ def main() -> None:
     # LoRA frees the optimiser state and gradients that force param/optimizer offload
     # in full-parameter mode, which is what caps us at 8 episodes/step. 0 = full FT.
     p.add_argument("--lora-rank", type=int, default=0)
+    p.add_argument("--instance-type", default=INSTANCE_TYPE)
     p.add_argument(
         "--gpu-mem-fraction", type=float, default=0.4, help="vLLM's share of each GPU"
     )
@@ -181,7 +183,7 @@ def main() -> None:
             "LocalPath": "/opt/ml/checkpoints",
         },
         ResourceConfig={
-            "InstanceType": INSTANCE_TYPE,
+            "InstanceType": args.instance_type,
             "InstanceCount": 1,
             "VolumeSizeInGB": 500,
         },
