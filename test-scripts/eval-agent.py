@@ -516,7 +516,9 @@ def score_report_rubric(
     }
 
 
-def write_comparison_plot(rows: list[tuple[str, float, list[dict]]], out_path: Path) -> None:
+def write_comparison_plot(
+    rows: list[tuple[str, float, list[dict]]], out_path: Path
+) -> None:
     """Bar chart of mean rubric score per model, with 95% CI error bars.
 
     Error bars are not decoration: at n=98 the resolvable difference is ~0.065, so
@@ -536,10 +538,24 @@ def write_comparison_plot(rows: list[tuple[str, float, list[dict]]], out_path: P
         errs.append(1.96 * sd / math.sqrt(len(vals)) if vals else 0.0)
 
     fig, ax = plt.subplots(figsize=(1.5 * len(rows) + 3, 5))
-    bars = ax.bar(labels, means, yerr=errs, capsize=5, color="#4A7EBB", edgecolor="black", linewidth=0.6)
+    bars = ax.bar(
+        labels,
+        means,
+        yerr=errs,
+        capsize=5,
+        color="#4A7EBB",
+        edgecolor="black",
+        linewidth=0.6,
+    )
     for b, m, n in zip(bars, means, [len(r[2]) for r in rows]):
-        ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.02, f"{m:.3f}\nn={n}",
-                ha="center", va="bottom", fontsize=9)
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            b.get_height() + 0.02,
+            f"{m:.3f}\nn={n}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
     ax.set_ylabel("Rubric score (0-1)")
     ax.set_ylim(0, max(m + e for m, e in zip(means, errs)) * 1.25)
     ax.set_title("Deep research report quality (identical harness, same judge)")
@@ -550,7 +566,9 @@ def write_comparison_plot(rows: list[tuple[str, float, list[dict]]], out_path: P
     print_msg(f"Plot saved to: {out_path}", "success")
 
 
-def write_compute_plot(rows: list[tuple[str, float, list[dict]]], hours: dict, out_path: Path) -> None:
+def write_compute_plot(
+    rows: list[tuple[str, float, list[dict]]], hours: dict, out_path: Path
+) -> None:
     """Eval score against cumulative training compute, in measured GPU-hours.
 
     One continuous line: base (no training) -> SFT -> successive RL checkpoints, so
@@ -571,16 +589,30 @@ def write_compute_plot(rows: list[tuple[str, float, list[dict]]], hours: dict, o
         pts.append((float(hours[label]), mean, err, label))
     pts.sort()
     if not pts:
-        print_msg("No --compute-hours mapping matched any tag; skipping compute plot", "warning")
+        print_msg(
+            "No --compute-hours mapping matched any tag; skipping compute plot",
+            "warning",
+        )
         return
 
     x = [p[0] for p in pts]
     y = [p[1] for p in pts]
     e = [p[2] for p in pts]
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.errorbar(x, y, yerr=e, marker="o", capsize=4, color="#4A7EBB", linewidth=1.8, markersize=7)
+    ax.errorbar(
+        x,
+        y,
+        yerr=e,
+        marker="o",
+        capsize=4,
+        color="#4A7EBB",
+        linewidth=1.8,
+        markersize=7,
+    )
     for xi, yi, _, lab in pts:
-        ax.annotate(lab, (xi, yi), textcoords="offset points", xytext=(6, -12), fontsize=8)
+        ax.annotate(
+            lab, (xi, yi), textcoords="offset points", xytext=(6, -12), fontsize=8
+        )
     ax.set_xlabel("Cumulative training compute (GPU-hours, measured)")
     ax.set_ylabel("Rubric score (0-1)")
     ax.set_title("Report quality vs training compute")

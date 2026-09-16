@@ -182,7 +182,7 @@ def main() -> None:
         # /opt/ml/checkpoints is SageMaker's CheckpointConfig LocalPath: contents sync
         # to S3 during training, so a mid-run checkpoint is evaluable. Writing under
         # /opt/ml/model instead would only surface at job termination.
-        'trainer.default_local_dir=/opt/ml/checkpoints',
+        "trainer.default_local_dir=/opt/ml/checkpoints",
         f"trainer.total_training_steps={total_steps}",
         f"trainer.save_freq={hp('save_freq', 50, int)}",
         # Saves an HF-format copy alongside the sharded checkpoint, so
