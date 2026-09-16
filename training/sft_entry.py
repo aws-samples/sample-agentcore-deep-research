@@ -115,7 +115,6 @@ def main():
     eval_fraction = get_hp("eval_fraction", 0.05, float)
     save_steps = get_hp("save_steps", 0, int)
     seed = get_hp("seed", 42, int)
-    use_liger = get_hp("use_liger_kernel", "1") in ("1", "true", "True")
     save_total_limit = get_hp("save_total_limit", 2, int)
 
     print("=" * 60)
@@ -123,7 +122,6 @@ def main():
     print("=" * 60)
     print(f"Model:          {hf_model_id}")
     print(f"Seed:           {seed}")
-    print(f"Liger kernel:   {use_liger}")
     print(
         "Fine-tuning:    "
         + (f"LoRA r={lora_rank}" if lora_rank > 0 else "FULL-PARAMETER (no adapters)")
@@ -166,10 +164,8 @@ def main():
             return False
         return all((Path(path) / shard).exists() for shard in wanted)
 
-    # Only rank 0 downloads. All four ranks calling snapshot_download into the
-    # same local_dir races and leaves partial/missing shards, which surfaces
-    # much later as FileNotFoundError on a shard at model-load time — a failure
-    # that looks like a flaky download but is actually concurrent writers.
+    # Only rank 0 downloads: concurrent snapshot_download into one local_dir races
+    # and leaves partial shards, surfacing much later as a load-time FileNotFoundError.
     if RANK == 0:
         print(f"Downloading model: {hf_model_id}", flush=True)
         for attempt in range(5):
@@ -202,18 +198,10 @@ def main():
         else:
             raise RuntimeError(f"Timed out waiting for model download on rank {RANK}")
 
-    # LoRA config
-    # Qwen3.5 is a vision-language architecture: a 27-layer vision tower sits
-    # alongside the 32-layer text model. "all-linear" would adapt the vision
-    # tower too, but we train on text-only trajectories, so those adapters never
-    # receive gradient. They stay zero-initialised and merge as identity, so
-    # results are unaffected — but they consume GPU memory and merge time for
-    # nothing. Excluding them puts the whole memory budget behind the text model.
-    # lora_rank <= 0 means full-parameter fine-tuning: no adapters, every weight
-    # trained. That needs far more memory — weights + grads + Adam states rather
-    # than weights + a small adapter — so it relies on FSDP sharding those states
-    # across ranks, and may additionally need optimizer offload at long sequence
-    # lengths.
+    # exclude_modules keeps adapters off the 27-layer vision tower: we train on
+    # text-only trajectories, so those adapters never receive gradient and merge as
+    # identity, but still cost memory. lora_rank <= 0 means full-parameter, which
+    # needs far more memory and likely optimizer offload at long sequences.
     use_lora = lora_rank > 0
     lora_config = (
         LoraConfig(
@@ -237,18 +225,11 @@ def main():
 
     tok = AutoTokenizer.from_pretrained(model_cache, trust_remote_code=True)
 
-    # Loss masking needs {% generation %} markers in the chat template so
-    # transformers can build the assistant-token mask. Most published templates,
-    # Qwen3.5's included, do not have them — and enabling assistant_only_loss
-    # against such a template does NOT error, it silently trains on the whole
-    # sequence including tool observations, teaching the model to fabricate
-    # retrieval results.
-    #
-    # TRL handles this: SFTTrainer swaps in a marked-up training template for
-    # recognised model families (see trl/chat_templates/). We rely on that rather
-    # than vendoring a copy, which would only drift from upstream. What we add is
-    # the assertion below, because TRL only covers listed families and the
-    # failure is silent for anything else.
+    # Loss masking needs {% generation %} markers in the chat template. Without
+    # them assistant_only_loss does not error -- it silently trains on tool
+    # observations, teaching the model to fabricate retrieval results. TRL swaps in
+    # a marked-up template for recognised families; the assertion below covers the
+    # unrecognised case, where the failure is silent.
     from trl.chat_template_utils import (
         get_training_chat_template,
         has_generation_markers,
@@ -276,12 +257,8 @@ def main():
         source = "TRL training template" if assistant_only else "unavailable"
     print(f"assistant_only_loss: {assistant_only} (masking via {source})", flush=True)
 
-    # Training on tool observations teaches the model to fabricate retrieval
-    # results, which is the single worst failure mode for a research agent and
-    # is invisible in the loss curve. Without a {% generation %} block there is
-    # no way to mask them, so refuse to run rather than silently produce a
-    # model trained on the wrong tokens. Set ALLOW_UNMASKED_OBSERVATIONS=1 to
-    # override deliberately (e.g. for a non-agentic dataset).
+    # Refuse rather than silently train on observations: invisible in the loss
+    # curve, and it teaches fabrication. ALLOW_UNMASKED_OBSERVATIONS=1 to override.
     if not assistant_only and os.environ.get("ALLOW_UNMASKED_OBSERVATIONS") != "1":
         raise RuntimeError(
             "Refusing to train: chat template for "
@@ -299,13 +276,9 @@ def main():
         # re-run reproduces the same shuffle order, dropout masks and LoRA init.
         seed=seed,
         data_seed=seed,
-        # Liger replaces RMSNorm/SwiGLU/RoPE and the cross-entropy head with
-        # fused Triton kernels. The fused linear cross-entropy is the large
-        # win here: it avoids materialising the full logits tensor, which at
-        # 32K sequence length dominates activation memory. Support is
-        # per-architecture, so this fails fast rather than silently if the
-        # model is unsupported — set --use-liger-kernel 0 in that case.
-        use_liger_kernel=use_liger,
+        # No Liger: its fused kernel operates on plain tensors and raises under
+        # FSDP, where lm_head weights are sharded DTensors. Measured peak without it
+        # is 38.5-44.9GB of 47.7GB, which fits.
         num_train_epochs=epochs,
         per_device_train_batch_size=per_device_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
@@ -324,12 +297,9 @@ def main():
         # epochs are still helping or starting to overfit.
         eval_strategy="epoch",
         per_device_eval_batch_size=1,
-        # Save adapters during the run, not only at the end. Intermediate
-        # checkpoints let us measure quality partway through instead of waiting
-        # ~33h to learn whether the recipe worked, and they show whether the
-        # score is still climbing or has plateaued. Requires the job to declare
-        # a CheckpointConfig, otherwise SageMaker never copies this directory to
-        # S3 and the adapters die with the container.
+        # Intermediate checkpoints show mid-run whether the score is still climbing,
+        # instead of waiting ~33h. Needs the job to declare a CheckpointConfig or
+        # SageMaker never copies them to S3.
         **(
             {"save_strategy": "steps", "save_steps": save_steps}
             if save_steps > 0
@@ -378,12 +348,9 @@ def main():
     )
     log_sharding(trainer.model)
 
-    # Confirms whether reports are training in full or being truncated
-    # Check every example, not a prefix. Datasets are usually concatenated from
-    # several collection batches, so a prefix sample can miss an entire batch
-    # whose trajectories are longer. A sequence at the cap has been truncated,
-    # which silently cuts the end of the report and trains the model to stop
-    # mid-report, so treat it as fatal rather than informational.
+    # Check every example, not a prefix: datasets concatenate collection batches, so
+    # a prefix can miss a whole batch of longer trajectories. Truncation cuts the end
+    # of the report and teaches the model to stop mid-report, so treat it as fatal.
     lens = sorted(len(x) for x in trainer.train_dataset["input_ids"])
     n = len(lens)
     at_cap = sum(1 for x in lens if x >= max_seq_length)
@@ -413,12 +380,9 @@ def main():
     trainer.train()
     print("Training complete.", flush=True)
 
-    # Saving under FSDP needs care: the trained parameters are sharded
-    # DTensors, so calling merge_and_unload().save_pretrained() directly fails
-    # with safetensors "Attempted to access the data pointer on an invalid
-    # python storage". Instead: let the trainer gather the adapter to a full
-    # state dict, then merge into the base model in a single process on CPU
-    # (the instance has ample host RAM for a BF16 copy).
+    # Under FSDP the parameters are sharded DTensors, so merging in place fails with
+    # safetensors "invalid python storage". Gather the adapter first, then merge into
+    # the base model on CPU.
     save_dir = "/opt/ml/checkpoints/adapter" if use_lora else OUTPUT_DIR
     print(
         f"Saving {'LoRA adapter' if use_lora else 'full model'} "
@@ -472,13 +436,9 @@ def main():
         print("Restored upstream chat template for inference", flush=True)
     processing_class.save_pretrained(OUTPUT_DIR)
 
-    # Qwen3.5 declares a vision-language architecture, so a serving stack such
-    # as vLLM instantiates the full processor and hard-fails with
-    # "Can't load image processor for ..." if preprocessor_config.json and
-    # video_preprocessor_config.json are absent. We train text-only and so hold
-    # a plain tokenizer as processing_class, which does not emit those files.
-    # Persist the base model's full processor alongside it so the merged
-    # checkpoint is self-contained and directly servable.
+    # vLLM instantiates the full processor for a vision-language architecture and
+    # fails with "Can't load image processor" without preprocessor_config.json. We
+    # hold a plain tokenizer, so save the base model's processor alongside it.
     try:
         from transformers import AutoProcessor
 
@@ -497,10 +457,8 @@ def main():
                 print(f"  copied {name}", flush=True)
     print(f"Merged model saved to {OUTPUT_DIR}", flush=True)
 
-    # Both LoRA and full-parameter runs must leave the same artifact shape, since
-    # deployment and RL both consume it as a plain HF checkpoint and neither knows
-    # how it was trained. Check here rather than letting vLLM fail to start or RL
-    # fail inside Megatron.
+    # Both modes must leave the same artifact shape; check here rather than letting
+    # vLLM fail to start.
     required = ("config.json", "tokenizer_config.json")
     missing = [n for n in required if not (Path(OUTPUT_DIR) / n).exists()]
     weights = list(Path(OUTPUT_DIR).glob("*.safetensors"))

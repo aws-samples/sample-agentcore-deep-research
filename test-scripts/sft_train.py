@@ -21,7 +21,7 @@ Usage:
         --hf-model-id Qwen/Qwen3.6-27B
 
 Prerequisites:
-    - Deployed RL stack: cd infra-cdk && npm run deploy:train
+    - Deployed RL stack: cd infra-cdk && npm run deploy:rl
     - SFT traces generated: uv run test-scripts/sft_generate_data.py
     - Training container pushed: ./training/build_and_push.sh sft
 """
@@ -52,7 +52,7 @@ def main():
         "--s3-bucket",
         type=str,
         default=os.environ.get("RL_S3_BUCKET"),
-        help="S3 bucket (from deploy:train output)",
+        help="S3 bucket (from deploy:rl output)",
     )
     parser.add_argument(
         "--hf-model-id",
@@ -107,17 +107,6 @@ def main():
         type=int,
         default=8,
         help="Gradient accumulation steps (default: 8)",
-    )
-    parser.add_argument(
-        "--use-liger-kernel",
-        type=int,
-        default=0,
-        choices=[0, 1],
-        help="Use Liger fused kernels (default: 0 = off). Liger cuts activation "
-        "memory via fused linear cross-entropy, but that kernel operates on plain "
-        "tensors and fails under FSDP, where lm_head weights are sharded DTensors "
-        '("aten.mm.default got mixed torch.Tensor and DTensor"). Only enable for '
-        "single-GPU or other non-FSDP runs.",
     )
     parser.add_argument(
         "--seed",
@@ -176,7 +165,7 @@ def main():
     # Validate
     if not args.s3_bucket:
         logger.error(
-            "--s3-bucket required (from `npm run deploy:train` output: RLBucketName)"
+            "--s3-bucket required (from `npm run deploy:rl` output: RLBucketName)"
         )
         sys.exit(1)
 
@@ -212,7 +201,7 @@ def main():
 
     if not training_role:
         logger.error(
-            "--role-arn required (or deploy training stack first: npm run deploy:train)"
+            "--role-arn required (or deploy training stack first: npm run deploy:rl)"
         )
         sys.exit(1)
 
@@ -264,7 +253,6 @@ def main():
         "max_steps": str(args.max_steps),
         "eval_fraction": str(args.eval_fraction),
         "seed": str(args.seed),
-        "use_liger_kernel": str(args.use_liger_kernel),
         "save_steps": str(args.save_steps),
         "save_total_limit": str(args.save_total_limit),
     }
@@ -359,7 +347,7 @@ def main():
     logger.info(
         f"  uv run test-scripts/rl_train.py --sft-job-name {job_name} \\\n"
         "      --data <rl-prompts.jsonl> --agent-arn <RLAgentRuntimeArn> \\\n"
-        "      --s3-bucket <RLBucketName> --model-type qwen3.5-9B"
+        "      --s3-bucket <RLBucketName>"
     )
     logger.info(
         "  (--sft-job-name resolves this job's artifact; it must be in the same "

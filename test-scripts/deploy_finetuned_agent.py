@@ -19,7 +19,30 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+
+def wait_for_ready(runtime_arn: str, region: str, timeout: int = 900) -> None:
+    """Block until the agent runtime reports READY, printing its version."""
+    import boto3
+
+    acc = boto3.client("bedrock-agentcore-control", region_name=region)
+    runtime_id = runtime_arn.rsplit("/", 1)[-1]
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        r = acc.get_agent_runtime(agentRuntimeId=runtime_id)
+        status, version = r.get("status"), r.get("agentRuntimeVersion")
+        if (status, version) != last:
+            print(f"  runtime v{version}: {status}")
+            last = (status, version)
+        if status == "READY":
+            return
+        if status in ("CREATE_FAILED", "UPDATE_FAILED", "DELETING"):
+            raise RuntimeError(f"runtime is {status}")
+        time.sleep(15)
+    raise TimeoutError(f"runtime not READY after {timeout}s")
 
 
 def main():
@@ -134,8 +157,13 @@ def main():
     print("\n✓ Fine-tuned agent deployed!")
     print(f"  Runtime ARN: {finetuned_arn}")
     print(f"  Endpoint:    {args.endpoint_name}")
-    print("\nWAIT ~15 min before evaluating: AgentCore does not hot-swap the")
-    print("image mid-session, so an immediate eval scores an empty runtime.")
+
+    # Poll for readiness rather than sleeping a fixed interval. Existing sessions keep
+    # the old image, but a new session gets the new version as soon as the runtime
+    # leaves UPDATING -- so READY at the bumped version is the real signal. Evaluating
+    # while it is still UPDATING is what scores an empty runtime.
+    wait_for_ready(finetuned_arn, args.region)
+
     print("\nTo eval:")
     print(
         f"  uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \\\n"
