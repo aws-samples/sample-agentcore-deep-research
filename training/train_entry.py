@@ -1,286 +1,219 @@
-#!/usr/bin/env python3
 """
-SageMaker training entry point for agentic RL fine-tuning with AgentCore RL Toolkit.
+SageMaker entry point for agentic RL fine-tuning of the deep research agent.
 
-Uses SlimeRunner (GRPO with full agent rollouts via AgentCore Runtime).
-The agent runs with tools during training — learning from complete research
-trajectories, not just text completions.
+Uses the AgentCore RL Toolkit's verl backend with the FSDP engine. Rollouts are
+full research episodes run by the agent on AgentCore Runtime, with the same code
+and Gateway tools as production; reports are scored by research_rubric.py.
 
-SageMaker passes hyperparameters via /opt/ml/input/config/hyperparameters.json.
-Training data arrives at /opt/ml/input/data/training/
-Output goes to /opt/ml/model/ (uploaded to S3 automatically).
+A translation layer only: resolve the policy checkpoint, build hydra overrides,
+hand off. Anything not set here is left to verl's defaults on purpose.
 """
 
 import json
 import os
-import shutil
+import subprocess
 import sys
-import tempfile
-from collections.abc import Callable
-from typing import Any
+import tarfile
+from pathlib import Path
 
-# SageMaker paths
 OUTPUT_DIR = os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
+DATA_DIR = os.environ.get("SM_CHANNEL_TRAINING", "/opt/ml/input/data/training")
+MODEL_CACHE = "/opt/ml/model-cache"
+
+# SageMaker writes hyperparameters to a JSON file, and only mirrors them into
+# SM_HP_* env vars in some configurations. Read the file first.
 HP_FILE = os.environ.get("SM_HPS", "/opt/ml/input/config/hyperparameters.json")
+_HP = json.loads(Path(HP_FILE).read_text()) if os.path.exists(HP_FILE) else {}
 
-# Load hyperparameters
-if os.path.exists(HP_FILE):
-    with open(HP_FILE) as f:
-        hyperparameters = json.load(f)
-else:
-    hyperparameters = {}
-
-
-def get_hp(
-    key: str, default: Any = None, cast: Callable[[Any], Any] | None = None
-) -> Any:
-    """Get hyperparameter with optional type casting."""
-    val = hyperparameters.get(key, os.environ.get(f"SM_HP_{key.upper()}", default))
-    if val is not None and cast is not None:
-        val = cast(val)
-    return val
+# Fixed by the hardware and the data, not per run. One node of 4x L40S 48GB
+# (44.4GB usable, no NVLink) and research episodes that reach ~32K tokens.
+GPUS = 4
+ROLLOUT_TP = 2  # TP=4 pays per-layer all-reduce over PCIe for no gain
 
 
-def resolve_data_path(data_path: str) -> str:
-    """Resolve data path — SageMaker puts files in a directory."""
-    if os.path.isdir(data_path):
-        jsonl_files = [f for f in os.listdir(data_path) if f.endswith(".jsonl")]
-        if jsonl_files:
-            return os.path.join(data_path, jsonl_files[0])
-        print(f"ERROR: No .jsonl files found in {data_path}")
-        print(f"Contents: {os.listdir(data_path)}")
-        sys.exit(1)
-    return data_path
+def hp(name: str, default=None, cast=str):
+    """Read a SageMaker hyperparameter."""
+    raw = _HP.get(name, os.environ.get(f"SM_HP_{name.upper()}"))
+    return default if raw is None or raw == "" else cast(raw)
 
 
-def resolve_model_dir(hf_model_id: str, dest: str) -> str:
+def resolve_policy(model_id: str) -> str:
     """
-    Materialise the policy weights locally, from the HF Hub or an S3 tarball.
-
-    RL continues from the SFT checkpoint, which SageMaker writes to S3 as
-    model.tar.gz. Supporting only the Hub meant RL could start from a public base
-    model but never from our own SFT run, so the two stages could not be chained.
-
-    Accepts an HF Hub repo id (Qwen/Qwen3.5-9B) or an S3 tarball
-    (s3://bucket/.../output/model.tar.gz).
+    Materialise the starting policy: an HF Hub id, or an S3 model.tar.gz so RL can
+    continue from our own SFT run rather than only from a public checkpoint.
     """
-    if not hf_model_id.startswith("s3://"):
+    if not model_id.startswith("s3://"):
         from huggingface_hub import snapshot_download
 
-        print(f"Downloading from HuggingFace: {hf_model_id}", flush=True)
-        snapshot_download(repo_id=hf_model_id, local_dir=dest)
-        return dest
+        print(f"Downloading {model_id}", flush=True)
+        return snapshot_download(repo_id=model_id, local_dir=MODEL_CACHE)
 
-    if not hf_model_id.endswith(".tar.gz"):
-        raise ValueError(
-            f"S3 model must be a .tar.gz archive, got {hf_model_id}. "
-            "SageMaker training jobs write model.tar.gz."
-        )
-
-    import tarfile
+    if not model_id.endswith(".tar.gz"):
+        raise ValueError(f"S3 policy must be a .tar.gz, got {model_id}")
 
     import boto3
 
-    bucket, _, key = hf_model_id[len("s3://") :].partition("/")
-    os.makedirs(dest, exist_ok=True)
-    archive = os.path.join(dest, "model.tar.gz")
-
-    print(f"Downloading {hf_model_id}", flush=True)
+    bucket, _, key = model_id[len("s3://") :].partition("/")
+    os.makedirs(MODEL_CACHE, exist_ok=True)
+    archive = os.path.join(MODEL_CACHE, "model.tar.gz")
+    print(f"Downloading {model_id}", flush=True)
     boto3.client("s3").download_file(bucket, key, archive)
     with tarfile.open(archive) as tar:
-        # filter="data" refuses absolute paths and parent-directory escapes.
-        tar.extractall(dest, filter="data")
+        tar.extractall(MODEL_CACHE, filter="data")  # refuses paths outside dest
     os.remove(archive)
 
-    # Without config.json this fails much later inside Megatron with an
-    # unhelpful error, so check where the cause is still obvious.
-    if not os.path.exists(os.path.join(dest, "config.json")):
+    # Without config.json this fails much later inside verl, unhelpfully.
+    if not os.path.exists(os.path.join(MODEL_CACHE, "config.json")):
         raise RuntimeError(
-            f"No config.json in {dest} after extracting {hf_model_id}. "
-            f"Contents: {sorted(os.listdir(dest))[:20]}"
+            f"No config.json after extracting {model_id}. "
+            f"Contents: {sorted(os.listdir(MODEL_CACHE))[:20]}"
         )
-    print(f"Model ready at: {dest}", flush=True)
-    return dest
+    return MODEL_CACHE
 
 
 def main() -> None:
-    from agentcore_rl_toolkit.backends.slime import SlimeRunner
+    agent_arn = hp("agent_runtime_arn")
+    s3_bucket = hp("s3_bucket")
+    if not agent_arn or not s3_bucket:
+        raise ValueError("agent_runtime_arn and s3_bucket are required")
 
-    # Required params
-    agent_runtime_arn = get_hp("agent_runtime_arn")
-    s3_bucket = get_hp("s3_bucket")
-    data_path = get_hp("data_path", "/opt/ml/input/data/training/")
-    exp_id = get_hp("exp_id", "dr-rl-sagemaker")
+    group_size = hp("group_size", 8, int)
+    prompts_per_step = hp("prompts_per_step", 8, int)
+    total_steps = hp("total_steps", 1000, int)
+    # Memory-shaping knobs, tunable per run without rebuilding the image.
+    # The initial prompt only: system prompt (~3.4K tokens) plus the question.
+    max_prompt_len = hp("max_prompt_len", 8192, int)
+    # CUMULATIVE assistant tokens per trajectory, not per call -- verl's response
+    # storage width doubles as the gateway's whole-trajectory budget. Measured over
+    # 1,833 teacher trajectories: median 13.6K, max 21.5K, so anything below 24576
+    # kills rollouts mid-episode (4096 killed 100% of them).
+    max_response_len = hp("max_response_len", 24576, int)
+    # One model call's output. Measured per-turn p99.9 is 2,636 tokens.
+    max_tokens_per_turn = hp("max_tokens_per_turn", 4096, int)
+    # 0 = full-parameter. LoRA removes the optimiser state and gradient copies that
+    # force param/optimizer offload, which is what caps full FT at 8 episodes/step.
+    lora_rank = hp("lora_rank", 0, int)
+    gpu_mem_fraction = hp("gpu_mem_fraction", 0.4, float)
+    policy = resolve_policy(hp("model_id", "Qwen/Qwen3.5-9B"))
+    job_name = os.environ.get("TRAINING_JOB_NAME", "local")
 
-    # Model config
-    model_type = get_hp("model_type", "qwen2.5-3B")
-    hf_model_id = get_hp("hf_model_id", "Qwen/Qwen2.5-3B-Instruct")
+    # verl asserts ppo_max_token_len_per_gpu >= the padded sequence width, and this
+    # is also the inference context (max_model_len).
+    width = max_prompt_len + max_response_len
 
-    # Training hyperparameters (tuned for 4x A10G)
-    num_rollout = get_hp("num_rollout", 20, int)
-    num_gpus = get_hp("num_gpus", 4, int)
-    tp_size = get_hp("tp_size", 2, int)
-    rollout_gpus_per_engine = get_hp("rollout_gpus_per_engine", 2, int)
-    rollout_batch_size = get_hp("rollout_batch_size", 8, int)
-    n_samples_per_prompt = get_hp("n_samples_per_prompt", 4, int)
-    # A research report is ~4,200 tokens and the policy generates ~10,300 tokens
-    # across a full episode (measured over real trajectories). 1024 truncates the
-    # rollout long before a report exists, so every episode scores at the floor
-    # and GRPO sees no signal.
-    rollout_max_response_len = get_hp("rollout_max_response_len", 16384, int)
-    rollout_temperature = get_hp("rollout_temperature", 1.0, float)
-    lr = get_hp("lr", 1e-6, float)
-    max_concurrent = get_hp("max_concurrent", 10, int)
-    acr_timeout = get_hp("acr_timeout", 900, int)
-    sglang_mem_fraction_static = get_hp("sglang_mem_fraction_static", 0.7, float)
-    # SGLang serving options for the rollout engine. These must match the served
-    # model or tool calls silently fail to parse — the same lesson as the SFT
-    # serving path, which needs an explicit tool-call parser for Qwen.
-    sglang_tool_call_parser = get_hp("sglang_tool_call_parser", "qwen")
-    sglang_reasoning_parser = get_hp("sglang_reasoning_parser") or None
-    # An agentic episode runs ~20-32K tokens of context, well past SGLang's
-    # default, so cap it explicitly rather than discovering the ceiling mid-rollout.
-    sglang_context_length = get_hp("sglang_context_length", 32768, int)
-    sglang_data_parallel_size = get_hp("sglang_data_parallel_size", 1, int)
-
-    # Resolve data path
-    data_path = resolve_data_path(data_path)
-
-    # Download model from HuggingFace
-    safe_name = hf_model_id.replace("/", "_").replace(":", "_")
-    model_dir = resolve_model_dir(hf_model_id, f"/opt/ml/model-cache/{safe_name}")
-
-    print("=" * 60)
-    print("AgentCore Deep Research — Agentic RL Training (SlimeRunner)")
-    print("=" * 60)
-    print(f"Agent ARN:     {agent_runtime_arn}")
-    print(f"S3 bucket:     {s3_bucket}")
-    print(f"Model:         {hf_model_id} ({model_type})")
-    print(f"Data:          {data_path}")
-    print(f"Num rollouts:  {num_rollout}")
-    print(f"GPUs:          {num_gpus}")
-    print(f"TP size:       {tp_size}")
-    print(f"Rollout GPUs:  {rollout_gpus_per_engine}")
-    print(f"Batch size:    {rollout_batch_size}")
-    print(f"N samples:     {n_samples_per_prompt}")
-    print(f"Max resp len:  {rollout_max_response_len}")
-    print(f"LR:            {lr}")
-    print(f"SGLang mem:    {sglang_mem_fraction_static}")
-    print(
-        f"SGLang parsers: tool={sglang_tool_call_parser} "
-        f"reasoning={sglang_reasoning_parser}"
-    )
-    print(f"SGLang ctx len: {sglang_context_length}")
-    print(f"Output:        {OUTPUT_DIR}")
-    print()
-
-    if not agent_runtime_arn:
-        print("ERROR: agent_runtime_arn hyperparameter required")
-        sys.exit(1)
-    if not s3_bucket:
-        print("ERROR: s3_bucket hyperparameter required")
-        sys.exit(1)
-
-    # SlimeRunner doesn't pass --save/--save-hf by default (paths are user-specific).
-    # We save in HF format directly to SageMaker output dir for seamless deployment.
-    # --save: Megatron format (needed for slime's save machinery to trigger)
-    # --save-hf: HF safetensors export (what we deploy to SageMaker)
-    hf_save_path = os.path.join(OUTPUT_DIR, "hf")
-    megatron_save_path = os.path.join(tempfile.gettempdir(), "megatron_ckpts")
-
-    runner = SlimeRunner(
-        exp_id=exp_id,
-        agent_runtime_arn=agent_runtime_arn,
-        s3_bucket=s3_bucket,
-        model_dir=model_dir,
-        data_path=data_path,
-        model_type=model_type,
-        num_gpus=num_gpus,
-        tp_size=tp_size,
-        rollout_gpus_per_engine=rollout_gpus_per_engine,
-        rollout_batch_size=rollout_batch_size,
-        n_samples_per_prompt=n_samples_per_prompt,
-        rollout_max_response_len=rollout_max_response_len,
-        rollout_temperature=rollout_temperature,
-        lr=lr,
-        max_concurrent=max_concurrent,
-        acr_timeout=acr_timeout,
-        reward_postprocessing="grpo",
-        sglang_tool_call_parser=sglang_tool_call_parser,
-        sglang_reasoning_parser=sglang_reasoning_parser,
-        sglang_context_length=sglang_context_length,
-        sglang_data_parallel_size=sglang_data_parallel_size,
-        sglang_mem_fraction_static=sglang_mem_fraction_static,
-        extra_flags=[
-            "--save",
-            megatron_save_path,
-            "--save-interval",
-            str(num_rollout),
-            "--save-hf",
-            f"{hf_save_path}/{{rollout_id}}",
-        ],
+    # The AgentCore integration is one of verl's agent loops, configured by file
+    # rather than hydra override. Generated here so the ARN and bucket come from
+    # hyperparameters instead of committed config or environment plumbing.
+    loop_config = Path("/tmp/agentcore_agent.yaml")
+    loop_config.write_text(
+        "- name: agentcore_agent\n"
+        "  _target_: agentcore_rl_toolkit.backends.verl.agent_loop.AgentCoreAgentLoop\n"
+        f"  agent_runtime_arn: {agent_arn}\n"
+        f"  s3_bucket: {s3_bucket}\n"
+        f"  max_tokens_per_turn: {max_tokens_per_turn}\n"
+        "  max_rollout_time: 1800\n"
     )
 
-    print("Starting agentic GRPO training via SlimeRunner...")
-    print("(Agent will use tools during rollouts on AgentCore Runtime)")
-    print()
-    runner.train(num_rollout=num_rollout)
+    overrides = [
+        "trainer.use_v1=true",
+        "trainer.v1.trainer_mode=sync",
+        "algorithm.adv_estimator=grpo",
+        "algorithm.norm_adv_by_std_in_grpo=true",
+        "algorithm.use_kl_in_reward=False",
+        f"data.train_files=['{DATA_DIR}/rl_prompts_train.parquet']",
+        f"data.val_files=['{DATA_DIR}/rl_prompts_val.parquet']",
+        f"data.train_batch_size={prompts_per_step}",
+        f"data.max_prompt_length={max_prompt_len}",
+        f"data.max_response_length={max_response_len}",
+        # Rows reach the agent as the session payload verbatim.
+        "data.custom_cls.path=pkg://agentcore_rl_toolkit.backends.verl.dataset",
+        "data.custom_cls.name=PayloadDataset",
+        f"actor_rollout_ref.model.path={policy}",
+        "actor_rollout_ref.model.use_remove_padding=True",
+        *(
+            [
+                f"actor_rollout_ref.model.lora_rank={lora_rank}",
+                f"actor_rollout_ref.model.lora_alpha={lora_rank * 2}",
+                "actor_rollout_ref.model.target_modules=all-linear",
+                # vLLM must serve the adapter during rollouts, else generation uses base weights
+                "actor_rollout_ref.rollout.load_format=safetensors",
+                f"actor_rollout_ref.rollout.max_lora_rank={lora_rank}",
+            ]
+            if lora_rank
+            else []
+        ),
+        # A 248,320-token vocabulary makes the lm_head logits ~16GB per micro-batch
+        # in bf16. Fused kernels chunk the projection instead of materialising it.
+        "actor_rollout_ref.model.use_fused_kernels=true",
+        f"actor_rollout_ref.actor.optim.lr={hp('lr', 1e-6, float)}",
+        "actor_rollout_ref.actor.use_dynamic_bsz=True",
+        f"actor_rollout_ref.actor.ppo_max_token_len_per_gpu={width}",
+        # Full-parameter 9B carries 16 bytes/param of master and optimizer state,
+        # 38GB per card unsharded. Offloading to host RAM (373GB) brings resident
+        # use to ~33GB of 44.4GB; parameter offload frees the card during rollout.
+        # verl defaults this to fp32, which holds fp32 master weights AND fp32
+        # gradients: 19.2GB/card for a 9B, against ~26GB left after vLLM. bf16
+        # halves it; mixed precision already reduces gradients in fp32.
+        "actor_rollout_ref.actor.fsdp_config.model_dtype=bf16",
+        f"actor_rollout_ref.actor.fsdp_config.param_offload={str(lora_rank == 0).lower()}",
+        f"actor_rollout_ref.actor.fsdp_config.optimizer_offload={str(lora_rank == 0).lower()}",
+        # No KL term, so no reference policy: a second 9B does not fit, and KL-free
+        # GRPO is standard in DAPO and Dr.GRPO.
+        "actor_rollout_ref.actor.use_kl_loss=False",
+        "actor_rollout_ref.actor.entropy_coeff=0",
+        "actor_rollout_ref.rollout.name=vllm",
+        "actor_rollout_ref.rollout.mode=async",
+        "actor_rollout_ref.rollout.calculate_log_probs=true",
+        f"actor_rollout_ref.rollout.n={group_size}",
+        f"actor_rollout_ref.rollout.prompt_length={max_prompt_len}",
+        f"actor_rollout_ref.rollout.response_length={max_response_len}",
+        # Otherwise vLLM reserves KV cache for max_position_embeddings (262144).
+        f"actor_rollout_ref.rollout.max_model_len={width}",
+        f"actor_rollout_ref.rollout.tensor_model_parallel_size={ROLLOUT_TP}",
+        f"actor_rollout_ref.rollout.gpu_memory_utilization={gpu_mem_fraction}",
+        # Qwen3.5 is a hybrid attention/Gated-DeltaNet model, so vLLM reserves a
+        # recurrent-state cache block per sequence. The 1024 default exceeds what
+        # fits at our memory fraction; we only need group_size * prompts_per_step.
+        f"actor_rollout_ref.rollout.max_num_seqs={max(16, group_size * prompts_per_step)}",
+        "actor_rollout_ref.rollout.agent.default_agent_loop=agentcore_agent",
+        f"actor_rollout_ref.rollout.agent.agent_loop_config_path={loop_config}",
+        f"trainer.n_gpus_per_node={GPUS}",
+        "trainer.nnodes=1",
+        # /opt/ml/checkpoints is SageMaker's CheckpointConfig LocalPath: contents sync
+        # to S3 during training, so a mid-run checkpoint is evaluable. Writing under
+        # /opt/ml/model instead would only surface at job termination.
+        'trainer.default_local_dir=/opt/ml/checkpoints',
+        f"trainer.total_training_steps={total_steps}",
+        f"trainer.save_freq={hp('save_freq', 50, int)}",
+        # Saves an HF-format copy alongside the sharded checkpoint, so
+        # deploy_model.py has something servable without a conversion step.
+        # No 'optimizer'/'extra': resume_mode is disable, so resumable state is dead
+        # weight. Saving all four OOM'd at the first save_freq boundary -- gathering
+        # FSDP shards spikes memory on top of a training step that already fits in
+        # 44.4 GB. 'hf_model' is the one we need: it is directly deployable.
+        "actor_rollout_ref.actor.checkpoint.save_contents=['model','hf_model']",
+        # Without these, exp_id derives from verl's defaults and every run shares
+        # one S3 rollout prefix, so runs cannot be told apart after the fact.
+        "trainer.project_name=deep-research-rl",
+        f"trainer.experiment_name={job_name}",
+        "trainer.resume_mode=disable",
+        "trainer.logger=['console']",
+    ]
 
-    # Save trained model to SageMaker output dir.
-    # Strategy: start with the complete original model (has correct tokenizer,
-    # config, etc.), then overwrite with trained weights from slime's HF export.
-    print("Preparing model for deployment...")
+    print(f"Policy: {policy}")
+    print(f"Episodes per step: {group_size * prompts_per_step}  Steps: {total_steps}")
+    print(f"Agent loop config:\n{loop_config.read_text()}")
+    for o in overrides:
+        print(f"  {o}")
+    print(flush=True)
 
-    # Step 1: Copy full original model to output (tokenizer, config, everything)
-    for item in os.listdir(model_dir):
-        src = os.path.join(model_dir, item)
-        dst = os.path.join(OUTPUT_DIR, item)
-        if os.path.isdir(src):
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-        else:
-            shutil.copy2(src, dst)
-
-    # Step 2: Overwrite with trained weights from --save-hf (only weight files)
-    # slime's tokenizer export is incomplete (missing chat_template), so we
-    # keep the original tokenizer files from step 1 and only take the weights.
-    weight_extensions = {".safetensors", ".bin", ".pt"}
-    weight_files = {"model.safetensors.index.json", "config.json"}
-
-    if os.path.exists(hf_save_path):
-
-        def _rollout_sort_key(name: str) -> int:
-            """Parse rollout dir name as int, returning -1 for non-numeric dirs."""
-            try:
-                return int(name)
-            except (ValueError, TypeError):
-                return -1
-
-        all_dirs = [
-            d
-            for d in os.listdir(hf_save_path)
-            if os.path.isdir(os.path.join(hf_save_path, d))
-        ]
-        # Only consider directories with valid numeric names (rollout checkpoints)
-        numeric_dirs = [d for d in all_dirs if _rollout_sort_key(d) >= 0]
-        rollout_dirs = sorted(numeric_dirs, key=_rollout_sort_key)
-        if rollout_dirs:
-            latest = os.path.join(hf_save_path, rollout_dirs[-1])
-            print(f"Overwriting with trained weights from rollout {rollout_dirs[-1]}")
-            for item in os.listdir(latest):
-                # Only copy weight files and model config, skip tokenizer files
-                if (
-                    any(item.endswith(ext) for ext in weight_extensions)
-                    or item in weight_files
-                ):
-                    src = os.path.join(latest, item)
-                    dst = os.path.join(OUTPUT_DIR, item)
-                    shutil.copy2(src, dst)
-            shutil.rmtree(hf_save_path, ignore_errors=True)
-            print("Training complete. Model saved to SageMaker output.")
-        else:
-            print("WARNING: No rollout checkpoints found. Saving base model.")
-    else:
-        print("WARNING: No HF checkpoint found. Saving base model.")
+    # verl's own entry point. The toolkit contributes a dataset class and an agent
+    # loop through the overrides above rather than wrapping the trainer.
+    subprocess.run(
+        [sys.executable, "-m", "verl.trainer.main_ppo", *overrides],
+        check=True,
+        env={**os.environ, "HYDRA_FULL_ERROR": "1"},
+    )
 
 
 if __name__ == "__main__":

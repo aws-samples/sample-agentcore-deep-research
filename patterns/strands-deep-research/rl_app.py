@@ -18,7 +18,6 @@ Deploy with:
     agentcore deploy --agent deep-research-rl
 """
 
-import json
 import os
 import re
 import traceback
@@ -32,6 +31,7 @@ import strands_compat
 from agentcore_rl_toolkit import AgentCoreRLApp, RewardFunction
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
+from strands.hooks import AfterToolCallEvent, HookProvider
 from strands.models.openai import OpenAIModel
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
@@ -47,6 +47,10 @@ SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 # Where the system prompt instructs the agent to write its report. The reward is
 # computed from this file, not from the agent's closing chat message.
 REPORT_PATH = "/tmp/research_report.md"
+
+# Cap on each tool result. Matches --observation-chars used to build the SFT
+# trajectories; larger values overflow max_model_len mid-episode.
+OBSERVATION_CHARS = int(os.environ.get("OBSERVATION_CHARS", "1200"))
 
 # Default data sources for training rollouts. Key-free tools only: a source that
 # needs an API key fails intermittently if the key is absent or rate-limited, and
@@ -219,6 +223,37 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
     )
 
 
+class TruncateObservations(HookProvider):
+    """Cap every tool result, matching the SFT training distribution.
+
+    SFT trajectories were built with --observation-chars 1200. Untruncated, one web
+    search returns ~2900 chars, so the trajectory exhausts max_model_len before the
+    report is written: the agent emits its skeleton, researches, then dies on the
+    token limit leaving a 290-char report that scores 0. Hooked rather than wrapping
+    tool functions because Gateway tools are MCP-backed, not decorated functions.
+    """
+
+    def __init__(self, limit: int):
+        self.limit = limit
+
+    def register_hooks(self, registry):
+        registry.add_callback(AfterToolCallEvent, self._cap)
+
+    def _cap(self, event) -> None:
+        for block in (event.result or {}).get("content", []):
+            text = block.get("text")
+            if not isinstance(text, str) or len(text) <= self.limit:
+                continue
+            # Tools append their URLs in a trailing "## Sources" block. Head-truncating
+            # would drop every URL, so the model could not cite anything and the
+            # citation metric would read as a model regression rather than a cap.
+            body, sep, sources = text.partition("\n\n## Sources")
+            kept = body[: self.limit]
+            block["text"] = (
+                kept + f"\n[prose truncated at {self.limit} chars]" + sep + sources
+            )
+
+
 def read_report(path: str = REPORT_PATH) -> str:
     """
     Read the report the agent wrote.
@@ -261,6 +296,7 @@ def invoke_agent(payload: dict):
     model_id = cfg.get(
         "model_id", os.environ.get("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
     )
+    api_key = cfg.get("api_key") or "EMPTY"
     sampling_params = cfg.get(
         "sampling_params", {"temperature": 0.7, "max_tokens": 4096}
     )
@@ -274,7 +310,11 @@ def invoke_agent(payload: dict):
 
     # Create model pointing at training infrastructure's inference server
     model = OpenAIModel(
-        client_args={"api_key": "EMPTY", "base_url": base_url},
+        # The gateway keys trajectory capture off the api-key slot, so the session
+        # key the trainer supplies must be forwarded. With a placeholder the
+        # gateway captures no token ids, the rollout is treated as degenerate and
+        # scored 0 regardless of the reward the agent computed.
+        client_args={"api_key": api_key, "base_url": base_url},
         model_id=model_id,
         params=sampling_params,
     )
@@ -294,6 +334,7 @@ def invoke_agent(payload: dict):
         system_prompt=system_prompt,
         tools=tools,
         model=model,
+        hooks=[TruncateObservations(OBSERVATION_CHARS)],
     )
 
     # Run the agent

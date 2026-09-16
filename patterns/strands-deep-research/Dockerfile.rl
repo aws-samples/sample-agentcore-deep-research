@@ -38,6 +38,12 @@ EXPOSE 8080
 
 # Copy agent code
 COPY patterns/strands-deep-research/rl_app.py .
+# rl_app.py imports both of these at module scope. Without them the container
+# exits on ModuleNotFoundError before serving a single rollout, which reaches
+# the trainer as an instant empty response and a reward of 0.0 -- looking like
+# a model that cannot write rather than an agent that never started.
+COPY patterns/strands-deep-research/research_rubric.py .
+COPY patterns/strands-deep-research/strands_compat.py .
 COPY patterns/strands-deep-research/system_prompt.txt .
 COPY patterns/utils/ utils/
 
