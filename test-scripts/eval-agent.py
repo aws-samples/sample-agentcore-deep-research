@@ -39,8 +39,10 @@ Prerequisites:
 import argparse
 import getpass
 import json
+import math
 import os
 import re
+import statistics
 import sys
 import time
 import uuid
@@ -512,6 +514,80 @@ def score_report_rubric(
         "format": round(format_reward, 4),
         "per_criterion": per_criterion,
     }
+
+
+def write_comparison_plot(rows: list[tuple[str, float, list[dict]]], out_path: Path) -> None:
+    """Bar chart of mean rubric score per model, with 95% CI error bars.
+
+    Error bars are not decoration: at n=98 the resolvable difference is ~0.065, so
+    bars without them invite reading noise as a result.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = [r[0] for r in rows]
+    means = [r[1] for r in rows]
+    errs = []
+    for _, _, recs in rows:
+        vals = [x["scores"]["total"] for x in recs]
+        sd = statistics.stdev(vals) if len(vals) > 1 else 0.0
+        errs.append(1.96 * sd / math.sqrt(len(vals)) if vals else 0.0)
+
+    fig, ax = plt.subplots(figsize=(1.5 * len(rows) + 3, 5))
+    bars = ax.bar(labels, means, yerr=errs, capsize=5, color="#4A7EBB", edgecolor="black", linewidth=0.6)
+    for b, m, n in zip(bars, means, [len(r[2]) for r in rows]):
+        ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.02, f"{m:.3f}\nn={n}",
+                ha="center", va="bottom", fontsize=9)
+    ax.set_ylabel("Rubric score (0-1)")
+    ax.set_ylim(0, max(m + e for m, e in zip(means, errs)) * 1.25)
+    ax.set_title("Deep research report quality (identical harness, same judge)")
+    ax.grid(axis="y", alpha=0.3)
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    print_msg(f"Plot saved to: {out_path}", "success")
+
+
+def write_compute_plot(rows: list[tuple[str, float, list[dict]]], hours: dict, out_path: Path) -> None:
+    """Eval score against cumulative training compute, in measured GPU-hours.
+
+    One continuous line: base (no training) -> SFT -> successive RL checkpoints, so
+    the marginal return of each stage is visible rather than implied.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    pts = []
+    for label, mean, recs in rows:
+        if label not in hours:
+            continue
+        vals = [x["scores"]["total"] for x in recs]
+        sd = statistics.stdev(vals) if len(vals) > 1 else 0.0
+        err = 1.96 * sd / math.sqrt(len(vals)) if vals else 0.0
+        pts.append((float(hours[label]), mean, err, label))
+    pts.sort()
+    if not pts:
+        print_msg("No --compute-hours mapping matched any tag; skipping compute plot", "warning")
+        return
+
+    x = [p[0] for p in pts]
+    y = [p[1] for p in pts]
+    e = [p[2] for p in pts]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.errorbar(x, y, yerr=e, marker="o", capsize=4, color="#4A7EBB", linewidth=1.8, markersize=7)
+    for xi, yi, _, lab in pts:
+        ax.annotate(lab, (xi, yi), textcoords="offset points", xytext=(6, -12), fontsize=8)
+    ax.set_xlabel("Cumulative training compute (GPU-hours, measured)")
+    ax.set_ylabel("Rubric score (0-1)")
+    ax.set_title("Report quality vs training compute")
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    print_msg(f"Compute plot saved to: {out_path}", "success")
 
 
 def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
@@ -1162,6 +1238,32 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         "Only used with --benchmark rubric.",
     )
     parser.add_argument(
+        "--plot",
+        type=str,
+        default=None,
+        help="With --compare: write a bar chart (with 95%% CIs) to this filename in results/.",
+    )
+    parser.add_argument(
+        "--plot-compute",
+        type=str,
+        default=None,
+        help="With --compare: write a score-vs-GPU-hours curve to this filename in results/.",
+    )
+    parser.add_argument(
+        "--compute-hours",
+        action="append",
+        default=[],
+        metavar="LABEL=HOURS",
+        help="Cumulative GPU-hours for a plot label, used by --plot-compute. Repeatable.",
+    )
+    parser.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        metavar="TAG=NAME",
+        help="Display name for a tag in --plot output. Repeatable.",
+    )
+    parser.add_argument(
         "--compare",
         type=str,
         default=None,
@@ -1238,6 +1340,8 @@ def main():
     # Compare mode (no agent invocation needed)
     if args.compare:
         tags = [t.strip() for t in args.compare.split(",")]
+        args.labels = dict(kv.split("=", 1) for kv in args.label)
+        plot_rows: list[tuple[str, float, list[dict]]] = []
         print(
             f"\n{'Tag':<25} {'Total':>8} {'Rubric':>8} {'Citation':>8} {'Format':>8} {'N':>5}"
         )
@@ -1263,7 +1367,16 @@ def main():
             print(
                 f"{tag:<25} {total:>8.3f} {rubric:>8.3f} {citation:>8.3f} {fmt:>8.3f} {len(results):>5}"
             )
+            plot_rows.append((args.labels.get(tag, tag), total, results))
         print()
+        if args.plot and plot_rows:
+            write_comparison_plot(plot_rows, output_dir / args.plot)
+        if args.plot_compute and plot_rows:
+            write_compute_plot(
+                plot_rows,
+                dict(kv.split("=", 1) for kv in args.compute_hours),
+                output_dir / args.plot_compute,
+            )
         return
 
     # Parse enabled tools
