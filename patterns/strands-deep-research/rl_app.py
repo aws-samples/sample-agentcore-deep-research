@@ -31,6 +31,7 @@ import strands_compat
 from agentcore_rl_toolkit import AgentCoreRLApp, RewardFunction
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
+from strands.agent.conversation_manager import NullConversationManager
 from strands.hooks import AfterToolCallEvent, HookProvider
 from strands.models.openai import OpenAIModel
 from strands.tools.mcp import MCPClient
@@ -100,6 +101,7 @@ class DeepResearchReward(RewardFunction):
         ground_truth: str = "",
         user_input: str = "",
         retrieved_urls: set | None = None,
+        observations: list[str] | None = None,
         **kwargs,
     ) -> float:
         """Compute scalar reward for the report."""
@@ -107,6 +109,7 @@ class DeepResearchReward(RewardFunction):
             response_text=response_text,
             user_input=user_input,
             retrieved_urls=retrieved_urls,
+            observations=observations,
         )
         return total
 
@@ -115,6 +118,7 @@ class DeepResearchReward(RewardFunction):
         response_text: str = "",
         user_input: str = "",
         retrieved_urls: set | None = None,
+        observations: list[str] | None = None,
     ) -> tuple[float, dict]:
         """
         Reward plus its individual components.
@@ -129,7 +133,7 @@ class DeepResearchReward(RewardFunction):
         if not response_text or response_text.startswith("ERROR"):
             return 0.0, {"rubric": 0.0, "citation": 0.0, "format": 0.0}
 
-        rubric_reward = self._judge_rubric(user_input, response_text)
+        rubric_reward = self._judge_rubric(user_input, response_text, observations)
         citation_reward = research_rubric.score_citations(response_text, retrieved_urls)
         format_reward = research_rubric.score_format(response_text)
         total = research_rubric.combine(rubric_reward, citation_reward, format_reward)
@@ -139,7 +143,9 @@ class DeepResearchReward(RewardFunction):
             "format": format_reward,
         }
 
-    def _judge_rubric(self, question: str, report: str) -> float:
+    def _judge_rubric(
+        self, question: str, report: str, observations: list[str] | None = None
+    ) -> float:
         """
         Score report against the shared rubric using an LLM judge call.
 
@@ -163,6 +169,7 @@ class DeepResearchReward(RewardFunction):
             os.environ.get(
                 "JUDGE_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
             ),
+            observations=observations,
         )
         return score
 
@@ -334,6 +341,11 @@ def invoke_agent(payload: dict):
         system_prompt=system_prompt,
         tools=tools,
         model=model,
+        # NullConversationManager, not the Strands default. The default is
+        # SlidingWindowConversationManager(window_size=40); measured across 1,833 real
+        # episodes 86% exceed 40 messages (p50=45, max=75), so the default truncates
+        # mid-episode and can split a tool_use from its tool_result.
+        conversation_manager=NullConversationManager(),
         hooks=[TruncateObservations(OBSERVATION_CHARS)],
     )
 

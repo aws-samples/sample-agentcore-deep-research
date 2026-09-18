@@ -203,9 +203,14 @@ def invoke_agent_sync(
     headers: dict[str, str],
     enabled_sources: list[str] | None = None,
     timeout: int = 600,
-) -> str:
+) -> tuple[str, list[str]]:
     """
-    Invoke the deployed agent and collect the full response.
+    Invoke the deployed agent; return (report, tool_observations).
+
+    Strands emits one `message` event per completed message, so tool results are
+    recoverable from the stream. They are needed to verify grounding: without them
+    the judge can only assess whether claims *look* attributed, and the citation
+    component can only check that URLs are well-formed.
 
     Parameters
     ----------
@@ -242,11 +247,12 @@ def invoke_agent_sync(
         )
 
         if response.status_code != 200:
-            return f"ERROR: HTTP {response.status_code}: {response.text[:500]}"
+            return f"ERROR: HTTP {response.status_code}: {response.text[:500]}", []
 
         # Collect full text response from streaming + look for report URL
         full_text = ""
         report_url = None
+        observations: list[str] = []
         for line in response.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):
                 continue
@@ -257,6 +263,17 @@ def invoke_agent_sync(
                 # Strands: text token
                 if isinstance(chunk.get("data"), str):
                     full_text += chunk["data"]
+
+                # Strands: one completed message per event. Tool results arrive as
+                # role="user" messages carrying toolResult blocks.
+                msg = chunk.get("message")
+                if isinstance(msg, dict):
+                    for blk in msg.get("content") or []:
+                        tr = blk.get("toolResult") if isinstance(blk, dict) else None
+                        for inner in (tr or {}).get("content") or []:
+                            txt = inner.get("text") if isinstance(inner, dict) else None
+                            if isinstance(txt, str) and txt:
+                                observations.append(txt)
 
                 # LangGraph: AIMessageChunk with content array
                 elif chunk.get("type") == "AIMessageChunk" and isinstance(
@@ -283,13 +300,13 @@ def invoke_agent_sync(
                     report_resp.status_code == 200
                     and len(report_resp.text.strip()) > 500
                 ):
-                    return report_resp.text.strip()
+                    return report_resp.text.strip(), observations
             except Exception:
                 pass
 
         # Fallback: stream text if it looks like a report
         if full_text.strip().startswith("#") and len(full_text.strip()) > 1000:
-            return full_text.strip()
+            return full_text.strip(), observations
 
         # Also check stream text for report URL
         if "[REPORT_URL:" in full_text:
@@ -301,18 +318,18 @@ def invoke_agent_sync(
                         report_resp.status_code == 200
                         and len(report_resp.text.strip()) > 500
                     ):
-                        return report_resp.text.strip()
+                        return report_resp.text.strip(), observations
                 except Exception:
                     pass
 
-        return full_text.strip()
+        return full_text.strip(), observations
 
     except requests.exceptions.Timeout:
-        return "ERROR: Request timed out"
+        return "ERROR: Request timed out", []
     except requests.exceptions.ConnectionError:
-        return "ERROR: Connection failed"
+        return "ERROR: Connection failed", []
     except Exception as e:
-        return f"ERROR: {e}"
+        return f"ERROR: {e}", []
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +475,7 @@ def score_report_rubric(
     report: str,
     judge_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0",
     retrieved_urls: set | None = None,
+    observations: list[str] | None = None,
 ) -> dict:
     """
     Score a research report using the shared rubric (see research_rubric.py).
@@ -469,11 +487,23 @@ def score_report_rubric(
     Pass `retrieved_urls` (URLs actually returned by tool calls) to enable the
     grounding gate, which discards fabricated citations.
 
+    Pass `observations` (raw tool results) to let the judge check grounding against
+    what the tools actually returned. Without them the judge sees only the report,
+    so its grounding criterion measures whether claims *look* attributed rather than
+    whether they are -- the weakness DR Tulu (arXiv 2511.19399) addresses by showing
+    the judge its search context. `retrieved_urls` is derived from them when not
+    supplied explicitly.
+
     Returns dict with total (0-1), rubric, citation, format, and per_criterion.
     """
     import boto3 as _boto3
 
     rubric_mod = _load_shared_rubric()
+
+    if observations and retrieved_urls is None:
+        retrieved_urls = set(
+            re.findall(r"https?://[^\s)\]\">]+", "\n".join(observations))
+        )
 
     if not report or report.startswith("ERROR") or len(report) < 100:
         return {
@@ -500,7 +530,7 @@ def score_report_rubric(
     # it raise records the question as an error and the run reports fewer
     # questions than requested, which is visible.
     rubric_reward, per_criterion = rubric_mod.score_rubric_with_judge(
-        question, report, bedrock, judge_model
+        question, report, bedrock, judge_model, observations=observations
     )
 
     citation_reward = rubric_mod.score_citations(report, retrieved_urls)
@@ -730,7 +760,7 @@ def run_rubric_evaluation(
             q_text = question["question"]
             session_id = generate_session_id()
             start_time = time.time()
-            response = invoke_agent_sync(
+            response, observations = invoke_agent_sync(
                 url=url,
                 prompt=q_text,
                 session_id=session_id,
@@ -738,7 +768,9 @@ def run_rubric_evaluation(
                 enabled_sources=question.get("enabled_sources"),
             )
             elapsed = time.time() - start_time
-            scores = score_report_rubric(q_text, response, judge_model)
+            scores = score_report_rubric(
+                q_text, response, judge_model, observations=observations
+            )
             return {
                 "question": q_text,
                 "response_length": len(response),
@@ -1005,7 +1037,7 @@ def _evaluate_single_question(
     q_text = question["question"]
 
     start_time = time.time()
-    response = invoke_agent_sync(
+    response, _observations = invoke_agent_sync(
         url=url,
         prompt=q_text,
         session_id=session_id,
