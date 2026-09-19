@@ -70,4 +70,20 @@ RUN apt-get purge -y --auto-remove python3-pip python3-wheel \
 
 COPY training/train_entry.py /opt/ml/code/train_entry.py
 
+# Non-root: without USER the runtime stage runs as root regardless of earlier stages.
+#
+# The chown below only affects the image. SageMaker bind-mounts /opt/ml/model,
+# /opt/ml/output, /opt/ml/checkpoints and /opt/ml/input at run time, and a mount masks
+# whatever the image set, so runtime ownership is SageMaker's to decide. A non-root
+# training container that cannot write /opt/ml/model fails only at the end of the run,
+# after the GPU time has been spent (see aws/sagemaker-python-sdk#4764). UID 1000 is
+# pinned because that is the id SageMaker is documented to use for non-root images.
+#
+# Validate with a short job on a cheap instance after any change here. Do not assume a
+# multi-hour run will be able to save.
+RUN useradd --create-home --uid 1000 trainer \
+    && mkdir -p /opt/ml/code /opt/ml/model /opt/ml/output /opt/ml/checkpoints /opt/ml/input \
+    && chown -R trainer:trainer /opt/ml
+USER trainer
+
 ENTRYPOINT ["python3", "/opt/ml/code/train_entry.py"]
