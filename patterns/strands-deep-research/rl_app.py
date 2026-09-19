@@ -242,6 +242,10 @@ class TruncateObservations(HookProvider):
 
     def __init__(self, limit: int):
         self.limit = limit
+        # Collected so the reward can gate citations against what the tools actually
+        # returned, and so the judge can verify grounding. Without this the citation
+        # component scores URL well-formedness only, which rewards plausible invention.
+        self.observations: list[str] = []
 
     def register_hooks(self, registry):
         registry.add_callback(AfterToolCallEvent, self._cap)
@@ -249,16 +253,20 @@ class TruncateObservations(HookProvider):
     def _cap(self, event) -> None:
         for block in (event.result or {}).get("content", []):
             text = block.get("text")
-            if not isinstance(text, str) or len(text) <= self.limit:
+            if not isinstance(text, str):
                 continue
-            # Tools append their URLs in a trailing "## Sources" block. Head-truncating
-            # would drop every URL, so the model could not cite anything and the
-            # citation metric would read as a model regression rather than a cap.
-            body, sep, sources = text.partition("\n\n## Sources")
-            kept = body[: self.limit]
-            block["text"] = (
-                kept + f"\n[prose truncated at {self.limit} chars]" + sep + sources
-            )
+            if len(text) > self.limit:
+                # Tools append their URLs in a trailing "## Sources" block.
+                # Head-truncating would drop every URL, so the model could not cite
+                # anything and the citation metric would read as a model regression
+                # rather than a cap.
+                body, sep, sources = text.partition("\n\n## Sources")
+                kept = body[: self.limit]
+                block["text"] = (
+                    kept + f"\n[prose truncated at {self.limit} chars]" + sep + sources
+                )
+            # Record what the model actually saw, capped exactly as it was shown.
+            self.observations.append(block["text"])
 
 
 def read_report(path: str = REPORT_PATH) -> str:
@@ -336,6 +344,7 @@ def invoke_agent(payload: dict):
     gateway_client = create_gateway_client(enabled_sources)
     tools.append(gateway_client)
 
+    observer = TruncateObservations(OBSERVATION_CHARS)
     agent = Agent(
         name="DeepResearchRL",
         system_prompt=system_prompt,
@@ -346,7 +355,7 @@ def invoke_agent(payload: dict):
         # episodes 86% exceed 40 messages (p50=45, max=75), so the default truncates
         # mid-episode and can split a tool_use from its tool_result.
         conversation_manager=NullConversationManager(),
-        hooks=[TruncateObservations(OBSERVATION_CHARS)],
+        hooks=[observer],
     )
 
     # Run the agent
@@ -378,9 +387,16 @@ def invoke_agent(payload: dict):
         traceback.print_exc()
         response_text = f"ERROR: {e}"
 
-    # Compute reward
+    # Compute reward. Passing observations activates the citation grounding gate and
+    # lets the judge check claims against retrieved text -- without them the reward is
+    # measurably easier to game than the metric it is supposed to approximate.
     reward, components = reward_fn.score(
-        response_text=response_text, user_input=prompt
+        response_text=response_text,
+        user_input=prompt,
+        retrieved_urls=set(
+            re.findall(r"https?://[^\s)\]\">]+", "\n".join(observer.observations))
+        ),
+        observations=observer.observations,
     )
     # One greppable line per episode, so component trends can be recovered from
     # training logs without re-running rollouts.

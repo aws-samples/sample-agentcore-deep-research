@@ -1313,7 +1313,7 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         type=str,
         default=None,
         help="Path to an existing eval_rubric_*.jsonl; re-judge its stored reports "
-             "instead of running the agent (no rollouts, no endpoint needed)",
+        "instead of running the agent (no rollouts, no endpoint needed)",
     )
     parser.add_argument(
         "--judge-model",

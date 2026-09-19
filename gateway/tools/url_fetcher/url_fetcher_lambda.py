@@ -33,13 +33,20 @@ MAX_REDIRECTS = 3
 UA = "Mozilla/5.0 (compatible; AgentCoreDeepResearch/1.0)"
 
 # text/* is allowed as a prefix; these are the non-text types worth reading.
-ALLOWED_CONTENT = ("text/", "application/json", "application/xml", "application/xhtml+xml")
+ALLOWED_CONTENT = (
+    "text/",
+    "application/json",
+    "application/xml",
+    "application/xhtml+xml",
+)
 
 DROP_TAGS = re.compile(
     r"<(script|style|noscript|svg|nav|footer|header|form|aside)\b.*?</\1>",
     re.IGNORECASE | re.DOTALL,
 )
-BLOCK_BOUNDARY = re.compile(r"</(p|div|h[1-6]|li|tr|section|article|blockquote)\s*>", re.IGNORECASE)
+BLOCK_BOUNDARY = re.compile(
+    r"</(p|div|h[1-6]|li|tr|section|article|blockquote)\s*>", re.IGNORECASE
+)
 TAG = re.compile(r"<[^>]+>")
 BLANK_RUN = re.compile(r"\n{3,}")
 
@@ -69,7 +76,9 @@ def _assert_public(hostname: str) -> None:
             or ip.is_multicast
             or ip.is_unspecified
         ):
-            raise ValueError(f"refusing to fetch non-public address {ip} for {hostname}")
+            raise ValueError(
+                f"refusing to fetch non-public address {ip} for {hostname}"
+            )
 
 
 def _validate(url: str) -> str:
@@ -111,7 +120,9 @@ def fetch_url(url: str, max_chars: int = MAX_CHARS) -> str:
                 raise
             location = exc.headers.get("Location")
             if not location:
-                raise ValueError(f"redirect from {current} with no Location header") from exc
+                raise ValueError(
+                    f"redirect from {current} with no Location header"
+                ) from exc
             current = _validate(urllib.parse.urljoin(current, location))
             continue
 
@@ -122,7 +133,11 @@ def fetch_url(url: str, max_chars: int = MAX_CHARS) -> str:
         raw = response.read(MAX_BYTES).decode(
             response.headers.get_content_charset() or "utf-8", errors="replace"
         )
-        text = html_to_text(raw) if "html" in content_type or raw.lstrip().startswith("<") else raw
+        text = (
+            html_to_text(raw)
+            if "html" in content_type or raw.lstrip().startswith("<")
+            else raw
+        )
         truncated = len(text) > max_chars
         body = text[:max_chars] + ("\n\n[truncated]" if truncated else "")
         return f"Source: {current}\n\n{body}"
@@ -145,7 +160,9 @@ def handler(event, context):
         else ""
     )
     if tool_name and "fetch_url" not in tool_name:
-        return {"error": f"This Lambda only supports 'fetch_url', received: {tool_name}"}
+        return {
+            "error": f"This Lambda only supports 'fetch_url', received: {tool_name}"
+        }
 
     url = (event.get("url") or "").strip()
     if not url:
