@@ -41,6 +41,9 @@ tools:
   edgar: # Search SEC company filings (10-K, 10-Q, 8-K)
     enabled: true
     default_on: true
+  fetch: # Fetch full readable text of a public web page (off: would change the task)
+    enabled: false
+    default_on: false
   fred: # 800K+ economic time series from the Federal Reserve
     enabled: false
     default_on: false

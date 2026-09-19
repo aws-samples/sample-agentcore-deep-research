@@ -889,6 +889,22 @@ export class BackendStack extends cdk.NestedStack {
       )
     }
 
+    // URL Fetcher Lambda (reads the pages that search tools only summarise)
+    let urlFetcherLambda: lambda.Function | undefined
+    if (isToolEnabled("fetch")) {
+      urlFetcherLambda = new lambda.Function(this, "UrlFetcherLambda", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "url_fetcher_lambda.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../gateway/tools/url_fetcher")),
+        timeout: cdk.Duration.seconds(30),
+        logGroup: new logs.LogGroup(this, "UrlFetcherLambdaLogGroup", {
+          logGroupName: `/aws/lambda/${config.stack_name_base}-url-fetcher`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      })
+    }
+
     // Nova Web Search Lambda
     let novaSearchLambda: lambda.Function | undefined
     if (isToolEnabled("nova")) {
@@ -1224,6 +1240,16 @@ export class BackendStack extends cdk.NestedStack {
         "S3 file reader (text and PDF)",
         s3ReaderLambda,
         "../../gateway/tools/s3_reader/tool_spec.json"
+      )
+    }
+
+    if (urlFetcherLambda) {
+      createGatewayTarget(
+        "UrlFetcherTarget",
+        "url-fetcher-target",
+        "Fetch readable text from a public URL",
+        urlFetcherLambda,
+        "../../gateway/tools/url_fetcher/tool_spec.json"
       )
     }
 

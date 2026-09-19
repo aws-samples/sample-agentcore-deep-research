@@ -1,0 +1,20 @@
+[
+  {
+    "name": "fetch_url",
+    "description": "Fetch the full readable text of a public web page by URL. Use this after a search tool returns a promising result, to read the actual document before citing it — search tools return only short snippets, so a citation based on a snippet alone is not verified. Returns plain text with markup removed. Only public http/https pages are reachable; PDFs and other binary formats are not supported (use s3_text_reader for PDFs in S3).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Absolute http or https URL of the page to read (e.g., 'https://example.org/report')"
+        },
+        "max_chars": {
+          "type": "integer",
+          "description": "Maximum characters of text to return (default 20000, which is also the maximum)"
+        }
+      },
+      "required": ["url"]
+    }
+  }
+]

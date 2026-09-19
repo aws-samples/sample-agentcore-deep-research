@@ -275,10 +275,19 @@ def score_rubric_with_judge(
         criteria=criteria_text,
         context_block=context_block,
     )
+    # Newer reasoning models reject `temperature` outright rather than ignoring it, so it
+    # is only sent to models that accept it. Judge determinism is unaffected: those models
+    # do not expose the knob at all.
+    # Reasoning models spend tokens thinking before emitting any text, so a 300-token cap
+    # returns an empty completion. They also reject `temperature` rather than ignoring it.
+    reasoning_judge = "opus-5" in judge_model or "sonnet-5" in judge_model
+    inference_config: dict = {"maxTokens": 4000 if reasoning_judge else 300}
+    if not reasoning_judge:
+        inference_config["temperature"] = 0.0
     resp = bedrock_client.converse(
         modelId=judge_model,
         messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 300, "temperature": 0.0},
+        inferenceConfig=inference_config,
     )
     text = "".join(
         block.get("text", "") for block in resp["output"]["message"]["content"]

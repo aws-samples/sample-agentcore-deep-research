@@ -703,6 +703,58 @@ def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
     return questions
 
 
+def rescore_from_file(
+    source: Path,
+    results_file: Path,
+    judge_model: str,
+    parallel: int = 8,
+) -> dict:
+    """
+    Re-judge reports stored in a previous eval file, without new rollouts.
+
+    Used to change judge model or rubric without paying for rollouts again. Records
+    written before observations were persisted can only be re-scored blind, so the
+    grounding criterion is not comparable across the two record formats; the count of
+    records carrying observations is reported so that is visible rather than implicit.
+    """
+    rows = [json.loads(line) for line in source.open() if line.strip()]
+    with_obs = sum(1 for r in rows if r.get("observations"))
+    print_msg(
+        f"Re-scoring {len(rows)} reports from {source.name} with {judge_model} "
+        f"({with_obs}/{len(rows)} carry observations)",
+        "info",
+    )
+
+    def score_one(row: dict) -> dict:
+        scores = score_report_rubric(
+            row["question"],
+            row["response"],
+            judge_model,
+            observations=row.get("observations"),
+        )
+        return {**row, "scores": scores, "rescored_with": judge_model}
+
+    out = []
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        futures = {pool.submit(score_one, r): r for r in rows}
+        for i, fut in enumerate(as_completed(futures), 1):
+            out.append(fut.result())
+            if i % 10 == 0 or i == len(rows):
+                print_msg(f"  re-scored {i}/{len(rows)}", "info")
+
+    with results_file.open("w") as fh:
+        for r in out:
+            fh.write(json.dumps(r) + "\n")
+
+    keys = ("total", "rubric", "citation", "format")
+    return {
+        "total_questions": len(out),
+        "observations_present": with_obs,
+        "judge_model": judge_model,
+        **{f"mean_{k}": sum(r["scores"][k] for r in out) / len(out) for k in keys},
+    }
+
+
 def run_rubric_evaluation(
     questions: list[dict],
     url: str,
@@ -778,6 +830,10 @@ def run_rubric_evaluation(
                 # a full re-run of every baseline just to re-score, and there
                 # is no way to audit qualitatively what the model produced.
                 "response": response,
+                # Persist tool observations too. The grounding criterion is unscoreable
+                # without them, so a record lacking them can only ever be re-scored by a
+                # blind judge -- which is the weakness the grounding gate exists to fix.
+                "observations": observations,
                 "scores": scores,
                 "elapsed_seconds": round(elapsed, 2),
                 "metadata": question.get("metadata", {}),
@@ -1253,6 +1309,13 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         "Actual model is configured on the deployed agent.",
     )
     parser.add_argument(
+        "--rescore",
+        type=str,
+        default=None,
+        help="Path to an existing eval_rubric_*.jsonl; re-judge its stored reports "
+             "instead of running the agent (no rollouts, no endpoint needed)",
+    )
+    parser.add_argument(
         "--judge-model",
         type=str,
         default="global.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -1446,9 +1509,13 @@ def main():
     # Parse enabled tools
     enabled_sources = args.tools.split(",") if args.tools else None
 
-    # Set up connection
+    # Set up connection. --rescore re-judges stored reports, so it needs no runtime and
+    # no Cognito token; authenticating anyway would fail whenever creds have gone stale.
     auth_refresh_fn = None
-    if args.local:
+    url, headers = "", {}
+    if args.rescore:
+        print_msg(f"Re-scoring stored reports from {args.rescore}", "info")
+    elif args.local:
         print_msg("Using LOCAL agent (localhost:8080)", "info")
         url, headers = setup_local_connection()
     else:
@@ -1494,6 +1561,21 @@ def main():
 
     # Construct tag suffix for filenames
     tag_suffix = f"_{args.tag}" if args.tag else ""
+
+    # --- Re-score only: no rollouts, no dataset, no runtime ---
+    if args.rescore:
+        results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
+        all_metrics["rubric"] = rescore_from_file(
+            source=Path(args.rescore),
+            results_file=results_file,
+            judge_model=args.judge_model,
+            parallel=args.parallel,
+        )
+        print_section("RE-SCORE RESULTS")
+        for k, v in all_metrics["rubric"].items():
+            print(f"  {k}: {v}")
+        print(f"\nSaved to {results_file}")
+        return
 
     # --- GAIA Benchmark ---
     if args.benchmark in ("gaia", "both"):
@@ -1542,7 +1624,7 @@ def main():
         all_metrics["hle-search"] = metrics
 
     # --- Rubric Benchmark (report quality) ---
-    if args.benchmark == "rubric":
+    elif args.benchmark == "rubric":
         results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
         questions = load_rubric_dataset(args.rubric_questions)
 
