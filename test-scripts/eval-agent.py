@@ -39,8 +39,10 @@ Prerequisites:
 import argparse
 import getpass
 import json
+import math
 import os
 import re
+import statistics
 import sys
 import time
 import uuid
@@ -201,9 +203,14 @@ def invoke_agent_sync(
     headers: dict[str, str],
     enabled_sources: list[str] | None = None,
     timeout: int = 600,
-) -> str:
+) -> tuple[str, list[str]]:
     """
-    Invoke the deployed agent and collect the full response.
+    Invoke the deployed agent; return (report, tool_observations).
+
+    Strands emits one `message` event per completed message, so tool results are
+    recoverable from the stream. They are needed to verify grounding: without them
+    the judge can only assess whether claims *look* attributed, and the citation
+    component can only check that URLs are well-formed.
 
     Parameters
     ----------
@@ -240,11 +247,12 @@ def invoke_agent_sync(
         )
 
         if response.status_code != 200:
-            return f"ERROR: HTTP {response.status_code}: {response.text[:500]}"
+            return f"ERROR: HTTP {response.status_code}: {response.text[:500]}", []
 
         # Collect full text response from streaming + look for report URL
         full_text = ""
         report_url = None
+        observations: list[str] = []
         for line in response.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):
                 continue
@@ -255,6 +263,17 @@ def invoke_agent_sync(
                 # Strands: text token
                 if isinstance(chunk.get("data"), str):
                     full_text += chunk["data"]
+
+                # Strands: one completed message per event. Tool results arrive as
+                # role="user" messages carrying toolResult blocks.
+                msg = chunk.get("message")
+                if isinstance(msg, dict):
+                    for blk in msg.get("content") or []:
+                        tr = blk.get("toolResult") if isinstance(blk, dict) else None
+                        for inner in (tr or {}).get("content") or []:
+                            txt = inner.get("text") if isinstance(inner, dict) else None
+                            if isinstance(txt, str) and txt:
+                                observations.append(txt)
 
                 # LangGraph: AIMessageChunk with content array
                 elif chunk.get("type") == "AIMessageChunk" and isinstance(
@@ -281,13 +300,13 @@ def invoke_agent_sync(
                     report_resp.status_code == 200
                     and len(report_resp.text.strip()) > 500
                 ):
-                    return report_resp.text.strip()
+                    return report_resp.text.strip(), observations
             except Exception:
                 pass
 
         # Fallback: stream text if it looks like a report
         if full_text.strip().startswith("#") and len(full_text.strip()) > 1000:
-            return full_text.strip()
+            return full_text.strip(), observations
 
         # Also check stream text for report URL
         if "[REPORT_URL:" in full_text:
@@ -299,18 +318,18 @@ def invoke_agent_sync(
                         report_resp.status_code == 200
                         and len(report_resp.text.strip()) > 500
                     ):
-                        return report_resp.text.strip()
+                        return report_resp.text.strip(), observations
                 except Exception:
                     pass
 
-        return full_text.strip()
+        return full_text.strip(), observations
 
     except requests.exceptions.Timeout:
-        return "ERROR: Request timed out"
+        return "ERROR: Request timed out", []
     except requests.exceptions.ConnectionError:
-        return "ERROR: Connection failed"
+        return "ERROR: Connection failed", []
     except Exception as e:
-        return f"ERROR: {e}"
+        return f"ERROR: {e}", []
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +475,7 @@ def score_report_rubric(
     report: str,
     judge_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0",
     retrieved_urls: set | None = None,
+    observations: list[str] | None = None,
 ) -> dict:
     """
     Score a research report using the shared rubric (see research_rubric.py).
@@ -467,11 +487,23 @@ def score_report_rubric(
     Pass `retrieved_urls` (URLs actually returned by tool calls) to enable the
     grounding gate, which discards fabricated citations.
 
+    Pass `observations` (raw tool results) to let the judge check grounding against
+    what the tools actually returned. Without them the judge sees only the report,
+    so its grounding criterion measures whether claims *look* attributed rather than
+    whether they are -- the weakness DR Tulu (arXiv 2511.19399) addresses by showing
+    the judge its search context. `retrieved_urls` is derived from them when not
+    supplied explicitly.
+
     Returns dict with total (0-1), rubric, citation, format, and per_criterion.
     """
     import boto3 as _boto3
 
     rubric_mod = _load_shared_rubric()
+
+    if observations and retrieved_urls is None:
+        retrieved_urls = set(
+            re.findall(r"https?://[^\s)\]\">]+", "\n".join(observations))
+        )
 
     if not report or report.startswith("ERROR") or len(report) < 100:
         return {
@@ -498,7 +530,7 @@ def score_report_rubric(
     # it raise records the question as an error and the run reports fewer
     # questions than requested, which is visible.
     rubric_reward, per_criterion = rubric_mod.score_rubric_with_judge(
-        question, report, bedrock, judge_model
+        question, report, bedrock, judge_model, observations=observations
     )
 
     citation_reward = rubric_mod.score_citations(report, retrieved_urls)
@@ -512,6 +544,112 @@ def score_report_rubric(
         "format": round(format_reward, 4),
         "per_criterion": per_criterion,
     }
+
+
+def write_comparison_plot(
+    rows: list[tuple[str, float, list[dict]]], out_path: Path
+) -> None:
+    """Bar chart of mean rubric score per model, with 95% CI error bars.
+
+    Error bars are not decoration: at n=98 the resolvable difference is ~0.065, so
+    bars without them invite reading noise as a result.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = [r[0] for r in rows]
+    means = [r[1] for r in rows]
+    errs = []
+    for _, _, recs in rows:
+        vals = [x["scores"]["total"] for x in recs]
+        sd = statistics.stdev(vals) if len(vals) > 1 else 0.0
+        errs.append(1.96 * sd / math.sqrt(len(vals)) if vals else 0.0)
+
+    fig, ax = plt.subplots(figsize=(1.5 * len(rows) + 3, 5))
+    bars = ax.bar(
+        labels,
+        means,
+        yerr=errs,
+        capsize=5,
+        color="#4A7EBB",
+        edgecolor="black",
+        linewidth=0.6,
+    )
+    for b, m, n in zip(bars, means, [len(r[2]) for r in rows]):
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            b.get_height() + 0.02,
+            f"{m:.3f}\nn={n}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+    ax.set_ylabel("Rubric score (0-1)")
+    ax.set_ylim(0, max(m + e for m, e in zip(means, errs)) * 1.25)
+    ax.set_title("Deep research report quality (identical harness, same judge)")
+    ax.grid(axis="y", alpha=0.3)
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    print_msg(f"Plot saved to: {out_path}", "success")
+
+
+def write_compute_plot(
+    rows: list[tuple[str, float, list[dict]]], hours: dict, out_path: Path
+) -> None:
+    """Eval score against cumulative training compute, in measured GPU-hours.
+
+    One continuous line: base (no training) -> SFT -> successive RL checkpoints, so
+    the marginal return of each stage is visible rather than implied.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    pts = []
+    for label, mean, recs in rows:
+        if label not in hours:
+            continue
+        vals = [x["scores"]["total"] for x in recs]
+        sd = statistics.stdev(vals) if len(vals) > 1 else 0.0
+        err = 1.96 * sd / math.sqrt(len(vals)) if vals else 0.0
+        pts.append((float(hours[label]), mean, err, label))
+    pts.sort()
+    if not pts:
+        print_msg(
+            "No --compute-hours mapping matched any tag; skipping compute plot",
+            "warning",
+        )
+        return
+
+    x = [p[0] for p in pts]
+    y = [p[1] for p in pts]
+    e = [p[2] for p in pts]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.errorbar(
+        x,
+        y,
+        yerr=e,
+        marker="o",
+        capsize=4,
+        color="#4A7EBB",
+        linewidth=1.8,
+        markersize=7,
+    )
+    for xi, yi, _, lab in pts:
+        ax.annotate(
+            lab, (xi, yi), textcoords="offset points", xytext=(6, -12), fontsize=8
+        )
+    ax.set_xlabel("Cumulative training compute (GPU-hours, measured)")
+    ax.set_ylabel("Rubric score (0-1)")
+    ax.set_title("Report quality vs training compute")
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    print_msg(f"Compute plot saved to: {out_path}", "success")
 
 
 def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
@@ -563,6 +701,58 @@ def load_rubric_dataset(questions_path: str | None = None) -> list[dict]:
 
     print_msg(f"Loaded {len(questions)} rubric eval questions", "success")
     return questions
+
+
+def rescore_from_file(
+    source: Path,
+    results_file: Path,
+    judge_model: str,
+    parallel: int = 8,
+) -> dict:
+    """
+    Re-judge reports stored in a previous eval file, without new rollouts.
+
+    Used to change judge model or rubric without paying for rollouts again. Records
+    written before observations were persisted can only be re-scored blind, so the
+    grounding criterion is not comparable across the two record formats; the count of
+    records carrying observations is reported so that is visible rather than implicit.
+    """
+    rows = [json.loads(line) for line in source.open() if line.strip()]
+    with_obs = sum(1 for r in rows if r.get("observations"))
+    print_msg(
+        f"Re-scoring {len(rows)} reports from {source.name} with {judge_model} "
+        f"({with_obs}/{len(rows)} carry observations)",
+        "info",
+    )
+
+    def score_one(row: dict) -> dict:
+        scores = score_report_rubric(
+            row["question"],
+            row["response"],
+            judge_model,
+            observations=row.get("observations"),
+        )
+        return {**row, "scores": scores, "rescored_with": judge_model}
+
+    out = []
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        futures = {pool.submit(score_one, r): r for r in rows}
+        for i, fut in enumerate(as_completed(futures), 1):
+            out.append(fut.result())
+            if i % 10 == 0 or i == len(rows):
+                print_msg(f"  re-scored {i}/{len(rows)}", "info")
+
+    with results_file.open("w") as fh:
+        for r in out:
+            fh.write(json.dumps(r) + "\n")
+
+    keys = ("total", "rubric", "citation", "format")
+    return {
+        "total_questions": len(out),
+        "observations_present": with_obs,
+        "judge_model": judge_model,
+        **{f"mean_{k}": sum(r["scores"][k] for r in out) / len(out) for k in keys},
+    }
 
 
 def run_rubric_evaluation(
@@ -622,7 +812,7 @@ def run_rubric_evaluation(
             q_text = question["question"]
             session_id = generate_session_id()
             start_time = time.time()
-            response = invoke_agent_sync(
+            response, observations = invoke_agent_sync(
                 url=url,
                 prompt=q_text,
                 session_id=session_id,
@@ -630,7 +820,9 @@ def run_rubric_evaluation(
                 enabled_sources=question.get("enabled_sources"),
             )
             elapsed = time.time() - start_time
-            scores = score_report_rubric(q_text, response, judge_model)
+            scores = score_report_rubric(
+                q_text, response, judge_model, observations=observations
+            )
             return {
                 "question": q_text,
                 "response_length": len(response),
@@ -638,6 +830,10 @@ def run_rubric_evaluation(
                 # a full re-run of every baseline just to re-score, and there
                 # is no way to audit qualitatively what the model produced.
                 "response": response,
+                # Persist tool observations too. The grounding criterion is unscoreable
+                # without them, so a record lacking them can only ever be re-scored by a
+                # blind judge -- which is the weakness the grounding gate exists to fix.
+                "observations": observations,
                 "scores": scores,
                 "elapsed_seconds": round(elapsed, 2),
                 "metadata": question.get("metadata", {}),
@@ -897,7 +1093,7 @@ def _evaluate_single_question(
     q_text = question["question"]
 
     start_time = time.time()
-    response = invoke_agent_sync(
+    response, _observations = invoke_agent_sync(
         url=url,
         prompt=q_text,
         session_id=session_id,
@@ -1113,6 +1309,13 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         "Actual model is configured on the deployed agent.",
     )
     parser.add_argument(
+        "--rescore",
+        type=str,
+        default=None,
+        help="Path to an existing eval_rubric_*.jsonl; re-judge its stored reports "
+        "instead of running the agent (no rollouts, no endpoint needed)",
+    )
+    parser.add_argument(
         "--judge-model",
         type=str,
         default="global.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -1160,6 +1363,32 @@ Benchmark comparison from TTD-DR paper (arXiv:2507.16075):
         default=None,
         help="Path to rubric eval questions JSONL (default: test-scripts/results/sft_eval_questions.jsonl). "
         "Only used with --benchmark rubric.",
+    )
+    parser.add_argument(
+        "--plot",
+        type=str,
+        default=None,
+        help="With --compare: write a bar chart (with 95%% CIs) to this filename in results/.",
+    )
+    parser.add_argument(
+        "--plot-compute",
+        type=str,
+        default=None,
+        help="With --compare: write a score-vs-GPU-hours curve to this filename in results/.",
+    )
+    parser.add_argument(
+        "--compute-hours",
+        action="append",
+        default=[],
+        metavar="LABEL=HOURS",
+        help="Cumulative GPU-hours for a plot label, used by --plot-compute. Repeatable.",
+    )
+    parser.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        metavar="TAG=NAME",
+        help="Display name for a tag in --plot output. Repeatable.",
     )
     parser.add_argument(
         "--compare",
@@ -1238,6 +1467,8 @@ def main():
     # Compare mode (no agent invocation needed)
     if args.compare:
         tags = [t.strip() for t in args.compare.split(",")]
+        args.labels = dict(kv.split("=", 1) for kv in args.label)
+        plot_rows: list[tuple[str, float, list[dict]]] = []
         print(
             f"\n{'Tag':<25} {'Total':>8} {'Rubric':>8} {'Citation':>8} {'Format':>8} {'N':>5}"
         )
@@ -1263,15 +1494,28 @@ def main():
             print(
                 f"{tag:<25} {total:>8.3f} {rubric:>8.3f} {citation:>8.3f} {fmt:>8.3f} {len(results):>5}"
             )
+            plot_rows.append((args.labels.get(tag, tag), total, results))
         print()
+        if args.plot and plot_rows:
+            write_comparison_plot(plot_rows, output_dir / args.plot)
+        if args.plot_compute and plot_rows:
+            write_compute_plot(
+                plot_rows,
+                dict(kv.split("=", 1) for kv in args.compute_hours),
+                output_dir / args.plot_compute,
+            )
         return
 
     # Parse enabled tools
     enabled_sources = args.tools.split(",") if args.tools else None
 
-    # Set up connection
+    # Set up connection. --rescore re-judges stored reports, so it needs no runtime and
+    # no Cognito token; authenticating anyway would fail whenever creds have gone stale.
     auth_refresh_fn = None
-    if args.local:
+    url, headers = "", {}
+    if args.rescore:
+        print_msg(f"Re-scoring stored reports from {args.rescore}", "info")
+    elif args.local:
         print_msg("Using LOCAL agent (localhost:8080)", "info")
         url, headers = setup_local_connection()
     else:
@@ -1317,6 +1561,21 @@ def main():
 
     # Construct tag suffix for filenames
     tag_suffix = f"_{args.tag}" if args.tag else ""
+
+    # --- Re-score only: no rollouts, no dataset, no runtime ---
+    if args.rescore:
+        results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
+        all_metrics["rubric"] = rescore_from_file(
+            source=Path(args.rescore),
+            results_file=results_file,
+            judge_model=args.judge_model,
+            parallel=args.parallel,
+        )
+        print_section("RE-SCORE RESULTS")
+        for k, v in all_metrics["rubric"].items():
+            print(f"  {k}: {v}")
+        print(f"\nSaved to {results_file}")
+        return
 
     # --- GAIA Benchmark ---
     if args.benchmark in ("gaia", "both"):
@@ -1365,7 +1624,7 @@ def main():
         all_metrics["hle-search"] = metrics
 
     # --- Rubric Benchmark (report quality) ---
-    if args.benchmark == "rubric":
+    elif args.benchmark == "rubric":
         results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
         questions = load_rubric_dataset(args.rubric_questions)
 

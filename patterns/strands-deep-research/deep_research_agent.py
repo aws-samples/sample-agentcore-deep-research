@@ -18,6 +18,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from report_upload_hook import ReportS3UploadHook
 from strands import Agent
+from strands.agent.conversation_manager import NullConversationManager
 from strands.models import BedrockModel, CacheConfig
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
@@ -402,6 +403,11 @@ def create_deep_research_agent(
             system_prompt=system_prompt,
             tools=tools,
             model=model,
+        # NullConversationManager, not the Strands default. The default is
+        # SlidingWindowConversationManager(window_size=40); measured across 1,833 real
+        # episodes 86% exceed 40 messages (p50=45, max=75), so the default truncates
+        # mid-episode and can split a tool_use from its tool_result.
+        conversation_manager=NullConversationManager(),
             session_manager=session_manager,
             hooks=[report_upload_hook],
             trace_attributes={

@@ -1,22 +1,32 @@
 #!/bin/bash
-# Build and push training containers to ECR.
+# Build and push a training container to ECR.
+#
 # Usage:
-#   ./training/build_and_push.sh         # RL container (default)
-#   ./training/build_and_push.sh sft     # SFT container
+#   ./training/build_and_push.sh rl      # agentic RL (verl, FSDP engine)
+#   ./training/build_and_push.sh sft     # trajectory SFT (TRL)
+#
+# The stage is required rather than defaulted. The two images share a repository
+# but nothing else -- different base, different dependencies, different entry
+# point -- and a mistaken default overwrites the tag the other pipeline resolves,
+# which only shows up as a confusing runtime failure in the wrong stage.
 
 set -e
 
 REGION=${AWS_DEFAULT_REGION:-us-east-1}
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REPO_NAME="deep-research-rl-training"
-IMAGE_TAG=${1:-latest}
+IMAGE_TAG=${1:-}
 
-# Select Dockerfile based on tag
-if [ "${IMAGE_TAG}" = "sft" ]; then
-    DOCKERFILE="training/Dockerfile.sft"
-else
-    DOCKERFILE="training/Dockerfile"
-fi
+case "${IMAGE_TAG}" in
+    rl)  DOCKERFILE="training/Dockerfile" ;;
+    sft) DOCKERFILE="training/Dockerfile.sft" ;;
+    *)
+        echo "ERROR: specify the stage to build: rl or sft" >&2
+        echo "  ./training/build_and_push.sh rl    # agentic RL (verl)" >&2
+        echo "  ./training/build_and_push.sh sft   # trajectory SFT (TRL)" >&2
+        exit 1
+        ;;
+esac
 
 FULL_URI="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}"
 
@@ -61,7 +71,12 @@ if [ "${IMAGE_TAG}" = "sft" ]; then
 else
     echo "  uv run test-scripts/rl_train.py --image-uri ${FULL_URI} \\"
     echo "      --data <rl-prompts.jsonl> --agent-arn <RLAgentRuntimeArn> \\"
-    echo "      --s3-bucket <RLBucketName> --sft-job-name <sft-job> --model-type qwen3.5-9B"
+    echo "      --s3-bucket <RLBucketName>"
+    echo ""
+    echo "  Starting policy defaults to Qwen3.5-9B from the Hub. To start from your"
+    echo "  own SFT run instead, add ONE of:"
+    echo "      --sft-job-name <completed-sft-job>   (resolves its artifact for you)"
+    echo "      --model-id <hf-id or s3://.../model.tar.gz>"
 fi
 echo ""
 echo "Note: the image must be in the same region as the training job."

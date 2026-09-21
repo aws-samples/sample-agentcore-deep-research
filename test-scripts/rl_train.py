@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 """
-Launch agentic RL training for the deep research agent.
+Launch agentic RL fine-tuning for the deep research agent on SageMaker.
 
-Uploads training data to S3 and submits a SageMaker GRPO training job
-using AgentCore RL Toolkit (slime backend). The agent learns to write
-better research reports by using tools during training rollouts.
+Rollouts are full research episodes run by the agent on AgentCore Runtime, using
+the same code and Gateway tools as production. Reports are scored by the shared
+rubric in research_rubric.py and GRPO updates the policy from each group.
 
-Usage:
-    uv run test-scripts/rl_train.py \
-        --data test-scripts/results/rl_train_data.jsonl \
-        --agent-arn <RLAgentRuntimeArn> \
-        --s3-bucket <RLBucketName>
+    uv run test-scripts/rl_train.py \\
+        --data test-scripts/results/rl_prompts_5k.jsonl \\
+        --agent-arn <RLAgentRuntimeArn> \\
+        --s3-bucket <bucket-in-the-training-region> \\
+        --sft-job-name <completed-sft-job>
 
-Prerequisites:
-    - Deployed RL stack: cd infra-cdk && npm run deploy:rl
-    - Training container pushed: ./training/build_and_push.sh
-    - Training data JSONL (see README for format)
+Training configuration lives in verl's defaults and the toolkit's
+agentcore_grpo.yaml. Only what changes per run is exposed here.
 """
 
 import argparse
+import json
 import logging
 import os
-import sys
-from datetime import datetime, timezone
+import time
 from pathlib import Path
 
 import boto3
@@ -30,310 +28,181 @@ import boto3
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+# 4x L40S 48GB = 192 GB, no NVLink. ml.p5.48xlarge (8x H100 80GB = 640 GB, NVLink)
+INSTANCE_TYPE = "ml.g6e.12xlarge"  # smaller cards do not fit a 9B
+VAL_PROMPTS = 32  # verl requires a validation file; this is enough to track drift
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Launch agentic RL training for the deep research agent",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
 
-    parser.add_argument(
-        "--data", type=str, required=True, help="Training JSONL file path"
+def to_parquet(jsonl: Path, out: Path) -> None:
+    """
+    Write the train/val parquet pair verl reads.
+
+    One `payload` column holding the exact AgentCore invoke dict, authored against
+    rl_app.py's contract. PayloadDataset forwards it verbatim and synthesises the
+    chat-format `prompt` column verl's dataloader needs.
+    """
+    import pandas as pd
+
+    rows = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+    df = pd.DataFrame(
+        [
+            {
+                "payload": {
+                    "prompt": r["prompt"][0]["content"],
+                    "enabled_sources": r.get("enabled_sources", []),
+                }
+            }
+            for r in rows
+        ]
+    ).sample(frac=1.0, random_state=42)
+
+    out.mkdir(parents=True, exist_ok=True)
+    df.iloc[:VAL_PROMPTS].to_parquet(out / "rl_prompts_val.parquet", index=False)
+    df.iloc[VAL_PROMPTS:].to_parquet(out / "rl_prompts_train.parquet", index=False)
+    logger.info(f"Prompts: {len(df) - VAL_PROMPTS} train / {VAL_PROMPTS} val")
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--data", required=True, help="Prompt JSONL")
+    p.add_argument(
+        "--agent-arn", required=True, help="AgentCore Runtime ARN of the RL agent"
     )
-    parser.add_argument(
-        "--agent-arn",
-        type=str,
-        default=os.environ.get("AGENT_RUNTIME_ARN"),
-        help="AgentCore Runtime ARN of RL agent",
-    )
-    parser.add_argument(
-        "--s3-bucket",
-        type=str,
-        default=os.environ.get("RL_S3_BUCKET"),
-        help="S3 bucket for rollout results",
-    )
-    parser.add_argument(
-        "--hf-model-id",
-        type=str,
-        default="Qwen/Qwen3.5-4B",
-        help="Policy to start from: an HF Hub id or an S3 model.tar.gz "
-        "(default: Qwen/Qwen3.5-4B). Use --sft-job-name to continue from an SFT "
-        "run instead of naming the artifact by hand.",
-    )
-    parser.add_argument(
-        "--sft-job-name",
-        type=str,
-        default=None,
-        help="Continue RL from this completed SFT training job. Resolves the "
-        "job's model artifact and overrides --hf-model-id. This is the SFT -> RL "
-        "hand-off: the literature treats SFT purely as an RL cold start.",
-    )
-    parser.add_argument(
-        "--model-type",
-        type=str,
-        default="qwen3.5-4B",
-        help="Model type for SlimeRunner (default: qwen3.5-4B)",
-    )
-    parser.add_argument(
-        "--instance-type",
-        type=str,
-        default="ml.g5.12xlarge",
-        help="SageMaker instance type (default: ml.g5.12xlarge)",
-    )
-    parser.add_argument(
-        "--image-uri",
-        type=str,
-        default=None,
-        help="Training container ECR URI (default: auto-detect)",
-    )
-    parser.add_argument(
-        "--role-arn",
-        type=str,
-        default=None,
-        help="SageMaker execution role ARN (default: from CDK stack)",
-    )
-    parser.add_argument("--exp-id", type=str, default=None, help="Experiment ID")
-    parser.add_argument(
-        "--num-rollout", type=int, default=30, help="Training iterations (default: 30)"
-    )
-    parser.add_argument(
-        "--num-gpus", type=int, default=4, help="Number of GPUs (default: 4)"
-    )
-    parser.add_argument(
-        "--tp-size", type=int, default=2, help="Tensor parallel size (default: 2)"
-    )
-    parser.add_argument(
-        "--rollout-batch-size",
-        type=int,
-        default=8,
-        help="Rollout batch size (default: 8)",
-    )
-    parser.add_argument(
-        "--n-samples",
-        type=int,
-        default=4,
-        help="Samples per prompt for GRPO (default: 4)",
-    )
-    parser.add_argument(
-        "--max-response-len",
-        type=int,
-        default=16384,
-        help="Max response tokens per episode (default: 16384). A report is ~4,200 "
-        "tokens and a full episode generates ~10,300, so a small value truncates "
-        "the rollout before a report exists and every episode scores at the floor.",
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=1.0,
-        help="Sampling temperature (default: 1.0)",
-    )
-    parser.add_argument(
-        "--lr", type=float, default=1e-6, help="Learning rate (default: 1e-6)"
-    )
-    parser.add_argument(
-        "--max-concurrent",
-        type=int,
-        default=10,
-        help="Max concurrent ACR sessions (default: 10)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=900,
-        help="Per-rollout ACR timeout in seconds (default: 900)",
+    p.add_argument(
+        "--s3-bucket", required=True, help="Bucket for prompts and checkpoints"
     )
 
-    args = parser.parse_args()
+    src = p.add_mutually_exclusive_group()
+    src.add_argument(
+        "--sft-job-name", help="Start from this completed SFT job's checkpoint"
+    )
+    src.add_argument(
+        "--model-id",
+        default="Qwen/Qwen3.5-9B",
+        help="Starting policy: HF Hub id or s3://.../model.tar.gz",
+    )
 
-    # Validate required args
-    if not args.agent_arn:
-        logger.error(
-            "--agent-arn required (from `npm run deploy:rl` output: RLAgentRuntimeArn)"
-        )
-        sys.exit(1)
-    if not args.s3_bucket:
-        logger.error(
-            "--s3-bucket required (from `npm run deploy:rl` output: RLBucketName)"
-        )
-        sys.exit(1)
+    p.add_argument(
+        "--steps", type=int, default=1000, help="Training steps (default: 1000)"
+    )
+    p.add_argument(
+        "--group-size", type=int, default=8, help="Rollouts per prompt (default: 8)"
+    )
+    p.add_argument(
+        "--prompts-per-step", type=int, default=8, help="Prompts per step (default: 8)"
+    )
+    p.add_argument("--max-prompt-len", type=int, default=24576)
+    p.add_argument("--max-response-len", type=int, default=24576)
+    p.add_argument("--max-tokens-per-turn", type=int, default=4096)
+    # Matches train_entry.py. Each save gathers FSDP shards to materialise hf_model,
+    # which is a memory spike on top of a step that already fits in 44.4 GB -- saving
+    # more often than needed costs time and risks OOM.
+    p.add_argument("--save-freq", type=int, default=50)
+    p.add_argument("--lr", type=float, default=5e-6)
+    # LoRA frees the optimiser state and gradients that force param/optimizer offload
+    # in full-parameter mode, which is what caps us at 8 episodes/step. 0 = full FT.
+    p.add_argument("--lora-rank", type=int, default=0)
+    p.add_argument("--instance-type", default=INSTANCE_TYPE)
+    p.add_argument(
+        "--gpu-mem-fraction", type=float, default=0.4, help="vLLM's share of each GPU"
+    )
+    p.add_argument("--image-uri", help="Training image (default: :rl in this region)")
+    args = p.parse_args()
 
-    data_path = Path(args.data)
-    if not data_path.exists():
-        logger.error(f"Training data not found: {data_path}")
-        sys.exit(1)
-
-    num_records = sum(1 for _ in open(data_path))
-
-    # Determine training image URI
-    account = boto3.client("sts").get_caller_identity()["Account"]
     region = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
-    image_uri = (
-        args.image_uri
-        or f"{account}.dkr.ecr.{region}.amazonaws.com/deep-research-rl-training:latest"
-    )
+    data = Path(args.data)
+    if not data.exists():
+        raise FileNotFoundError(data)
 
-    logger.info(f"{'=' * 60}")
-    logger.info("GRPO TRAINING — SageMaker Job")
-    logger.info(f"{'=' * 60}")
-    logger.info(f"Agent ARN:     {args.agent_arn}")
-    logger.info(f"S3 bucket:     {args.s3_bucket}")
-    logger.info(f"Model:         {args.hf_model_id}")
-    logger.info(f"Data:          {data_path} ({num_records} prompts)")
-    logger.info(f"Instance:      {args.instance_type}")
-    logger.info(f"Image:         {image_uri}")
-    logger.info(f"Num rollouts:  {args.num_rollout}")
-    logger.info("")
-
-    # Resolve an SFT job to its artifact so RL can continue from it.
+    sm = boto3.client("sagemaker", region_name=region)
+    model_id = args.model_id
     if args.sft_job_name:
-        sm = boto3.client("sagemaker", region_name=region)
         job = sm.describe_training_job(TrainingJobName=args.sft_job_name)
-        status = job["TrainingJobStatus"]
-        if status != "Completed":
-            logger.error(
-                f"SFT job '{args.sft_job_name}' is '{status}', not 'Completed'"
+        if job["TrainingJobStatus"] != "Completed":
+            raise ValueError(
+                f"{args.sft_job_name} is {job['TrainingJobStatus']}, not Completed"
             )
-            sys.exit(1)
-        args.hf_model_id = job["ModelArtifacts"]["S3ModelArtifacts"]
-        logger.info(f"Continuing RL from SFT job {args.sft_job_name}")
-        logger.info(f"  policy artifact: {args.hf_model_id}")
+        model_id = job["ModelArtifacts"]["S3ModelArtifacts"]
+        logger.info(f"Policy from {args.sft_job_name}: {model_id}")
 
-    # Upload training data to S3
-    s3 = boto3.client("s3")
-    s3_data_key = f"training-data/{data_path.name}"
-    logger.info(f"Uploading training data to s3://{args.s3_bucket}/{s3_data_key}...")
-    s3.upload_file(str(data_path), args.s3_bucket, s3_data_key)
-
-    # Get config from CDK stack (role, VPC)
-    outputs = {}
-    training_role = args.role_arn
-    try:
-        cfn = boto3.client("cloudformation")
-        resp = cfn.describe_stacks(StackName="deep-research-rl")
-        outputs = {
-            o["OutputKey"]: o["OutputValue"] for o in resp["Stacks"][0]["Outputs"]
-        }
-        if not training_role:
-            training_role = outputs.get("RLTrainingRoleArn")
-    except Exception:
-        pass
-
-    if not training_role:
-        logger.error(
-            "--role-arn required (or deploy RL stack first: npm run deploy:rl)"
-        )
-        sys.exit(1)
-
-    # Launch SageMaker training job
-    exp_id = (
-        args.exp_id or f"dr-rl-{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    job_name = f"deep-research-rl-{time.strftime('%Y%m%d-%H%M%S')}"
+    account = boto3.client("sts").get_caller_identity()["Account"]
+    image = args.image_uri or (
+        f"{account}.dkr.ecr.{region}.amazonaws.com/deep-research-rl-training:rl"
     )
-    sagemaker = boto3.client("sagemaker", region_name=region)
-    job_name = (
-        f"deep-research-rl-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    )
-
-    hyperparameters = {
-        "agent_runtime_arn": args.agent_arn,
-        "s3_bucket": args.s3_bucket,
-        "exp_id": exp_id,
-        "model_type": args.model_type,
-        "hf_model_id": args.hf_model_id,
-        "num_rollout": str(args.num_rollout),
-        "num_gpus": str(args.num_gpus),
-        "tp_size": str(args.tp_size),
-        "rollout_batch_size": str(args.rollout_batch_size),
-        "n_samples_per_prompt": str(args.n_samples),
-        "rollout_max_response_len": str(args.max_response_len),
-        "rollout_temperature": str(args.temperature),
-        "lr": str(args.lr),
-        "max_concurrent": str(args.max_concurrent),
-        "acr_timeout": str(args.timeout),
+    stack = {
+        o["OutputKey"]: o["OutputValue"]
+        for o in boto3.client("cloudformation", region_name=region).describe_stacks(
+            StackName="deep-research-rl"
+        )["Stacks"][0]["Outputs"]
     }
 
-    # Get VPC config from CDK stack outputs
-    vpc_subnets = None
-    vpc_sg = None
-    try:
-        vpc_subnets = outputs.get("RLVpcSubnets", "").split(",")
-        vpc_sg = outputs.get("RLSecurityGroupId", "")
-    except Exception:
-        pass
+    to_parquet(data, Path("/tmp/rl_parquet"))
+    prefix = f"rl-data/{job_name}"
+    s3 = boto3.client("s3", region_name=region)
+    for f in Path("/tmp/rl_parquet").glob("*.parquet"):
+        s3.upload_file(str(f), args.s3_bucket, f"{prefix}/{f.name}")
 
-    training_params = {
-        "TrainingJobName": job_name,
-        "RoleArn": training_role,
-        "AlgorithmSpecification": {
-            "TrainingImage": image_uri,
-            "TrainingInputMode": "File",
-            "MetricDefinitions": [
-                {"Name": "train:loss", "Regex": r"'train/loss': ([0-9\.\-e]+)"},
-                {"Name": "train:pg_loss", "Regex": r"'train/pg_loss': ([0-9\.\-e]+)"},
-                {"Name": "train:kl_loss", "Regex": r"'train/kl_loss': ([0-9\.\-e]+)"},
-                {
-                    "Name": "train:grad_norm",
-                    "Regex": r"'train/grad_norm': ([0-9\.\-e]+)",
-                },
-                {"Name": "train:ppo_kl", "Regex": r"'train/ppo_kl': ([0-9\.\-e]+)"},
-                {"Name": "rollout:reward", "Regex": r"reward=([0-9\.\-]+)"},
-                {"Name": "rollout:traces", "Regex": r"traces=([0-9]+)"},
-            ],
+    logger.info(f"Launching {job_name}")
+    sm.create_training_job(
+        TrainingJobName=job_name,
+        AlgorithmSpecification={"TrainingImage": image, "TrainingInputMode": "File"},
+        RoleArn=stack["RLTrainingRoleArn"],
+        HyperParameters={
+            "model_id": model_id,
+            "agent_runtime_arn": args.agent_arn,
+            "s3_bucket": args.s3_bucket,
+            "group_size": str(args.group_size),
+            "prompts_per_step": str(args.prompts_per_step),
+            "total_steps": str(args.steps),
+            "max_prompt_len": str(args.max_prompt_len),
+            "max_response_len": str(args.max_response_len),
+            "max_tokens_per_turn": str(args.max_tokens_per_turn),
+            "save_freq": str(args.save_freq),
+            "lr": str(args.lr),
+            "lora_rank": str(args.lora_rank),
+            "gpu_mem_fraction": str(args.gpu_mem_fraction),
         },
-        "HyperParameters": hyperparameters,
-        "InputDataConfig": [
+        InputDataConfig=[
             {
                 "ChannelName": "training",
                 "DataSource": {
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
-                        "S3Uri": f"s3://{args.s3_bucket}/training-data/",
+                        "S3Uri": f"s3://{args.s3_bucket}/{prefix}/",
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
-            },
+            }
         ],
-        "OutputDataConfig": {
-            "S3OutputPath": f"s3://{args.s3_bucket}/checkpoints/",
+        OutputDataConfig={"S3OutputPath": f"s3://{args.s3_bucket}/checkpoints/"},
+        # Streams checkpoints to S3 during training. Without this they only appear
+        # when the job terminates, so a mid-run checkpoint cannot be evaluated.
+        CheckpointConfig={
+            "S3Uri": f"s3://{args.s3_bucket}/live-ckpt/{job_name}/",
+            "LocalPath": "/opt/ml/checkpoints",
         },
-        "ResourceConfig": {
+        ResourceConfig={
             "InstanceType": args.instance_type,
             "InstanceCount": 1,
-            "VolumeSizeInGB": 100,
+            "VolumeSizeInGB": 500,
         },
-        "StoppingCondition": {
-            "MaxRuntimeInSeconds": 14400,  # 4 hours max
+        StoppingCondition={"MaxRuntimeInSeconds": 432000},
+        # The agent calls the rollout gateway on the trainer's private IP, so the
+        # training job must sit in the same VPC as the agent runtime.
+        VpcConfig={
+            "SecurityGroupIds": [stack["RLSecurityGroupId"]],
+            "Subnets": [x for x in stack["RLVpcSubnets"].split(",") if x],
         },
-    }
+    )
 
-    # Add VPC config if available (required for agent <-> training connectivity)
-    if vpc_subnets and vpc_sg:
-        training_params["VpcConfig"] = {
-            "SecurityGroupIds": [vpc_sg],
-            "Subnets": [s for s in vpc_subnets if s],
-        }
-        logger.info(f"VPC config: subnets={vpc_subnets}, sg={vpc_sg}")
-
-    logger.info(f"Launching SageMaker job: {job_name}")
-    sagemaker.create_training_job(**training_params)
-    logger.info(f"✓ Job submitted: {job_name}")
     logger.info(
-        f"  Monitor: https://console.aws.amazon.com/sagemaker/home?region={region}#/jobs/{job_name}"
-    )
-    logger.info(f"  Output:  s3://{args.s3_bucket}/checkpoints/{job_name}/output/")
-    logger.info("")
-    logger.info("Once complete, deploy the fine-tuned model:")
-    logger.info(
-        f"  uv run test-scripts/deploy_model.py --job-name {job_name} \\\n"
-        "      --endpoint-name dr-rl --instance-type ml.g6e.16xlarge \\\n"
-        "      --tensor-parallel-degree 1 --max-model-len 65536 \\\n"
-        "      --tool-call-parser qwen3_coder --reasoning-parser qwen3 \\\n"
-        "      --enable-capacity-fallback --region us-west-2"
+        f"✓ {job_name}  ({args.group_size * args.prompts_per_step} episodes/step)"
     )
     logger.info(
-        "  (size the instance to the policy: a 9B in BF16 plus KV cache needs a "
-        "48GB card, not ml.g5.xlarge's 24GB)"
+        f"  https://console.aws.amazon.com/sagemaker/home?region={region}#/jobs/{job_name}"
     )
+    logger.info("  Read the first step's wall clock before trusting the step budget.")
 
 
 if __name__ == "__main__":

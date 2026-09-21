@@ -18,7 +18,6 @@ Deploy with:
     agentcore deploy --agent deep-research-rl
 """
 
-import json
 import os
 import re
 import traceback
@@ -32,6 +31,8 @@ import strands_compat
 from agentcore_rl_toolkit import AgentCoreRLApp, RewardFunction
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
+from strands.agent.conversation_manager import NullConversationManager
+from strands.hooks import AfterToolCallEvent, HookProvider
 from strands.models.openai import OpenAIModel
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
@@ -47,6 +48,10 @@ SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 # Where the system prompt instructs the agent to write its report. The reward is
 # computed from this file, not from the agent's closing chat message.
 REPORT_PATH = "/tmp/research_report.md"
+
+# Cap on each tool result. Matches --observation-chars used to build the SFT
+# trajectories; larger values overflow max_model_len mid-episode.
+OBSERVATION_CHARS = int(os.environ.get("OBSERVATION_CHARS", "1200"))
 
 # Default data sources for training rollouts. Key-free tools only: a source that
 # needs an API key fails intermittently if the key is absent or rate-limited, and
@@ -96,6 +101,7 @@ class DeepResearchReward(RewardFunction):
         ground_truth: str = "",
         user_input: str = "",
         retrieved_urls: set | None = None,
+        observations: list[str] | None = None,
         **kwargs,
     ) -> float:
         """Compute scalar reward for the report."""
@@ -103,6 +109,7 @@ class DeepResearchReward(RewardFunction):
             response_text=response_text,
             user_input=user_input,
             retrieved_urls=retrieved_urls,
+            observations=observations,
         )
         return total
 
@@ -111,6 +118,7 @@ class DeepResearchReward(RewardFunction):
         response_text: str = "",
         user_input: str = "",
         retrieved_urls: set | None = None,
+        observations: list[str] | None = None,
     ) -> tuple[float, dict]:
         """
         Reward plus its individual components.
@@ -125,7 +133,7 @@ class DeepResearchReward(RewardFunction):
         if not response_text or response_text.startswith("ERROR"):
             return 0.0, {"rubric": 0.0, "citation": 0.0, "format": 0.0}
 
-        rubric_reward = self._judge_rubric(user_input, response_text)
+        rubric_reward = self._judge_rubric(user_input, response_text, observations)
         citation_reward = research_rubric.score_citations(response_text, retrieved_urls)
         format_reward = research_rubric.score_format(response_text)
         total = research_rubric.combine(rubric_reward, citation_reward, format_reward)
@@ -135,7 +143,9 @@ class DeepResearchReward(RewardFunction):
             "format": format_reward,
         }
 
-    def _judge_rubric(self, question: str, report: str) -> float:
+    def _judge_rubric(
+        self, question: str, report: str, observations: list[str] | None = None
+    ) -> float:
         """
         Score report against the shared rubric using an LLM judge call.
 
@@ -159,6 +169,7 @@ class DeepResearchReward(RewardFunction):
             os.environ.get(
                 "JUDGE_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
             ),
+            observations=observations,
         )
         return score
 
@@ -219,6 +230,45 @@ def create_gateway_client(enabled_sources: list[str]) -> MCPClient:
     )
 
 
+class TruncateObservations(HookProvider):
+    """Cap every tool result, matching the SFT training distribution.
+
+    SFT trajectories were built with --observation-chars 1200. Untruncated, one web
+    search returns ~2900 chars, so the trajectory exhausts max_model_len before the
+    report is written: the agent emits its skeleton, researches, then dies on the
+    token limit leaving a 290-char report that scores 0. Hooked rather than wrapping
+    tool functions because Gateway tools are MCP-backed, not decorated functions.
+    """
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        # Collected so the reward can gate citations against what the tools actually
+        # returned, and so the judge can verify grounding. Without this the citation
+        # component scores URL well-formedness only, which rewards plausible invention.
+        self.observations: list[str] = []
+
+    def register_hooks(self, registry):
+        registry.add_callback(AfterToolCallEvent, self._cap)
+
+    def _cap(self, event) -> None:
+        for block in (event.result or {}).get("content", []):
+            text = block.get("text")
+            if not isinstance(text, str):
+                continue
+            if len(text) > self.limit:
+                # Tools append their URLs in a trailing "## Sources" block.
+                # Head-truncating would drop every URL, so the model could not cite
+                # anything and the citation metric would read as a model regression
+                # rather than a cap.
+                body, sep, sources = text.partition("\n\n## Sources")
+                kept = body[: self.limit]
+                block["text"] = (
+                    kept + f"\n[prose truncated at {self.limit} chars]" + sep + sources
+                )
+            # Record what the model actually saw, capped exactly as it was shown.
+            self.observations.append(block["text"])
+
+
 def read_report(path: str = REPORT_PATH) -> str:
     """
     Read the report the agent wrote.
@@ -261,6 +311,7 @@ def invoke_agent(payload: dict):
     model_id = cfg.get(
         "model_id", os.environ.get("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
     )
+    api_key = cfg.get("api_key") or "EMPTY"
     sampling_params = cfg.get(
         "sampling_params", {"temperature": 0.7, "max_tokens": 4096}
     )
@@ -274,7 +325,11 @@ def invoke_agent(payload: dict):
 
     # Create model pointing at training infrastructure's inference server
     model = OpenAIModel(
-        client_args={"api_key": "EMPTY", "base_url": base_url},
+        # The gateway keys trajectory capture off the api-key slot, so the session
+        # key the trainer supplies must be forwarded. With a placeholder the
+        # gateway captures no token ids, the rollout is treated as degenerate and
+        # scored 0 regardless of the reward the agent computed.
+        client_args={"api_key": api_key, "base_url": base_url},
         model_id=model_id,
         params=sampling_params,
     )
@@ -289,11 +344,18 @@ def invoke_agent(payload: dict):
     gateway_client = create_gateway_client(enabled_sources)
     tools.append(gateway_client)
 
+    observer = TruncateObservations(OBSERVATION_CHARS)
     agent = Agent(
         name="DeepResearchRL",
         system_prompt=system_prompt,
         tools=tools,
         model=model,
+        # NullConversationManager, not the Strands default. The default is
+        # SlidingWindowConversationManager(window_size=40); measured across 1,833 real
+        # episodes 86% exceed 40 messages (p50=45, max=75), so the default truncates
+        # mid-episode and can split a tool_use from its tool_result.
+        conversation_manager=NullConversationManager(),
+        hooks=[observer],
     )
 
     # Run the agent
@@ -325,9 +387,16 @@ def invoke_agent(payload: dict):
         traceback.print_exc()
         response_text = f"ERROR: {e}"
 
-    # Compute reward
+    # Compute reward. Passing observations activates the citation grounding gate and
+    # lets the judge check claims against retrieved text -- without them the reward is
+    # measurably easier to game than the metric it is supposed to approximate.
     reward, components = reward_fn.score(
-        response_text=response_text, user_input=prompt
+        response_text=response_text,
+        user_input=prompt,
+        retrieved_urls=set(
+            re.findall(r"https?://[^\s)\]\">]+", "\n".join(observer.observations))
+        ),
+        observations=observer.observations,
     )
     # One greppable line per episode, so component trends can be recovered from
     # training logs without re-running rollouts.

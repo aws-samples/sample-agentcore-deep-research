@@ -23,8 +23,8 @@ const amplifyStack = new ADRMainStack(app, props.stack_name_base, {
   },
 })
 
-// Deploy RL training infrastructure (optional, via `npm run deploy:rl`)
-new RLTrainingStack(app, `${props.stack_name_base}-rl`, {
+// Deploy RL training infrastructure (via `npm run deploy:rl`)
+const rlStack = new RLTrainingStack(app, `${props.stack_name_base}-rl`, {
   finetunedEndpointName: props.training?.finetuned_endpoint_name,
   mainStackName: props.stack_name_base,
   stagingBucketName: props.training?.staging_bucket_name,
@@ -37,5 +37,13 @@ new RLTrainingStack(app, `${props.stack_name_base}-rl`, {
     region: props.region || process.env.CDK_DEFAULT_REGION,
   },
 })
+
+// The RL stack reads the Cognito user pool and client ids the main stack writes
+// to SSM, so it cannot stand alone: deployed into a fresh account or region on
+// its own, those lookups resolve to nothing and the RL agent cannot authenticate
+// to Gateway -- it runs, gets no tools, and produces empty reports. Declaring the
+// dependency makes `cdk deploy deep-research-rl` bring the main stack with it, in
+// the right order, on every deploy path.
+rlStack.addDependency(amplifyStack)
 
 app.synth()

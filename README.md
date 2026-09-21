@@ -259,12 +259,11 @@ uv run test-scripts/sft_generate_data.py \
     --output test-scripts/results/sft_traces_1k.jsonl
 
 # 3. Deploy training infra and build the training image
-cd infra-cdk && npm run deploy:train && cd ..
+cd infra-cdk && npm run deploy:rl && cd ..
 ./training/build_and_push.sh sft
 
 # 4. Train (LoRA). ~37h for 1,963 trajectories x 2 epochs on 4x L40S.
 #    --lora-alpha defaults to 2x rank; do not pin it independently.
-#    Liger fused kernels are on by default (--use-liger-kernel 0 to disable).
 uv run test-scripts/sft_train.py \
     --data test-scripts/results/sft_traces_2k_fitted.jsonl \
     --s3-bucket <sagemaker-bucket-in-training-region> \
@@ -301,7 +300,7 @@ Train a small open model to produce better deep research reports than a larger f
 ```
 TRAINING (SageMaker ml.g5.12xlarge)
 ┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
-│  SlimeRunner (GRPO) │────►│  AgentCore Runtime       │────►│  AgentCore Gateway  │
+│  verl GRPO (FSDP)   │────►│  AgentCore Runtime       │────►│  AgentCore Gateway  │
 │  train.py on Ray    │     │  (RL agent with tools)   │     │  (Tavily, Nova,     │
 │                     │◄────│  returns rubric rewards   │     │   ArXiv, PubMed...) │
 └──────────┬──────────┘     └──────────────────────────┘     └─────────────────────┘
@@ -363,7 +362,7 @@ The `prompt` field is a chat-format message list. The `enabled_sources` field co
 
 ```bash
 # 1. Deploy RL training infrastructure (S3 bucket, RL agent runtime, IAM roles)
-cd infra-cdk && npm run deploy:train
+cd infra-cdk && npm run deploy:rl
 ```
 
 Note the stack outputs — you'll need `RLAgentRuntimeArn` and `RLBucketName`:
@@ -374,16 +373,15 @@ aws cloudformation describe-stacks --stack-name deep-research-rl \
 
 ```bash
 # 2. Build and push training container to ECR (builds for linux/amd64)
-./training/build_and_push.sh
+./training/build_and_push.sh rl
 
 # 3. Train with GRPO (launches SageMaker job, runs ~2-4 hours)
 uv run test-scripts/rl_train.py \
     --data test-scripts/results/rl_train_data.jsonl \
     --agent-arn <RLAgentRuntimeArn> \
     --s3-bucket <RLBucketName> \
-    --hf-model-id Qwen/Qwen2.5-3B-Instruct \
-    --model-type qwen2.5-3B \
-    --instance-type ml.g5.12xlarge
+    --sft-job-name <completed-sft-job> \
+    --instance-type ml.g6e.12xlarge
 
 # 4. Deploy fine-tuned model as a SageMaker endpoint (vLLM)
 uv run test-scripts/deploy_model.py --job-name <training-job-name> \
@@ -405,7 +403,7 @@ aws sagemaker describe-training-job --training-job-name <job-name> \
     --query '{Status:TrainingJobStatus,SecondaryStatus:SecondaryStatus}'
 ```
 
-The `--model-type` must match a slime model script (e.g., `qwen2.5-3B`, `qwen3-4B`). These define the model architecture args for Megatron. See the [slime model scripts](https://github.com/slimerl/slime/tree/main/scripts/models) for available types.
+Training runs on the [verl](https://github.com/volcengine/verl) backend with the FSDP engine, so the model architecture is read from `config.json` — there is no per-model script to maintain. Attention comes from HuggingFace transformers, which is what allows unusual head dimensions to train without a fused-kernel fallback.
 
 ### Reward function
 

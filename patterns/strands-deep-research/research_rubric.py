@@ -105,6 +105,16 @@ RUBRICS = [
     },
 ]
 
+# Prefix inserted when tool observations are available. Without it the judge cannot
+# verify grounding at all -- it can only see whether claims look attributed. Showing
+# the retrieved context is the fix DR Tulu (arXiv 2511.19399) recommends.
+SEARCH_CONTEXT_BLOCK = (
+    "The agent retrieved the following source material. Use it to verify the "
+    "report's specific claims. A claim that contradicts this material, or that "
+    "cannot be found in it, is NOT grounded however confidently it is stated.\n"
+    "-- retrieved source material --\n{context}\n-- end source material --\n\n"
+)
+
 RUBRIC_JUDGE_PROMPT = (
     "You are a strict evaluator of deep research reports. Score each criterion on "
     "a 1-10 scale.\n"
@@ -114,7 +124,7 @@ RUBRIC_JUDGE_PROMPT = (
     "Correct section headings and citation-shaped text are NOT evidence of "
     "quality: judge the substance beneath them. A well-formatted report whose "
     "claims are vague, generic, or unsupported must score low.\n\n"
-    "Question: {question}\n\nReport:\n{report}\n\nCriteria:\n{criteria}\n\n"
+    "Question: {question}\n\n{context_block}Report:\n{report}\n\nCriteria:\n{criteria}\n\n"
     "Return ONLY a JSON object mapping criterion index to integer score 1-10.\n"
     'Example: {{"0": 7, "1": 5, "2": 8, "3": 6, "4": 7, "5": 6}}'
 )
@@ -242,6 +252,8 @@ def score_rubric_with_judge(
     report: str,
     bedrock_client,
     judge_model: str,
+    observations: list[str] | None = None,
+    context_chars: int = 24000,
 ) -> tuple[float, dict]:
     """
     Run the LLM judge. Returns (normalized_score_0_1, per_criterion_dict).
@@ -249,13 +261,33 @@ def score_rubric_with_judge(
     Criteria are equally weighted; each is scored 1-10 and normalized by 10.
     """
     criteria_text = "\n".join(f"{i}. {r['criterion']}" for i, r in enumerate(RUBRICS))
+    context_block = ""
+    if observations:
+        joined = "\n\n".join(observations)
+        # Truncate the oldest observations rather than the newest: later searches are
+        # usually the ones the report's specific claims came from.
+        if len(joined) > context_chars:
+            joined = "[earlier results omitted]\n" + joined[-context_chars:]
+        context_block = SEARCH_CONTEXT_BLOCK.format(context=joined)
     prompt = RUBRIC_JUDGE_PROMPT.format(
-        question=question, report=report, criteria=criteria_text
+        question=question,
+        report=report,
+        criteria=criteria_text,
+        context_block=context_block,
     )
+    # Newer reasoning models reject `temperature` outright rather than ignoring it, so it
+    # is only sent to models that accept it. Judge determinism is unaffected: those models
+    # do not expose the knob at all.
+    # Reasoning models spend tokens thinking before emitting any text, so a 300-token cap
+    # returns an empty completion. They also reject `temperature` rather than ignoring it.
+    reasoning_judge = "opus-5" in judge_model or "sonnet-5" in judge_model
+    inference_config: dict = {"maxTokens": 4000 if reasoning_judge else 300}
+    if not reasoning_judge:
+        inference_config["temperature"] = 0.0
     resp = bedrock_client.converse(
         modelId=judge_model,
         messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 300, "temperature": 0.0},
+        inferenceConfig=inference_config,
     )
     text = "".join(
         block.get("text", "") for block in resp["output"]["message"]["content"]

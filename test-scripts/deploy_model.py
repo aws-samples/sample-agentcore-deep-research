@@ -114,6 +114,13 @@ def main():
     )
 
     parser.add_argument(
+        "--max-num-seqs",
+        type=int,
+        default=None,
+        help="Cap concurrent sequences. Required for hybrid models (Qwen3.5) whose "
+        "recurrent-state budget is below vLLM's default of 256.",
+    )
+    parser.add_argument(
         "--tool-call-parser",
         default=None,
         help="vLLM tool-call parser for the model family (e.g. qwen3_coder, "
@@ -207,6 +214,12 @@ def main():
         "SM_VLLM_ENABLE_AUTO_TOOL_CHOICE": "true",
         "SM_VLLM_ENABLE_LOG_REQUESTS": "true",
     }
+    # Qwen3.5 is hybrid attention/Gated-DeltaNet, so vLLM reserves a recurrent state
+    # block per sequence. When the model's block budget is below vLLM's default
+    # max_num_seqs (256) the engine refuses to start with "exceeds available Mamba
+    # cache blocks", which surfaces only as a failed ping health check.
+    if args.max_num_seqs:
+        env["SM_VLLM_MAX_NUM_SEQS"] = str(args.max_num_seqs)
     # Parsers are model-family specific — omit when not applicable so vLLM
     # falls back to its defaults instead of mis-parsing another family's format.
     if args.tool_call_parser:
