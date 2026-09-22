@@ -268,10 +268,11 @@ def score_rubric_with_judge(
     context_block = ""
     if observations:
         joined = "\n\n".join(observations)
-        # context_chars=None sends everything the agent retrieved. The cap exists only to
-        # bound judge input cost; a capped judge can mark an early-sourced claim ungrounded
-        # simply because the supporting snippet is no longer in view, which biases grounding
-        # down for agents that search more. Keep it constant across models being compared.
+        # context_chars=None sends everything the agent retrieved. The cap
+        # exists only to bound judge input cost; a capped judge can mark an
+        # early-sourced claim ungrounded simply because the supporting snippet
+        # is no longer in view, which biases grounding down for agents that
+        # search more. Keep it constant across models being compared.
         if context_chars and len(joined) > context_chars:
             # Drop whole observations, oldest first, rather than slicing mid-token.
             kept: list[str] = []
