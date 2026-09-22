@@ -257,7 +257,7 @@ def score_rubric_with_judge(
     bedrock_client,
     judge_model: str,
     observations: list[str] | None = None,
-    context_chars: int = 24000,
+    context_chars: int | None = 24000,
 ) -> tuple[float, dict]:
     """
     Run the LLM judge. Returns (normalized_score_0_1, per_criterion_dict).
@@ -268,10 +268,20 @@ def score_rubric_with_judge(
     context_block = ""
     if observations:
         joined = "\n\n".join(observations)
-        # Truncate the oldest observations rather than the newest: later searches are
-        # usually the ones the report's specific claims came from.
-        if len(joined) > context_chars:
-            joined = "[earlier results omitted]\n" + joined[-context_chars:]
+        # context_chars=None sends everything the agent retrieved. The cap exists only to
+        # bound judge input cost; a capped judge can mark an early-sourced claim ungrounded
+        # simply because the supporting snippet is no longer in view, which biases grounding
+        # down for agents that search more. Keep it constant across models being compared.
+        if context_chars and len(joined) > context_chars:
+            # Drop whole observations, oldest first, rather than slicing mid-token.
+            kept: list[str] = []
+            total = 0
+            for obs in reversed(observations):
+                if total + len(obs) > context_chars:
+                    break
+                kept.append(obs)
+                total += len(obs)
+            joined = "[earlier results omitted]\n" + "\n\n".join(reversed(kept))
         context_block = SEARCH_CONTEXT_BLOCK.format(context=joined)
     prompt = RUBRIC_JUDGE_PROMPT.format(
         question=question,
