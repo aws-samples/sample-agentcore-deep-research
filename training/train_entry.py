@@ -14,7 +14,9 @@ import os
 import subprocess
 import sys
 import tarfile
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 OUTPUT_DIR = os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
 DATA_DIR = os.environ.get("SM_CHANNEL_TRAINING", "/opt/ml/input/data/training")
@@ -31,7 +33,7 @@ GPUS = 4
 ROLLOUT_TP = 2  # TP=4 pays per-layer all-reduce over PCIe for no gain
 
 
-def hp(name: str, default=None, cast=str):
+def hp(name: str, default: Any = None, cast: Callable[[str], Any] = str) -> Any:
     """Read a SageMaker hyperparameter."""
     raw = _HP.get(name, os.environ.get(f"SM_HP_{name.upper()}"))
     return default if raw is None or raw == "" else cast(raw)
@@ -46,7 +48,7 @@ def resolve_policy(model_id: str) -> str:
         from huggingface_hub import snapshot_download
 
         print(f"Downloading {model_id}", flush=True)
-        return snapshot_download(repo_id=model_id, local_dir=MODEL_CACHE)
+        return str(snapshot_download(repo_id=model_id, local_dir=MODEL_CACHE))
 
     if not model_id.endswith(".tar.gz"):
         raise ValueError(f"S3 policy must be a .tar.gz, got {model_id}")
@@ -104,7 +106,7 @@ def main() -> None:
     # The AgentCore integration is one of verl's agent loops, configured by file
     # rather than hydra override. Generated here so the ARN and bucket come from
     # hyperparameters instead of committed config or environment plumbing.
-    loop_config = Path("/tmp/agentcore_agent.yaml")
+    loop_config = Path("/tmp/agentcore_agent.yaml")  # noqa: S108  # nosec B108
     loop_config.write_text(
         "- name: agentcore_agent\n"
         "  _target_: agentcore_rl_toolkit.backends.verl.agent_loop.AgentCoreAgentLoop\n"
@@ -135,7 +137,8 @@ def main() -> None:
                 f"actor_rollout_ref.model.lora_rank={lora_rank}",
                 f"actor_rollout_ref.model.lora_alpha={lora_rank * 2}",
                 "actor_rollout_ref.model.target_modules=all-linear",
-                # vLLM must serve the adapter during rollouts, else generation uses base weights
+                # vLLM must serve the adapter during rollouts, else generation uses
+                # base weights
                 "actor_rollout_ref.rollout.load_format=safetensors",
                 f"actor_rollout_ref.rollout.max_lora_rank={lora_rank}",
             ]
@@ -155,8 +158,8 @@ def main() -> None:
         # gradients: 19.2GB/card for a 9B, against ~26GB left after vLLM. bf16
         # halves it; mixed precision already reduces gradients in fp32.
         "actor_rollout_ref.actor.fsdp_config.model_dtype=bf16",
-        f"actor_rollout_ref.actor.fsdp_config.param_offload={str(lora_rank == 0).lower()}",
-        f"actor_rollout_ref.actor.fsdp_config.optimizer_offload={str(lora_rank == 0).lower()}",
+        f"actor_rollout_ref.actor.fsdp_config.param_offload={str(lora_rank == 0).lower()}",  # noqa: E501
+        f"actor_rollout_ref.actor.fsdp_config.optimizer_offload={str(lora_rank == 0).lower()}",  # noqa: E501
         # No KL term, so no reference policy: a second 9B does not fit, and KL-free
         # GRPO is standard in DAPO and Dr.GRPO.
         "actor_rollout_ref.actor.use_kl_loss=False",
@@ -174,7 +177,7 @@ def main() -> None:
         # Qwen3.5 is a hybrid attention/Gated-DeltaNet model, so vLLM reserves a
         # recurrent-state cache block per sequence. The 1024 default exceeds what
         # fits at our memory fraction; we only need group_size * prompts_per_step.
-        f"actor_rollout_ref.rollout.max_num_seqs={max(16, group_size * prompts_per_step)}",
+        f"actor_rollout_ref.rollout.max_num_seqs={max(16, group_size * prompts_per_step)}",  # noqa: E501
         "actor_rollout_ref.rollout.agent.default_agent_loop=agentcore_agent",
         f"actor_rollout_ref.rollout.agent.agent_loop_config_path={loop_config}",
         f"trainer.n_gpus_per_node={GPUS}",

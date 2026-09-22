@@ -137,10 +137,10 @@ def main() -> None:
         )["Stacks"][0]["Outputs"]
     }
 
-    to_parquet(data, Path("/tmp/rl_parquet"))
+    to_parquet(data, Path("/tmp/rl_parquet"))  # noqa: S108  # nosec B108
     prefix = f"rl-data/{job_name}"
     s3 = boto3.client("s3", region_name=region)
-    for f in Path("/tmp/rl_parquet").glob("*.parquet"):
+    for f in Path("/tmp/rl_parquet").glob("*.parquet"):  # noqa: S108  # nosec B108
         s3.upload_file(str(f), args.s3_bucket, f"{prefix}/{f.name}")
 
     logger.info(f"Launching {job_name}")

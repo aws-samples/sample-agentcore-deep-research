@@ -221,7 +221,7 @@ def main():
     if args.max_num_seqs:
         env["SM_VLLM_MAX_NUM_SEQS"] = str(args.max_num_seqs)
     # Parsers are model-family specific — omit when not applicable so vLLM
-    # falls back to its defaults instead of mis-parsing another family's format.
+    # falls back to its defaults instead of misreading another family's format.
     if args.tool_call_parser:
         env["SM_VLLM_TOOL_CALL_PARSER"] = args.tool_call_parser
     if args.reasoning_parser:

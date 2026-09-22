@@ -218,9 +218,7 @@ export class RLTrainingStack extends cdk.Stack {
         // scoring the agent's narration instead of its report. That made a
         // self-hosted model appear to score 0.000 on format while its actual
         // written report scored 1.0.
-        ...(props?.stagingBucketName
-          ? { STAGING_BUCKET_NAME: props.stagingBucketName }
-          : {}),
+        ...(props?.stagingBucketName ? { STAGING_BUCKET_NAME: props.stagingBucketName } : {}),
         // Keep the tool gating identical to the production agent, otherwise the
         // two runtimes expose different tool sets and are not comparable.
         ...(props?.toolsConfig ? { TOOLS_CONFIG: props.toolsConfig } : {}),

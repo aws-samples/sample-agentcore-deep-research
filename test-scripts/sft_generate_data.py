@@ -82,7 +82,7 @@ def extract_stream_error(stream_text: str) -> str:
 def backoff_delay(attempt: int) -> float:
     """Compute exponential backoff with jitter."""
     delay = min(INITIAL_BACKOFF * (BACKOFF_MULTIPLIER**attempt), MAX_BACKOFF)
-    jitter = delay * JITTER_FACTOR * (2 * random.random() - 1)
+    jitter = delay * JITTER_FACTOR * (2 * random.random() - 1)  # noqa: S311
     return max(0.5, delay + jitter)
 
 

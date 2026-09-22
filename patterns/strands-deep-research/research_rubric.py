@@ -124,7 +124,8 @@ RUBRIC_JUDGE_PROMPT = (
     "Correct section headings and citation-shaped text are NOT evidence of "
     "quality: judge the substance beneath them. A well-formatted report whose "
     "claims are vague, generic, or unsupported must score low.\n\n"
-    "Question: {question}\n\n{context_block}Report:\n{report}\n\nCriteria:\n{criteria}\n\n"
+    "Question: {question}\n\n{context_block}Report:\n{report}\n\n"
+    "Criteria:\n{criteria}\n\n"
     "Return ONLY a JSON object mapping criterion index to integer score 1-10.\n"
     'Example: {{"0": 7, "1": 5, "2": 8, "3": 6, "4": 7, "5": 6}}'
 )
@@ -222,7 +223,10 @@ def score_format(report: str) -> float:
 
     def has_section(*keywords: str) -> bool:
         for title, body in sections.items():
-            if any(k in title for k in keywords) and len(body.strip()) >= SECTION_MIN_CHARS:
+            if (
+                any(k in title for k in keywords)
+                and len(body.strip()) >= SECTION_MIN_CHARS
+            ):
                 return True
         return False
 
@@ -241,7 +245,7 @@ class RubricJudgeError(RuntimeError):
     The judge could not be scored — as distinct from scoring zero.
 
     Raised rather than returning 0.0 because the two are not interchangeable: a
-    throttled or unparseable judge is missing data, while 0.0 is a claim about
+    throttled or unparsable judge is missing data, while 0.0 is a claim about
     report quality. Conflating them corrupts eval means and, in RL, becomes a
     false training label.
     """
@@ -275,11 +279,12 @@ def score_rubric_with_judge(
         criteria=criteria_text,
         context_block=context_block,
     )
-    # Newer reasoning models reject `temperature` outright rather than ignoring it, so it
-    # is only sent to models that accept it. Judge determinism is unaffected: those models
-    # do not expose the knob at all.
-    # Reasoning models spend tokens thinking before emitting any text, so a 300-token cap
-    # returns an empty completion. They also reject `temperature` rather than ignoring it.
+    # Newer reasoning models reject `temperature` outright rather than ignoring it,
+    # so it is only sent to models that accept it. Judge determinism is unaffected:
+    # those models do not expose the knob at all.
+    # Reasoning models spend tokens thinking before emitting any text, so a 300-token
+    # cap returns an empty completion. They also reject `temperature` rather than
+    # ignoring it.
     reasoning_judge = "opus-5" in judge_model or "sonnet-5" in judge_model
     inference_config: dict = {"maxTokens": 4000 if reasoning_judge else 300}
     if not reasoning_judge:

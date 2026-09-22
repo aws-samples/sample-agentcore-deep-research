@@ -134,13 +134,11 @@ export class ConfigManager {
         },
         tools,
         training: {
-          finetuned_endpoint_name:
-            parsedConfig.training?.finetuned_endpoint_name || "dr-finetuned",
+          finetuned_endpoint_name: parsedConfig.training?.finetuned_endpoint_name || "dr-finetuned",
           instance_type: parsedConfig.training?.instance_type || "ml.g5.12xlarge",
           staging_bucket_name: parsedConfig.training?.staging_bucket_name,
           sagemaker_max_tokens: parsedConfig.training?.sagemaker_max_tokens ?? 16384,
-          sagemaker_enable_thinking:
-            parsedConfig.training?.sagemaker_enable_thinking ?? false,
+          sagemaker_enable_thinking: parsedConfig.training?.sagemaker_enable_thinking ?? false,
           sagemaker_temperature: parsedConfig.training?.sagemaker_temperature ?? 0.0,
         },
       }

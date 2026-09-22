@@ -47,7 +47,7 @@ SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.txt"
 
 # Where the system prompt instructs the agent to write its report. The reward is
 # computed from this file, not from the agent's closing chat message.
-REPORT_PATH = "/tmp/research_report.md"
+REPORT_PATH = "/tmp/research_report.md"  # noqa: S108  # nosec B108
 
 # Cap on each tool result. Matches --observation-chars used to build the SFT
 # trajectories; larger values overflow max_model_len mid-episode.
@@ -149,7 +149,7 @@ class DeepResearchReward(RewardFunction):
         """
         Score report against the shared rubric using an LLM judge call.
 
-        Deliberately does not catch judge failures. A throttled or unparseable
+        Deliberately does not catch judge failures. A throttled or unparsable
         judge is missing data, and returning 0.0 would hand GRPO a false label
         saying this report is worthless — which is worse than a failed rollout,
         because it is indistinguishable from signal. Throttling also correlates
@@ -382,10 +382,18 @@ def invoke_agent(payload: dict):
                 "Reward will be near zero.",
                 flush=True,
             )
-    except Exception as e:
-        print(f"[RL] Agent failed: {e}")
+    except Exception:
+        # Do not convert an agent failure into a reward. A throttle, gateway error or
+        # timeout is missing data, and scoring it ~0.08 tells GRPO the policy produced
+        # something worthless -- a false label, and a biased one, because failures
+        # correlate with rollout concurrency and with long episodes. Raising loses the
+        # rollout instead, which is the same choice already made for judge failures.
+        #
+        # Note this is only for exceptions. An agent that ran fine but wrote no report
+        # did fail at the task, and its near-floor reward is correct signal.
+        print("[RL] Agent failed; losing this rollout rather than labelling it:")
         traceback.print_exc()
-        response_text = f"ERROR: {e}"
+        raise
 
     # Compute reward. Passing observations activates the citation grounding gate and
     # lets the judge check claims against retrieved text -- without them the reward is

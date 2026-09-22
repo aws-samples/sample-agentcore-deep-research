@@ -112,7 +112,7 @@ def fetch_url(url: str, max_chars: int = MAX_CHARS) -> str:
         )
         opener = urllib.request.build_opener(_NoRedirect)
         # _NoRedirect makes urllib raise on 3xx instead of following, so the redirect
-        # arrives as an HTTPError -- which is itself a readable response carrying Location.
+        # arrives as an HTTPError -- itself a readable response carrying Location.
         try:
             response = opener.open(request, timeout=TIMEOUT_SECONDS)
         except HTTPError as exc:

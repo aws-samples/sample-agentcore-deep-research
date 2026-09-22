@@ -10,6 +10,7 @@ from pathlib import Path
 # Bypass tool confirmation prompts for headless operation in AgentCore Runtime
 os.environ["BYPASS_TOOL_CONSENT"] = "true"
 
+import strands_compat
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
 from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
@@ -23,7 +24,6 @@ from strands.models import BedrockModel, CacheConfig
 from strands.tools.mcp import MCPClient
 from strands_tools import editor, file_read, file_write
 from utils.auth import extract_user_id_from_context, get_gateway_access_token
-import strands_compat
 from utils.inference import (
     get_bedrock_config,
     get_inference_configs,
@@ -309,7 +309,9 @@ def create_deep_research_agent(
         #     (measured: 12% tool error rate, 5/19 failed `editor` calls);
         #   - thinking tokens consumed part of that same small budget.
         sm_max_tokens = int(os.environ.get("SAGEMAKER_MAX_TOKENS", "16384"))
-        sm_thinking = os.environ.get("SAGEMAKER_ENABLE_THINKING", "false").lower() == "true"
+        sm_thinking = (
+            os.environ.get("SAGEMAKER_ENABLE_THINKING", "false").lower() == "true"
+        )
         # Do NOT inherit INFERENCE_CONFIG["temperature"] here. That value is
         # forced to 1.0 because Anthropic *requires* temperature 1.0 in extended
         # thinking mode — a constraint of the Bedrock models, not of a
@@ -403,11 +405,11 @@ def create_deep_research_agent(
             system_prompt=system_prompt,
             tools=tools,
             model=model,
-        # NullConversationManager, not the Strands default. The default is
-        # SlidingWindowConversationManager(window_size=40); measured across 1,833 real
-        # episodes 86% exceed 40 messages (p50=45, max=75), so the default truncates
-        # mid-episode and can split a tool_use from its tool_result.
-        conversation_manager=NullConversationManager(),
+            # NullConversationManager, not the Strands default. The default is
+            # SlidingWindowConversationManager(window_size=40); measured across 1,833
+            # real episodes 86% exceed 40 messages (p50=45, max=75), so the default
+            # truncates mid-episode and can split a tool_use from its tool_result.
+            conversation_manager=NullConversationManager(),
             session_manager=session_manager,
             hooks=[report_upload_hook],
             trace_attributes={

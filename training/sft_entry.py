@@ -11,7 +11,9 @@ import os
 import shutil
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import torch
 
@@ -27,7 +29,9 @@ if os.path.exists(HP_FILE):
         hyperparameters = json.load(f)
 
 
-def get_hp(key, default=None, cast=None):
+def get_hp(
+    key: str, default: Any = None, cast: Callable[[Any], Any] | None = None
+) -> Any:
     val = hyperparameters.get(key, os.environ.get(f"SM_HP_{key.upper()}", default))
     if val is not None and cast is not None:
         val = cast(val)
@@ -64,7 +68,7 @@ def log_mem(tag: str) -> None:
     )
 
 
-def log_sharding(model) -> None:
+def log_sharding(model: Any) -> None:
     """Confirm parameters are sharded across GPUs rather than replicated.
 
     With FSDP2/DTensor, `p.numel()` reports the GLOBAL shape and there is no
@@ -75,7 +79,7 @@ def log_sharding(model) -> None:
     try:
         from torch.distributed.tensor import DTensor
     except ImportError:
-        DTensor = ()  # type: ignore[assignment]
+        DTensor = ()  # type: ignore[assignment]  # noqa: N806
 
     global_elems = local_elems = 0
     for p in model.parameters():
@@ -94,7 +98,7 @@ def log_sharding(model) -> None:
     )
 
 
-def main():
+def main() -> None:
     from datasets import load_dataset
     from huggingface_hub import snapshot_download
     from peft import LoraConfig
@@ -340,7 +344,8 @@ def main():
     print(
         f"[CONFIG] max_length={getattr(ta, 'max_length', None)} "
         f"max_steps={ta.max_steps} epochs={ta.num_train_epochs} "
-        f"batch={ta.per_device_train_batch_size} grad_accum={ta.gradient_accumulation_steps} "
+        f"batch={ta.per_device_train_batch_size} "
+        f"grad_accum={ta.gradient_accumulation_steps} "
         f"grad_ckpt={ta.gradient_checkpointing} "
         f"assistant_only_loss={getattr(ta, 'assistant_only_loss', None)} "
         f"fsdp={ta.fsdp} world_size={ta.world_size}",
@@ -370,7 +375,9 @@ def main():
     from transformers import TrainerCallback
 
     class MemCallback(TrainerCallback):
-        def on_step_end(self, args, state, control, **kwargs):
+        def on_step_end(
+            self, args: Any, state: Any, control: Any, **kwargs: Any
+        ) -> None:
             if state.global_step == 1 or state.global_step % 10 == 0:
                 log_mem(f"step {state.global_step}")
 
@@ -464,7 +471,8 @@ def main():
     weights = list(Path(OUTPUT_DIR).glob("*.safetensors"))
     if missing or not weights:
         raise RuntimeError(
-            f"Incomplete checkpoint in {OUTPUT_DIR}: missing {missing or 'no .safetensors'}. "
+            f"Incomplete checkpoint in {OUTPUT_DIR}: "
+            f"missing {missing or 'no .safetensors'}. "
             f"Contents: {sorted(f.name for f in Path(OUTPUT_DIR).iterdir())[:20]}"
         )
 

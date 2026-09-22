@@ -577,7 +577,7 @@ def write_comparison_plot(
         edgecolor="black",
         linewidth=0.6,
     )
-    for b, m, n in zip(bars, means, [len(r[2]) for r in rows]):
+    for b, m, n in zip(bars, means, [len(r[2]) for r in rows], strict=False):
         ax.text(
             b.get_x() + b.get_width() / 2,
             b.get_height() + 0.02,
@@ -587,7 +587,7 @@ def write_comparison_plot(
             fontsize=9,
         )
     ax.set_ylabel("Rubric score (0-1)")
-    ax.set_ylim(0, max(m + e for m, e in zip(means, errs)) * 1.25)
+    ax.set_ylim(0, max(m + e for m, e in zip(means, errs, strict=False)) * 1.25)
     ax.set_title("Deep research report quality (identical harness, same judge)")
     ax.grid(axis="y", alpha=0.3)
     plt.xticks(rotation=20, ha="right")
@@ -793,9 +793,16 @@ def run_rubric_evaluation(
             for line in f:
                 try:
                     r = json.loads(line)
-                    completed_questions.add(r.get("question", ""))
                 except json.JSONDecodeError:
                     continue
+                # A failed rollout is not a result. Counting one as complete bakes a
+                # zero into the mean and makes an infrastructure failure -- expired
+                # credentials, a dropped connection -- look like a bad model. Leave
+                # these out of the completed set so a resume retries them.
+                resp = r.get("response") or ""
+                if resp.startswith("ERROR") or len(resp) < 500:
+                    continue
+                completed_questions.add(r.get("question", ""))
         if completed_questions:
             print_msg(f"Resuming: {len(completed_questions)} already scored", "info")
 
@@ -1625,7 +1632,11 @@ def main():
 
     # --- Rubric Benchmark (report quality) ---
     elif args.benchmark == "rubric":
-        results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
+        # Resume matters here because a full run can outlast a credential lifetime.
+        if args.resume and "rubric" in args.resume:
+            results_file = Path(args.resume)
+        else:
+            results_file = output_dir / f"eval_rubric_{run_timestamp}{tag_suffix}.jsonl"
         questions = load_rubric_dataset(args.rubric_questions)
 
         metrics = run_rubric_evaluation(
