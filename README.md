@@ -159,20 +159,25 @@ SFT, then serve it self-hosted. The student learns the full agentic trajectory �
 which tools to call, in what order, how to build a report incrementally, and how
 to cite sources — not just what a finished report looks like.
 
-**Measured result** (98-question benchmark, identical harness for every model,
-same judge, greedy sampling for both Qwen runs):
+**Measured result** (98 held-out questions, identical harness for every model:
+same agent code, same tools, same prompt, same judge, greedy decoding):
 
-| Model | Score | Rubric | Citation | Format |
-|---|--:|--:|--:|--:|
-| Teacher model (frontier) | 0.738 | 0.677 | 0.971 | 1.000 |
-| Mid-size reference model | 0.654 | 0.590 | 0.822 | 1.000 |
-| **Qwen3.5-9B + trajectory SFT** | **0.616** | 0.558 | 0.917 | 0.778 |
-| Qwen3.5-9B base | 0.487 | 0.458 | 0.247 | 0.957 |
+| Stage | Score | Rubric | Citation | Format | Training compute |
+|---|--:|--:|--:|--:|--:|
+| Qwen3.5-9B base | 0.538 | 0.524 | 0.308 | 0.990 | — |
+| **Qwen3.5-9B + trajectory SFT** | **0.744** | 0.687 | 0.953 | 0.986 | 138 GPU-h |
+| Teacher model (frontier) | 0.743 | 0.683 | 0.966 | 1.000 | — |
 
-SFT closes 58% of the base→teacher gap (+0.127, 95% CI [+0.088, +0.165], 72 wins
-/ 16 losses / 1 tie, sign test p=1.2e-09). Nearly all of the gain is citation
-quality: the base model emits unresolvable bare domains, the distilled model
-learned the teacher's habit of citing full URLs.
+Trajectory SFT gains **+0.208** over the base model (95% CI [+0.174, +0.242],
+p=1.2e-20, 92 wins / 6 losses). Most of that is provenance: citation validity
+moves 0.308 → 0.953, measured by a deterministic check against the URLs the tools
+actually returned, so it needs no judge at all. The base model emits unresolvable
+bare domains; the distilled model cites pages it genuinely retrieved.
+
+One caveat on the teacher comparison. The judge is the same model used for the RL
+reward below, chosen because it is cheap enough to run inside a training loop
+rather than because it is the strongest available evaluator. Scored by a larger
+independent judge every score drops and the teacher's lead widens.
 
 ### Why trajectories, not final reports
 
@@ -291,14 +296,34 @@ uv run test-scripts/eval-agent.py --benchmark rubric --max-questions 98 \
 
 ## 🧠 RL Fine-Tuning (Experimental)
 
-Train a small open model to produce better deep research reports than a larger frontier model using reinforcement learning with rubric-based rewards, powered by [AgentCore RL Toolkit](https://github.com/awslabs/agentcore-rl-toolkit).
+Sharpen the distilled model against a rubric reward using GRPO, powered by [AgentCore RL Toolkit](https://github.com/awslabs/agentcore-rl-toolkit) with the [verl](https://github.com/volcengine/verl) backend.
 
-**Goal:** A fine-tuned small model that beats a larger frontier model on report quality at a fraction of the inference cost.
+RL runs on top of an [SFT checkpoint](#-sft-distillation-experimental), not the base model, so run that stage first.
+
+**Measured result** (same 98 questions, same harness and judge as the SFT table above):
+
+| Stage | Score | Rubric | Citation | Format | Training compute |
+|---|--:|--:|--:|--:|--:|
+| Qwen3.5-9B + trajectory SFT | 0.744 | 0.687 | 0.953 | 0.986 | 138 GPU-h |
+| + GRPO, 50 steps | 0.772 | 0.726 | 0.906 | 1.000 | 168 GPU-h |
+| + GRPO, 100 steps | 0.770 | 0.721 | 0.929 | 1.000 | 198 GPU-h |
+| **+ GRPO, 150 steps** | **0.782** | 0.737 | 0.919 | 1.000 | 228 GPU-h |
+| + GRPO, 200 steps | 0.677 | 0.604 | 0.946 | 0.980 | 258 GPU-h |
+| Teacher model (frontier) | 0.743 | 0.683 | 0.966 | 1.000 | — |
+
+GRPO adds **+0.038** over SFT by step 150 (95% CI [+0.016, +0.060], p=0.001),
+then over-optimises: by step 200 the score falls to 0.677, which is 0.104 below
+step 150 (p<0.0001) and below SFT. The in-training reward was still climbing at
+that point, so the reward gave no warning. The failure is not uniform
+degradation — median report length barely moves, but reports scoring under 0.5 on
+the rubric jump from 4 to 20 out of 98. Checkpoint often (`--save-freq`) and
+evaluate every checkpoint; a rising training reward is not evidence that the
+policy is still improving.
 
 ### How it works
 
 ```
-TRAINING (SageMaker ml.g5.12xlarge)
+TRAINING (SageMaker ml.g6e.12xlarge — 4× L40S 48GB)
 ┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
 │  verl GRPO (FSDP)   │────►│  AgentCore Runtime       │────►│  AgentCore Gateway  │
 │  train.py on Ray    │     │  (RL agent with tools)   │     │  (Tavily, Nova,     │
@@ -313,7 +338,7 @@ TRAINING (SageMaker ml.g5.12xlarge)
 │  S3 Bucket          │
 └──────────┬──────────┘
            │
-INFERENCE (SageMaker ml.g5.xlarge)
+INFERENCE (SageMaker ml.g6e.16xlarge — 1× L40S 48GB)
            ▼
 ┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
 │  SageMaker Endpoint │◄────│  AgentCore Runtime       │────►│  AgentCore Gateway  │
@@ -331,7 +356,7 @@ Each training step: prompts → agent produces full research reports using tools
 ### Prerequisites
 
 - Deployed deep research stack (`npm run deploy` from `infra-cdk/`)
-- AWS account with SageMaker GPU quota (`ml.g5.12xlarge` for training jobs — 4× A10G GPUs)
+- AWS account with SageMaker GPU quota (`ml.g6e.12xlarge` for training jobs — 4× L40S 48GB GPUs)
 - Cognito user credentials exported as `EVAL_USERNAME` and `EVAL_PASSWORD` (for eval)
 - Docker or Finch installed (for building the training container)
 - [AgentCore CLI](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/get-started-cli.html) installed (`npm install -g @aws/agentcore`)
@@ -385,7 +410,7 @@ uv run test-scripts/rl_train.py \
 
 # 4. Deploy fine-tuned model as a SageMaker endpoint (vLLM)
 uv run test-scripts/deploy_model.py --job-name <training-job-name> \
-    --endpoint-name dr-finetuned --instance-type ml.g5.xlarge
+    --endpoint-name dr-finetuned --instance-type ml.g6e.16xlarge
 
 # 5. Deploy a separate agent with the fine-tuned model
 uv run test-scripts/deploy_finetuned_agent.py --endpoint-name dr-finetuned
