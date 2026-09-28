@@ -131,6 +131,7 @@ export function ResearchReportPanel({
             <FileText className="w-5 h-5 text-blue-600" />
           </div>
           <h2
+            dir="auto"
             className="font-semibold text-foreground truncate"
             title={reportTitle}
           >

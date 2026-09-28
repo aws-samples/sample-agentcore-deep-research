@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ExternalLink,
 } from "lucide-react";
+import { detectTextDirection } from "@/lib/utils";
 
 function completePartialMarkdown(text: string): string {
   const fenceCount = (text.match(/^```/gm) || []).length;
@@ -53,12 +54,30 @@ export function extractReportTitle(content: string): string | null {
   return match ? match[1] : null;
 }
 
+// Unicode-aware so non-Latin headings (e.g. Arabic) keep distinct ids; an
+// ASCII-only slug collapses them all to "-", and the duplicate React keys make
+// in-place section updates render as appended blocks.
+function slugify(title: string): string {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "section"
+  );
+}
+
 // Parse markdown into sections based on headings
-function parseIntoSections(content: string): Section[] {
+export function parseIntoSections(content: string): Section[] {
   const lines = content.split("\n");
   const sections: Section[] = [];
   let currentSection: Section | null = null;
   let contentLines: string[] = [];
+  const idCounts = new Map<string, number>();
+  const uniqueId = (base: string) => {
+    const n = idCounts.get(base) ?? 0;
+    idCounts.set(base, n + 1);
+    return n === 0 ? base : `${base}-${n + 1}`;
+  };
 
   for (const line of lines) {
     // Check H2 first (more specific) before H1
@@ -74,9 +93,12 @@ function parseIntoSections(content: string): Section[] {
 
       const level = h1Match ? 1 : 2;
       const title = h1Match ? h1Match[1] : h2Match![1];
-      const id = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-      currentSection = { id, level, title, content: "" };
+      currentSection = {
+        id: uniqueId(slugify(title)),
+        level,
+        title,
+        content: "",
+      };
       contentLines = [];
     } else if (currentSection) {
       contentLines.push(line);
@@ -106,7 +128,7 @@ const markdownComponents: Record<string, any> = {
   h2: () => null,
   h3({ children }: { children?: React.ReactNode }) {
     return (
-      <h3 className="text-base font-semibold text-foreground mt-4 mb-2 pl-2 border-l-3 border-blue-300 dark:border-blue-600">
+      <h3 className="text-base font-semibold text-foreground mt-4 mb-2 ps-2 border-s-3 border-blue-300 dark:border-blue-600">
         {children}
       </h3>
     );
@@ -118,7 +140,7 @@ const markdownComponents: Record<string, any> = {
     const text = String(children);
     const isAnchor = href?.startsWith("#");
     const isSource = text.startsWith("http") || text.includes("Source");
-    // Citation superscript links like [1], [2] — open source URL or scroll to ref
+    // Citation superscript links like [1], [2] open the source URL or scroll to the ref
     const isCitation = /^\[\d+\]$/.test(text);
     if (isCitation) {
       return (
@@ -159,14 +181,14 @@ const markdownComponents: Record<string, any> = {
   },
   ul({ children }: { children?: React.ReactNode }) {
     return (
-      <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-foreground">
+      <ul className="my-2.5 ps-5 list-disc space-y-1.5 text-foreground">
         {children}
       </ul>
     );
   },
   ol({ children }: { children?: React.ReactNode }) {
     return (
-      <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-foreground">
+      <ol className="my-2.5 ps-5 list-decimal space-y-1.5 text-foreground">
         {children}
       </ol>
     );
@@ -176,7 +198,7 @@ const markdownComponents: Record<string, any> = {
   },
   blockquote({ children }: { children?: React.ReactNode }) {
     return (
-      <blockquote className="my-3 pl-4 border-l-4 border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 py-2 pr-3 rounded-r-lg text-muted-foreground italic">
+      <blockquote className="my-3 ps-4 border-s-4 border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 py-2 pe-3 rounded-e-lg text-muted-foreground italic">
         {children}
       </blockquote>
     );
@@ -193,7 +215,7 @@ const markdownComponents: Record<string, any> = {
   },
   th({ children }: { children?: React.ReactNode }) {
     return (
-      <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      <th className="px-4 py-2.5 text-start text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         {children}
       </th>
     );
@@ -271,14 +293,14 @@ function CollapsibleSection({
       ? {
           wrapper: "mt-6 mb-4 scroll-mt-4",
           button:
-            "w-full flex items-center gap-2 px-3 py-3 rounded-xl bg-gradient-to-r from-blue-100 via-blue-50 to-transparent dark:from-blue-900/40 dark:via-blue-950/20 dark:to-transparent hover:from-blue-200 dark:hover:from-blue-900/60 transition-all text-left group border-b-2 border-blue-200 dark:border-blue-800",
+            "w-full flex items-center gap-2 px-3 py-3 rounded-xl bg-gradient-to-r rtl:bg-gradient-to-l from-blue-100 via-blue-50 to-transparent dark:from-blue-900/40 dark:via-blue-950/20 dark:to-transparent hover:from-blue-200 dark:hover:from-blue-900/60 transition-all text-start group border-b-2 border-blue-200 dark:border-blue-800",
           text: "text-xl font-bold text-foreground group-hover:text-blue-800 dark:group-hover:text-blue-300 transition-colors",
           icon: "w-5 h-5 text-blue-600",
         }
       : {
           wrapper: "mt-5 mb-3 scroll-mt-4",
           button:
-            "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-50 via-blue-50/50 to-transparent dark:from-blue-950/30 dark:via-blue-950/15 dark:to-transparent hover:from-blue-100 dark:hover:from-blue-950/50 transition-all text-left group",
+            "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r rtl:bg-gradient-to-l from-blue-50 via-blue-50/50 to-transparent dark:from-blue-950/30 dark:via-blue-950/15 dark:to-transparent hover:from-blue-100 dark:hover:from-blue-950/50 transition-all text-start group",
           text: "text-lg font-semibold text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors",
           icon: "w-5 h-5 text-blue-500",
         };
@@ -295,19 +317,19 @@ function CollapsibleSection({
     >
       <button onClick={onToggle} className={styles.button}>
         {isCollapsed ? (
-          <ChevronRight className={`${styles.icon} shrink-0`} />
+          <ChevronRight className={`${styles.icon} shrink-0 rtl:rotate-180`} />
         ) : (
           <ChevronDown className={`${styles.icon} shrink-0`} />
         )}
         <span className={styles.text}>{section.title}</span>
         {isNew && (
-          <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+          <span className="ms-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
             Updated
           </span>
         )}
       </button>
       {!isCollapsed && section.content && (
-        <div className="pl-6 pt-2">
+        <div className="ps-6 pt-2">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
@@ -340,6 +362,7 @@ export function ReportMarkdownRenderer({
   const prevSectionsRef = useRef<Map<string, string>>(new Map());
 
   const sections = useMemo(() => parseIntoSections(content), [content]);
+  const direction = useMemo(() => detectTextDirection(content), [content]);
 
   // Track changes between versions
   useEffect(() => {
@@ -414,7 +437,7 @@ export function ReportMarkdownRenderer({
   if (!content) return null;
 
   return (
-    <div className="report-markdown">
+    <div className="report-markdown" dir={direction}>
       {/* Table of Contents */}
       {toc.length > 3 && (
         <nav className="mb-6 p-4 bg-muted/50 rounded-xl border border-border">
@@ -425,15 +448,15 @@ export function ReportMarkdownRenderer({
             {toc.map((section) => (
               <li
                 key={section.id}
-                style={{ paddingLeft: `${(section.level - 1) * 12}px` }}
+                style={{ paddingInlineStart: `${(section.level - 1) * 12}px` }}
               >
                 <button
                   onClick={() => scrollToSection(section.id)}
-                  className="text-sm text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                  className="text-sm text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-start"
                 >
                   {section.title}
                   {changedSectionIds.has(section.id) && (
-                    <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="ms-2 inline-block w-2 h-2 bg-green-500 rounded-full" />
                   )}
                 </button>
               </li>
@@ -481,7 +504,7 @@ export function ReportMarkdownRenderer({
           // Non-collapsible fallback for H2
           return (
             <div key={section.id} id={section.id} className="mb-4 scroll-mt-4">
-              <h2 className="text-lg font-semibold text-foreground mt-5 mb-3 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/30 dark:to-transparent">
+              <h2 className="text-lg font-semibold text-foreground mt-5 mb-3 px-3 py-2 rounded-lg bg-gradient-to-r rtl:bg-gradient-to-l from-blue-50 to-transparent dark:from-blue-950/30 dark:to-transparent">
                 {section.title}
               </h2>
               {section.content && (
