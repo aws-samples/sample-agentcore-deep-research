@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import re
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
@@ -18,6 +19,13 @@ _s3_client = None
 
 STAGING_BUCKET = os.environ.get("STAGING_BUCKET_NAME", "")
 URL_EXPIRATION = 3600
+
+# Run rtl_text.py in the sandbox before the agent's code so matplotlib renders
+# Arabic/Hebrew labels shaped and in the right order. Kept to one line so error
+# line numbers in the agent's code shift by exactly one.
+_RTL_PRELUDE = "exec({src!r}, {{'__name__': '_rtl_text'}})\n".format(
+    src=(Path(__file__).parent / "rtl_text.py").read_text(encoding="utf-8")
+)
 
 
 def _get_interpreter() -> CodeInterpreterTools:
@@ -63,6 +71,9 @@ def execute_python(code: str, chart_name: str = "") -> str:
     Do NOT use this tool during the research or report writing phases (Steps 1-4).
 
     The sandbox has numpy, pandas, matplotlib, seaborn, scipy, and scikit-learn.
+    Arabic and Hebrew text in matplotlib titles, labels, ticks and legends is
+    shaped and ordered automatically: pass plain strings, do not reverse them or
+    use arabic_reshaper/bidi (they are not installed).
 
     IMPORTANT: The sandbox is remote. To output a chart, save to BytesIO and print base64:
 
@@ -80,7 +91,7 @@ def execute_python(code: str, chart_name: str = "") -> str:
         code: Python code for data analysis or visualization. Include all imports.
         chart_name: Short filename for the chart (e.g., "gold_forecasts").
     """  # noqa: E501
-    result = _get_interpreter().execute_python_securely(code)
+    result = _get_interpreter().execute_python_securely(_RTL_PRELUDE + code)
 
     if STAGING_BUCKET and chart_name:
         try:

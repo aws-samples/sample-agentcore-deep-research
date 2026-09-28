@@ -78,6 +78,7 @@ export function ChatMessage({
       }`}
     >
       <div
+        dir={message.role === "user" ? "auto" : undefined}
         className={`max-w-[80%] break-words ${
           message.role === "user"
             ? "p-3 rounded-lg bg-gray-800 dark:bg-gray-700 text-white rounded-br-none whitespace-pre-wrap"

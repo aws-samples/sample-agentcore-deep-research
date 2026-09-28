@@ -31,7 +31,7 @@ h1 {
     margin-bottom: 0.4em;
     border-bottom: 2px solid #333;
     padding-bottom: 0.2em;
-    text-align: left;
+    text-align: start;
 }
 h2 {
     font-size: 16pt;
@@ -39,10 +39,10 @@ h2 {
     margin-bottom: 0.4em;
     border-bottom: 1px solid #ccc;
     padding-bottom: 0.15em;
-    text-align: left;
+    text-align: start;
 }
-h3 { font-size: 13pt; margin-top: 1em; margin-bottom: 0.3em; text-align: left; }
-h4 { font-size: 11pt; margin-top: 0.8em; margin-bottom: 0.3em; text-align: left; }
+h3 { font-size: 13pt; margin-top: 1em; margin-bottom: 0.3em; text-align: start; }
+h4 { font-size: 11pt; margin-top: 0.8em; margin-bottom: 0.3em; text-align: start; }
 p { margin: 0.4em 0; }
 ul, ol { margin: 0.4em 0; padding-left: 1.5em; }
 li { margin: 0.15em 0; }
@@ -55,7 +55,7 @@ table {
 th, td {
     border: 1px solid #ccc;
     padding: 5px 8px;
-    text-align: left;
+    text-align: start;
     font-size: 9pt;
 }
 th { background: #f0f0f0; font-weight: bold; }
@@ -105,6 +105,15 @@ sup.citation a {
 .references h2 { border-bottom: none; font-size: 14pt; }
 .references ol { font-size: 9pt; padding-left: 1.5em; }
 .references li { margin: 0.3em 0; word-break: break-all; }
+/* Right-to-left documents (Arabic, Hebrew): mirror the box-model offsets */
+html[dir="rtl"] body { direction: rtl; }
+html[dir="rtl"] ul, html[dir="rtl"] ol,
+html[dir="rtl"] .references ol { padding-left: 0; padding-right: 1.5em; }
+html[dir="rtl"] blockquote {
+    border-left: none;
+    border-right: 3px solid #ccc;
+}
+html[dir="rtl"] .references li a { direction: ltr; unicode-bidi: embed; }
 """
 
 _MD_EXTENSIONS = ["tables", "fenced_code", "toc", "nl2br"]
@@ -112,6 +121,17 @@ _MD_EXTENSIONS = ["tables", "fenced_code", "toc", "nl2br"]
 # matches [Source: ...] patterns (URL or plain text)
 _SOURCE_RE = re.compile(r"\[Source:\s*([^\]]+)\]")
 _URL_RE = re.compile(r"^https?://\S+$")
+_ANY_URL_RE = re.compile(r"https?://\S+")
+# Hebrew, Arabic (incl. supplements/extended) and their presentation forms
+_RTL_CHARS_RE = re.compile(r"[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]")
+_LTR_CHARS_RE = re.compile(r"[A-Za-z\u00C0-\u024F]")
+
+
+def _text_direction(text: str) -> str:
+    """Return "rtl" when Hebrew/Arabic letters outnumber Latin ones, else "ltr"."""
+    text = _ANY_URL_RE.sub("", text)
+    rtl = len(_RTL_CHARS_RE.findall(text))
+    return "rtl" if rtl > len(_LTR_CHARS_RE.findall(text)) else "ltr"
 
 
 def _process_citations(html_body: str) -> str:
@@ -162,9 +182,10 @@ def generate_pdf(markdown_content: str) -> bytes:
     """
     html_body = markdown.markdown(markdown_content, extensions=_MD_EXTENSIONS)
     html_body = _process_citations(html_body)
+    direction = _text_direction(markdown_content)
     html_doc = (
         "<!DOCTYPE html>"
-        '<html><head><meta charset="utf-8">'
+        f'<html dir="{direction}"><head><meta charset="utf-8">'
         f"<style>{_CSS}</style></head>"
         f"<body>{html_body}</body></html>"
     )
