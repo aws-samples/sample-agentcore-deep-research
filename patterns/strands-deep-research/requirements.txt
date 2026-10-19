@@ -4,7 +4,7 @@
 # HTTP 424 and every eval scores 0. Raise both pins together, not just this one.
 strands-agents[sagemaker]>=1.30.0,<1.56.0
 strands-agents-tools==0.2.22
-mcp==1.28.1
+mcp==1.30.0
 bedrock-agentcore[strands-agents]==1.18.1
 PyJWT[crypto]>=2.10.1
 weasyprint>=62.0
