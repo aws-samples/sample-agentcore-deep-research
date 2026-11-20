@@ -47,7 +47,7 @@ dev = [
 agent-strands = [
     "strands-agents==1.30.0",
     "bedrock-agentcore[strands-agents]==1.18.1",
-    "mcp==1.28.1",
+    "mcp==1.30.0",
 ]
 
 # All dependencies for local development
